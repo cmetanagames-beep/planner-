@@ -419,7 +419,7 @@ const KEY='planner_data_v2';
 function load(){try{return JSON.parse(localStorage.getItem(KEY))||{}}catch(e){return{}}}
 function save(d){localStorage.setItem(KEY,JSON.stringify(d))}
 function getTasks(){const d=load();return d.tasks||[]}
-function setTasks(t){const d=load();d.tasks=t;save(d)}
+function setTasks(t){const d=load();d.tasks=t;save(d);syncPushData();}
 function vibrate(ms){if(navigator.vibrate)try{navigator.vibrate(ms)}catch(e){}}
 
 const monthNames=['января','февраля','марта','апреля','мая','июня','июля','августа','сентября','октября','ноября','декабря'];
@@ -1187,7 +1187,7 @@ function toggleTheme(){
 }
 function openSettings(){renderColorPick();markThemeBtns();document.getElementById('notify-hour').value=load().notifyHour||'09:00';document.getElementById('modal-settings').classList.add('on');}
 function closeSettings(){document.getElementById('modal-settings').classList.remove('on');}
-function saveNotifyHour(){const d=load();d.notifyHour=document.getElementById('notify-hour').value;save(d);toast('🔔 Время напоминания сохранено');}
+function saveNotifyHour(){const d=load();d.notifyHour=document.getElementById('notify-hour').value;save(d);syncPushData();toast('🔔 Время напоминания сохранено');}
 
 /* ===== ЭКСПОРТ / ИМПОРТ ===== */
 function exportData(){
@@ -1721,6 +1721,7 @@ function init(){
   aiHello();
   checkAchievements();
   if('Notification'in window&&Notification.permission==='granted')scheduleNotifyCheck();
+  syncPushData();
 
   // Регистрируем service worker (если файл sw.js есть рядом — для PWA-офлайна)
   if('serviceWorker'in navigator){
@@ -1834,11 +1835,29 @@ async function subscribePush() {
     });
 
     localStorage.setItem('pushSubscribed', 'yes');
+    syncPushData();
     alert('✅ Пуши включены! Проверь через кнопку теста.');
   } catch (err) {
     alert('❌ Ошибка подписки: ' + err.message);
     console.error(err);
   }
+}
+let _syncTimer=null;
+function syncPushData(){
+  if(localStorage.getItem('pushSubscribed')!=='yes')return;
+  clearTimeout(_syncTimer);
+  _syncTimer=setTimeout(()=>{
+    fetch(PUSH_SERVER+'/sync',{
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({
+        userId:PUSH_USER_ID,
+        tasks:getTasks(),
+        notifyHour:load().notifyHour||'09:00',
+        tzOffset:-new Date().getTimezoneOffset()
+      })
+    }).catch(()=>{});
+  },1200);
 }
 
 // Тестовый пуш
