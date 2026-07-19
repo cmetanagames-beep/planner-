@@ -1407,7 +1407,8 @@ async function aiParse(text){
     body:JSON.stringify({
       model:MODEL,
       messages:[{role:'system',content:sys},{role:'user',content:text}],
-      temperature:0.3,
+      temperature:0.1,
+      max_tokens:3000,
       response_format:{type:'json_object'}
     })
   });
@@ -1417,6 +1418,7 @@ async function aiParse(text){
   }
   const data=await res.json();
   const content=data.choices[0].message.content;
+  window._lastAIRaw=content;
   return JSON.parse(content);
 }
 let pendingAI=null;
@@ -1441,13 +1443,14 @@ function collectActions(r){
 }
   
 function handleAIResult(r){
-  // если пришёл только текстовый chat
+  if(window._debugAI&&window._lastAIRaw){addAImsg('🔧 '+window._lastAIRaw,'ai');}
   if(r&&typeof r.chat==='string'&&r.chat.trim()){
     let acts=collectActions(r);
     if(!acts.length){addAImsg(r.chat,'ai');return;}
   }
   let items=collectActions(r);
   if(!items.length){addAImsg((r&&r.chat)||'Не понял 🤔 Попробуй иначе.','ai');return;}
+  
 
   // применим определение времени из текста к каждой задаче
   const raw=window._lastUserText||'';
