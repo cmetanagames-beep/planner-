@@ -1443,7 +1443,7 @@ function collectActions(r){
 }
   
 function handleAIResult(r){
-  if(window._debugAI&&window._lastAIRaw){addAImsg('🔧 '+window._lastAIRaw,'ai');}
+  if(window._lastAIRaw){addAImsg('🔧 СЫРОЙ ОТВЕТ ИИ:\n'+window._lastAIRaw,'ai');}
   if(r&&typeof r.chat==='string'&&r.chat.trim()){
     let acts=collectActions(r);
     if(!acts.length){addAImsg(r.chat,'ai');return;}
