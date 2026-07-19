@@ -1073,29 +1073,34 @@ async function toggleMic(){
 
   // выбираем формат, который поддерживает устройство (важно для iOS)
   let mime='';
-  const types=['audio/webm','audio/mp4','audio/aac','audio/ogg'];
+  const types=['audio/mp4','audio/webm','audio/aac','audio/ogg'];
   for(const t of types){ if(MediaRecorder.isTypeSupported&&MediaRecorder.isTypeSupported(t)){mime=t;break;} }
 
   try{
     mediaRecorder=mime?new MediaRecorder(recStream,{mimeType:mime}):new MediaRecorder(recStream);
   }catch(e){
-    mediaRecorder=new MediaRecorder(recStream);
+    mediaRecorder=new MediaRecorder(recStream); mime='';
   }
 
   audioChunks=[];
-  mediaRecorder.ondataavailable=e=>{ if(e.data.size>0)audioChunks.push(e.data); };
+  mediaRecorder.ondataavailable=e=>{ if(e.data&&e.data.size>0)audioChunks.push(e.data); };
   mediaRecorder.onstop=async()=>{
     document.getElementById('mic').classList.remove('rec');
     if(recStream){recStream.getTracks().forEach(t=>t.stop());recStream=null;}
-    const blob=new Blob(audioChunks,{type:mime||'audio/webm'});
-    if(blob.size<1000){ return; } // слишком короткая запись
+    if(micTimer){clearTimeout(micTimer);micTimer=null;}
+    const realType=mediaRecorder.mimeType||mime||'audio/webm';
+    const blob=new Blob(audioChunks,{type:realType});
+    if(blob.size<1000){ toast('Слишком тихо/коротко 🤔 Попробуй ещё раз'); return; }
     await sendToWhisper(blob);
   };
 
-    mediaRecorder.start(1000); // сбрасываем данные каждую секунду — важно для длинных записей
+  mediaRecorder.start(1000); // ⬅️ КЛЮЧЕВОЕ: сбрасываем данные каждую секунду
   recording=true;
   document.getElementById('mic').classList.add('rec');
   toast('🎤 Говори... нажми ещё раз, чтобы остановить');
+
+  // защита: автостоп через 60 секунд
+  micTimer=setTimeout(()=>{ if(recording){ toast('⏱ Записал 60 сек'); stopRec(); } },60000);
 }
 
 function stopRec(){
