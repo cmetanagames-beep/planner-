@@ -4,7 +4,6 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
 <title>Планировщик</title>
-<!-- PWA -->
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="Дела">
@@ -238,7 +237,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;b
       </div>
     </div>
     <div class="field"><label>Сумма ₽</label><input id="e-amount" type="number" inputmode="decimal" placeholder="0"></div>
-       <div class="field" id="e-cat-field"><label>Категория</label><select id="e-cat"></select></div>
+    <div class="field" id="e-cat-field"><label>Категория</label><select id="e-cat"></select></div>
     <div class="field" id="e-src-field" style="display:none"><label>Источник</label>
       <select id="e-src"><option>Зарплата</option><option>Аванс</option><option>Премия</option><option>Подработка</option><option>Продажа</option><option>Прочее</option></select>
     </div>
@@ -309,6 +308,8 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;b
       <button type="button" class="pri-b" id="th-light" onclick="setThemeMode('light')">☀️ Светлая</button>
       <button type="button" class="pri-b" id="th-dark" onclick="setThemeMode('dark')">🌙 Тёмная</button>
     </div>
+    <div class="sub-h">🔑 ИИ-ключ Groq</div>
+    <button class="btn ghost" onclick="resetApiKey()">🔄 Сменить ключ Groq</button>
     <div class="sub-h">Данные</div>
     <button class="btn" onclick="exportData()">📥 Скачать резервную копию</button>
     <button class="btn ghost" onclick="document.getElementById('import-file').click()">📤 Загрузить копию</button>
@@ -329,8 +330,18 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;b
 
 <script>
 const API_URL='https://api.groq.com/openai/v1/chat/completions';
-const API_KEY='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';
 const MODEL='llama-3.3-70b-versatile';
+const AI_KEY_STORE='groq_api_key';
+function getApiKey(){return localStorage.getItem(AI_KEY_STORE)||'';}
+function ensureApiKey(){
+  let k=getApiKey();
+  if(!k){
+    k=prompt('🔑 Вставь свой Groq API ключ\n(получить бесплатно на console.groq.com/keys):');
+    if(k){k=k.trim();localStorage.setItem(AI_KEY_STORE,k);toast('Ключ сохранён 🔑');}
+  }
+  return k;
+}
+function resetApiKey(){localStorage.removeItem(AI_KEY_STORE);toast('Ключ удалён. Введи новый в чате ИИ');}
 
 const KEY='planner_data_v2';
 function load(){try{return JSON.parse(localStorage.getItem(KEY))||{}}catch(e){return{}}}
@@ -341,7 +352,6 @@ function setTasks(t){const d=load();d.tasks=t;save(d)}
 const monthNames=['января','февраля','марта','апреля','мая','июня','июля','августа','сентября','октября','ноября','декабря'];
 const monthFull=['Январь','Февраль','Март','Апрель','Май','Июнь','Июль','Август','Сентябрь','Октябрь','Ноябрь','Декабрь'];
 
-/* ===== КАТЕГОРИИ ДЕЛ ===== */
 const DEFAULT_CATS=[
   {id:'personal',emoji:'📋',name:'Личное'},
   {id:'car',emoji:'🚗',name:'Авто'},
@@ -353,7 +363,6 @@ function setCats(c){const d=load();d.cats=c;save(d);}
 function catLabel(id){const c=getCats().find(x=>x.id===id);return c?`${c.emoji} ${c.name}`:'📋 Личное';}
 const modLabel=new Proxy({},{get:(_,id)=>catLabel(id)});
 
-/* ===== КАТЕГОРИИ ТРАТ ===== */
 const DEFAULT_EXPCATS=[
   {name:'Продукты',i:'🛒',c:'#00b894'},{name:'Топливо',i:'⛽',c:'#e17055'},{name:'Кафе',i:'🍔',c:'#fdcb6e'},
   {name:'Транспорт',i:'🚌',c:'#0984e3'},{name:'Одежда',i:'👕',c:'#e84393'},{name:'Развлечения',i:'🎮',c:'#6c5ce7'},
@@ -376,7 +385,6 @@ function fmtDate(k){if(!k)return'';const[y,m,d]=k.split('-').map(Number);if(!y)r
 function fmtMoney(n){return Number(n||0).toLocaleString('ru-RU')}
 function toast(t){const el=document.getElementById('toast');el.textContent=t;el.classList.add('on');setTimeout(()=>el.classList.remove('on'),1800)}
 
-/* ===== НАВИГАЦИЯ ===== */
 function renderNav(){
   const nav=document.getElementById('nav');
   const cats=getCats();
@@ -411,7 +419,6 @@ function switchTab(tab){
   renderNav();
 }
 
-/* ===== FILTERS ===== */
 let filterState='active';
 function renderFilters(){
   const f=document.getElementById('filters');
@@ -420,7 +427,6 @@ function renderFilters(){
 }
 function setFilter(k){filterState=k;renderFilters();render();}
 
-/* ===== RENDER ===== */
 function render(){
   renderFilters();
   const view=document.getElementById('view');
@@ -472,7 +478,6 @@ function renderStats(){
   el.innerHTML=`<div class="hstat"><b>${today}</b><small>Сегодня</small></div><div class="hstat"><b>${total-done}</b><small>Активных</small></div><div class="hstat"><b>${done}</b><small>Готово</small></div>`;
 }
 
-/* ===== TASK ACTIONS ===== */
 function toggleTask(id){
   const t=getTasks();const x=t.find(a=>a.id===id);if(!x)return;
   x.done=!x.done;
@@ -499,7 +504,6 @@ function editTask(id){
   document.getElementById('modal').classList.add('on');
 }
 
-/* ===== MODAL TASK ===== */
 function fillModuleSelect(){
   document.getElementById('f-module').innerHTML=getCats().map(c=>`<option value="${c.id}">${c.emoji} ${esc(c.name)}</option>`).join('');
 }
@@ -527,7 +531,6 @@ function saveTask(){
   setTasks(t);closeModal();render();toast('Сохранено ✅');
 }
 
-/* ===== ПОДЗАДАЧИ ===== */
 let editSubs=[];
 function renderSubList(){
   const el=document.getElementById('sub-list');if(!el)return;
@@ -549,7 +552,6 @@ function toggleSubtask(taskId,idx){
   x.subs[idx].done=!x.subs[idx].done;setTasks(t);render();
 }
 
-/* ===== ПОВТОРЫ ===== */
 function nextRepeatDate(dateStr,repeat){
   const d=dateStr?new Date(dateStr):new Date();
   if(repeat==='daily')d.setDate(d.getDate()+1);
@@ -558,7 +560,6 @@ function nextRepeatDate(dateStr,repeat){
   return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
 }
 
- /* ===== 👆 СВАЙПЫ ===== */
 function attachSwipes(){
   document.querySelectorAll('#view .task[data-id]').forEach(el=>{
     let sx=0,sy=0,cur=0,drag=false;
@@ -578,7 +579,6 @@ function attachSwipes(){
   });
 }
 
-/* ===== УПРАВЛЕНИЕ КАТЕГОРИЯМИ ДЕЛ ===== */
 let catEditId=null,pickedEmoji='⭐';
 const EMOJI_LIST=['📋','🚗','🌱','💼','🏋️','📚','🏠','🐶','✈️','🎮','🎵','🍔','💊','👕','🛒','⚽','💻','🎨','📷','🔧','❤️','⭐','🔥','🎯','👶','🍼'];
 
@@ -630,7 +630,6 @@ function delCat(id){
   renderCatList();renderNav();render();toast('Категория удалена 🗑');
 }
 
-/* ===== УПРАВЛЕНИЕ КАТЕГОРИЯМИ ТРАТ ===== */
 let expCatEditName=null,pickedExpEmoji='📦';
 const EXP_EMOJI_LIST=['🛒','⛽','🍔','🚌','👕','🎮','💊','🏠','👶','🚗','🌱','📦','🐶','🎓','🎁','💡','📱','✈️','🏋️','☕','🍺','💇','🔧','🎬'];
 
@@ -691,7 +690,6 @@ function createTaskCat(name,emoji){
   return id;
 }
 
-/* ===== 🎯 БЮДЖЕТЫ / ЛИМИТЫ ===== */
 function getBudgets(){const d=load();return d.budgets||{};}
 function setBudgets(b){const d=load();d.budgets=b;save(d);}
 function openBudget(){
@@ -738,7 +736,6 @@ function checkBudgetAlert(cat){
   else if(used>=b[cat]*0.8)toast(`⚠️ 80% лимита «${cat}»`);
 }
 
-/* ===== FINANCE ===== */
 function finStats(y,m){
   const ym=y+'-'+String(m+1).padStart(2,'0');
   const exp=load().finance||[],inc=load().income||[];
@@ -824,7 +821,6 @@ function renderFinance(){
 function delExpense(id){if(!confirm('Удалить расход?'))return;const d=load();d.finance=(d.finance||[]).filter(x=>x.id!==id);save(d);renderFinance();toast('Удалено 🗑');}
 function delIncome(id){if(!confirm('Удалить доход?'))return;const d=load();d.income=(d.income||[]).filter(x=>x.id!==id);save(d);renderFinance();toast('Удалено 🗑');}
 
-/* ===== EXPENSE/INCOME MODAL ===== */
 function openExpModal(){
   expType='exp';pickType('exp');
   document.getElementById('e-amount').value='';document.getElementById('e-desc').value='';document.getElementById('e-date').value=todayKey();
@@ -846,7 +842,6 @@ function saveExpModal(){
   renderFinance();
 }
 
-/* ===== HELP / ВОЗМОЖНОСТИ ===== */
 function openHelp(){
   const cats=getCats().map(c=>c.emoji+' '+c.name).join(', ');
   document.getElementById('help-body').innerHTML=`
@@ -869,12 +864,12 @@ function openHelp(){
     <div class="feat"><h4>💬 Фраза дня</h4><p>В шапке — мотивирующая цитата, меняется каждый день.</p></div>
     <div class="feat"><h4>💾 Резервные копии</h4><p>⚙️ Настройки → скачай/загрузи все данные одним файлом.</p></div>
     <div class="feat"><h4>🔔 Утренние напоминания</h4><p>Включи колокольчик — в 9:00 придёт сводка дел и баланса.</p></div>
+    <div class="feat"><h4>🔑 Свой ИИ-ключ Groq</h4><p>Ключ хранится только в твоём браузере. При первом запросе к ИИ вставь его. Сменить: ⚙️ Настройки.</p></div>
   `;
   document.getElementById('modal-help').classList.add('on');
 }
 function closeHelp(){document.getElementById('modal-help').classList.remove('on');}
 
-/* ===== AI ===== */
 function aiHello(){
   aiMsg('ai','Привет! 👋 Я твой умный помощник. Напиши или надиктуй:\n• «Завтра заменить масло»\n• «Купил йогурт за 100 и коврики за 1200»\n• «Получил зарплату 60000»\n• «Создай категорию Спортзал»\n• «Сколько потратил в этом месяце?»');
   const chat=document.getElementById('ai-chat');
@@ -886,6 +881,8 @@ function aiTyping(on){const chat=document.getElementById('ai-chat');let t=docume
 async function aiSend(){
   const inp=document.getElementById('ai-input');
   const text=inp.value.trim();if(!text)return;
+  const API_KEY=ensureApiKey();
+  if(!API_KEY){aiMsg('ai','🔑 Нужен ключ Groq. Отправь сообщение ещё раз и вставь ключ в окошко.');return;}
   inp.value='';aiMsg('user',text);aiTyping(true);
   const now=new Date();
   const nowStr=now.toLocaleDateString('ru-RU',{weekday:'long',day:'numeric',month:'long'});
@@ -917,7 +914,11 @@ async function aiSend(){
   try{
     const res=await fetch(API_URL,{method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer '+API_KEY},body:JSON.stringify({model:MODEL,messages:[{role:'system',content:sys},{role:'user',content:text}],temperature:0.3,response_format:{type:'json_object'}})});
     const data=await res.json();aiTyping(false);
-    if(data.error){aiMsg('ai','⚠️ '+(data.error.message||'Ошибка API'));return;}
+    if(data.error){
+      const msg=data.error.message||'Ошибка API';
+      if(/api key|invalid|unauthorized|401/i.test(msg)){resetApiKey();aiMsg('ai','🔑 Ключ недействителен. Отправь сообщение ещё раз и вставь новый ключ.');return;}
+      aiMsg('ai','⚠️ '+msg);return;
+    }
     let raw=(data.choices?.[0]?.message?.content||'').replace(/```json|```/g,'').trim();
     let obj;try{obj=JSON.parse(raw);}catch(e){aiMsg('ai',raw||'Не понял 🤔');return;}
     handleAI(obj);
@@ -1022,7 +1023,6 @@ function declineSuggestCat(p,btn){
   }
 }
 
-/* ===== сохранение трат ===== */
 function saveExpenses(items,date){
   const d=load();if(!d.finance)d.finance=[];
   const dt=date||todayKey();
@@ -1039,7 +1039,6 @@ function saveExpenses(items,date){
   if(currentTab==='finance')renderFinance();
 }
 
-/* ===== сохранение дохода ===== */
 function saveIncome(o){
   const amount=Number(o.amount)||0,source=o.source||'Прочее',desc=o.desc||'',date=o.date||todayKey();
   if(!amount){aiMsg('ai','Не понял сумму дохода 🤔');return;}
@@ -1053,7 +1052,6 @@ function saveIncome(o){
   if(currentTab==='finance')renderFinance();
 }
 
-/* ===== VOICE ===== */
 let recog=null,recording=false;
 function toggleMic(){
   const SR=window.SpeechRecognition||window.webkitSpeechRecognition;
@@ -1067,10 +1065,8 @@ function toggleMic(){
   recog.start();
 }
 
-/* ===== FAB умная кнопка ===== */
 document.getElementById('fab').onclick=function(){if(currentTab==='finance')openExpModal();else openModal();};
 
-/* ===== CONFETTI ===== */
 function confetti(){
   const colors=['#6c5ce7','#a29bfe','#00b894','#fdcb6e','#e17055','#0984e3'];
   for(let i=0;i<24;i++){
@@ -1079,32 +1075,75 @@ function confetti(){
     c.style.background=colors[Math.floor(Math.random()*colors.length)];
     document.body.appendChild(c);
     const dur=1000+Math.random()*800,x=(Math.random()-0.5)*200;
-    c.animate([{transform:'translate(0,0) rotate(0)',opacity:1},{transform:`translate(${x}px,${window.innerHeight+40}px) rotate(${Math.random()*720}deg)`,opacity:0}],{duration:dur,easing:'cubic-bezier(.3,.7,.4,1)'});
+    c.animate([{transform:'translate(0,0) rotate(0)',opacity:1},{transform:`translate(${x}px,${window.innerHeight+40}px) rotate(${Math.random()*720}deg)`,opacity:0}],{duration:dur,easing:'cubic-bezier(.5,0,.7,1)'});
     setTimeout(()=>c.remove(),dur);
   }
 }
 
-/* ===== 🎨 ТЕМА И АКЦЕНТНЫЙ ЦВЕТ ===== */
+/* ===== СЕРИЯ ДНЕЙ (STREAK) ===== */
+function getStreak(){const d=load();return d.streak||{count:0,last:''};}
+function updateStreak(){
+  const d=load();const s=d.streak||{count:0,last:''};
+  const tk=todayKey();
+  if(s.last===tk)return;
+  const y=new Date();y.setDate(y.getDate()-1);
+  const yk=y.getFullYear()+'-'+String(y.getMonth()+1).padStart(2,'0')+'-'+String(y.getDate()).padStart(2,'0');
+  s.count=(s.last===yk)?s.count+1:1;
+  s.last=tk;d.streak=s;save(d);renderStreak();
+  if(s.count>1)toast('🔥 Серия: '+s.count+' дн. подряд!');
+}
+function renderStreak(){
+  const s=getStreak();const box=document.getElementById('streakBox');
+  if(!box)return;
+  if(s.count>0){box.style.display='inline-flex';box.textContent='🔥 '+s.count+(s.count===1?' день':' дн. подряд');}
+  else box.style.display='none';
+}
+
+/* ===== ФРАЗА ДНЯ ===== */
+const QUOTES=[
+  'Маленькие шаги каждый день ведут к большим результатам ✨',
+  'Сделанное лучше идеального 💪',
+  'Порядок в делах — порядок в голове 🧠',
+  'Каждое выполненное дело — это победа 🏆',
+  'Начни с малого — и всё получится 🌱',
+  'Ты можешь больше, чем думаешь 🚀',
+  'Дисциплина — это мост между целью и результатом 🌉',
+  'Не откладывай на завтра то, что можно сделать сегодня ⏰',
+  'Успех — это сумма маленьких усилий 📈',
+  'Сегодня — лучший день, чтобы начать 🌟',
+  'Считай деньги — и они начнут считаться с тобой 💰',
+  'Планируй бюджет — живи спокойно 🧘',
+  'Твоё будущее создаётся тем, что ты делаешь сегодня 🔮',
+  'Фокус на важном — вот секрет продуктивности 🎯',
+  'Отдых — тоже часть плана 😌'
+];
+function renderQuote(){
+  const el=document.getElementById('quoteChip');if(!el)return;
+  const day=Math.floor(Date.now()/86400000);
+  el.textContent='💬 '+QUOTES[day%QUOTES.length];
+}
+
+/* ===== ТЕМА И ЦВЕТ ===== */
 const ACCENTS=[
   {b:'#6c5ce7',b2:'#a29bfe'},{b:'#00b894',b2:'#55efc4'},{b:'#0984e3',b2:'#74b9ff'},
-  {b:'#e84393',b2:'#fd79a8'},{b:'#e17055',b2:'#fab1a0'},{b:'#00cec9',b2:'#81ecec'},
-  {b:'#fdcb6e',b2:'#ffeaa7'},{b:'#2d3436',b2:'#636e72'}
+  {b:'#e17055',b2:'#fab1a0'},{b:'#e84393',b2:'#fd79a8'},{b:'#fdcb6e',b2:'#ffeaa7'},
+  {b:'#00cec9',b2:'#81ecec'},{b:'#d63031',b2:'#ff7675'}
 ];
-function applyAccent(i){
-  const a=ACCENTS[i]||ACCENTS[0];
+function applyAccent(idx){
+  const a=ACCENTS[idx]||ACCENTS[0];
   document.documentElement.style.setProperty('--brand',a.b);
   document.documentElement.style.setProperty('--brand2',a.b2);
-  localStorage.setItem('accent',i);
-  const mt=document.getElementById('meta-theme');
-  if(mt)mt.setAttribute('content',a.b);
+  document.getElementById('meta-theme').setAttribute('content',a.b);
+  const d=load();d.accent=idx;save(d);
 }
 function renderColorPick(){
-  const cur=parseInt(localStorage.getItem('accent')||'0');
+  const cur=load().accent||0;
   document.getElementById('color-pick').innerHTML=ACCENTS.map((a,i)=>`<span class="${i===cur?'sel':''}" style="background:linear-gradient(135deg,${a.b},${a.b2})" onclick="pickAccent(${i})"></span>`).join('');
 }
-function pickAccent(i){applyAccent(i);renderColorPick();toast('Цвет применён 🎨');}
+function pickAccent(i){applyAccent(i);renderColorPick();toast('Цвет обновлён 🎨');}
 
-function getThemeMode(){return localStorage.getItem('themeMode')||'auto';}
+function getThemeMode(){return load().themeMode||'auto';}
+function setThemeMode(mode){const d=load();d.themeMode=mode;save(d);applyTheme();updateThemeButtons();}
 function applyTheme(){
   const mode=getThemeMode();
   let dark;
@@ -1113,261 +1152,105 @@ function applyTheme(){
   else dark=window.matchMedia&&window.matchMedia('(prefers-color-scheme:dark)').matches;
   document.body.classList.toggle('dark',dark);
 }
-function setThemeMode(m){
-  localStorage.setItem('themeMode',m);applyTheme();markThemeBtns();
-  toast(m==='auto'?'🌗 Авто-тема':m==='dark'?'🌙 Тёмная':'☀️ Светлая');
-}
-function markThemeBtns(){
-  const m=getThemeMode();
-  ['auto','light','dark'].forEach(k=>{const b=document.getElementById('th-'+k);if(b)b.classList.toggle('on',m===k);});
+function updateThemeButtons(){
+  const mode=getThemeMode();
+  ['auto','light','dark'].forEach(m=>{const b=document.getElementById('th-'+m);if(b)b.classList.toggle('on',m===mode);});
 }
 function toggleTheme(){
-  const m=getThemeMode();
-  const next=m==='dark'?'light':'dark';
-  setThemeMode(next);
+  const cur=document.body.classList.contains('dark');
+  setThemeMode(cur?'light':'dark');
+  toast(cur?'☀️ Светлая тема':'🌙 Тёмная тема');
 }
 
-/* ===== ⚙️ НАСТРОЙКИ ===== */
-function openSettings(){renderColorPick();markThemeBtns();document.getElementById('modal-settings').classList.add('on');}
+/* ===== НАСТРОЙКИ ===== */
+function openSettings(){renderColorPick();updateThemeButtons();document.getElementById('modal-settings').classList.add('on');}
 function closeSettings(){document.getElementById('modal-settings').classList.remove('on');}
 
-/* ===== 💾 ЭКСПОРТ / ИМПОРТ ===== */
+/* ===== ЭКСПОРТ / ИМПОРТ ===== */
 function exportData(){
   const data=localStorage.getItem(KEY)||'{}';
   const blob=new Blob([data],{type:'application/json'});
   const url=URL.createObjectURL(blob);
   const a=document.createElement('a');
-  a.href=url;a.download='planner-backup-'+todayKey()+'.json';
-  document.body.appendChild(a);a.click();a.remove();
-  URL.revokeObjectURL(url);
-  toast('Копия скачана 📥');
+  a.href=url;a.download='planner-backup-'+todayKey()+'.json';a.click();
+  URL.revokeObjectURL(url);toast('Копия скачана 📥');
 }
-function importData(ev){
-  const file=ev.target.files[0];if(!file)return;
+function importData(e){
+  const file=e.target.files[0];if(!file)return;
   const reader=new FileReader();
-  reader.onload=e=>{
+  reader.onload=ev=>{
     try{
-      const obj=JSON.parse(e.target.result);
-      if(typeof obj!=='object'||obj===null)throw new Error('bad');
-      if(!confirm('Заменить все текущие данные загруженными?'))return;
+      const obj=JSON.parse(ev.target.result);
+      if(typeof obj!=='object')throw new Error('bad');
+      if(!confirm('Заменить все текущие данные загруженной копией?'))return;
       localStorage.setItem(KEY,JSON.stringify(obj));
-      toast('Данные восстановлены ✅');
-      currentTab='all';renderNav();render();
-    }catch(err){toast('⚠️ Неверный файл');}
+      toast('Данные загружены ✅');
+      setTimeout(()=>location.reload(),600);
+    }catch(err){toast('Файл повреждён 😔');}
   };
   reader.readAsText(file);
-  ev.target.value='';
+  e.target.value='';
 }
 
-/* ===== 💬 ФРАЗА ДНЯ ===== */
-const QUOTES=[
-  '«Лучшее время начать — сейчас 🚀»',
-  '«Маленькие шаги ведут к большим целям 🎯»',
-  '«Сделай сегодня то, за что скажешь спасибо завтра ☀️»',
-  '«Дисциплина — мост между целью и результатом 🌉»',
-  '«Не откладывай на завтра то, что можно сделать сегодня ⏳»',
-  '«Каждый день — новый шанс стать лучше 🌱»',
-  '«Успех — это сумма маленьких усилий 💪»',
-  '«Планируй мечту, живи планом ✨»',
-  '«Действие — ключ к любому успеху 🔑»',
-  '«Ты сильнее, чем думаешь 🔥»',
-  '«Порядок в делах — порядок в голове 🧠»',
-  '«Один выполненный пункт лучше десяти задуманных ✅»',
-  '«Двигайся вперёд, даже если медленно 🐢»',
-  '«Экономия сегодня — свобода завтра 💰»',
-  '«Заботься о деньгах, и они позаботятся о тебе 🪙»'
-];
-function showQuote(){
-  const el=document.getElementById('quoteChip');if(!el)return;
-  const now=new Date();
-  const dayNum=Math.floor(now.getTime()/86400000);
-  el.textContent=QUOTES[dayNum%QUOTES.length];
-}
-
-/* ===== 🔥 STREAK ===== */
-function updateStreak(){
-  const today=new Date().toDateString();
-  const lastDay=localStorage.getItem('lastDay');
-  let streak=parseInt(localStorage.getItem('streak')||'0');
-  if(lastDay===today){/* уже был сегодня */}
-  else{
-    const y=new Date();y.setDate(y.getDate()-1);
-    if(lastDay===y.toDateString())streak++;
-    else streak=1;
-    localStorage.setItem('lastDay',today);
-    localStorage.setItem('streak',streak);
-  }
-  showStreak(streak);
-}
-function showStreak(s){
-  const el=document.getElementById('streakBox');
-  if(!el)return;
-  if(s>0){el.style.display='inline-flex';el.textContent=`🔥 ${s} ${s===1?'день':s<5?'дня':'дней'} подряд!`;}
-  else el.style.display='none';
-}
-
-/* ===== 🔔 УТРЕННЕЕ НАПОМИНАНИЕ ===== */
+/* ===== НАПОМИНАНИЯ ===== */
 function requestNotify(){
-  if(!('Notification' in window)){toast('Уведомления не поддерживаются 😔');return;}
-  if(Notification.permission==='granted'){
-    localStorage.setItem('notifyOn','1');
-    toast('🔔 Напоминания включены!');
-    scheduleMorning();
-    return;
-  }
+  if(!('Notification'in window)){toast('Уведомления не поддерживаются 😔');return;}
+  if(Notification.permission==='granted'){scheduleNotify();toast('🔔 Напоминания включены');return;}
   Notification.requestPermission().then(p=>{
-    if(p==='granted'){localStorage.setItem('notifyOn','1');toast('🔔 Напоминания включены!');scheduleMorning();}
-    else toast('Уведомления отклонены');
+    if(p==='granted'){scheduleNotify();toast('🔔 Напоминания включены на 9:00');}
+    else toast('Разрешение не выдано 😔');
   });
 }
-
-function scheduleMorning(){
-  if(window._morningTimer)clearInterval(window._morningTimer);
-  window._morningTimer=setInterval(()=>{
-    if(localStorage.getItem('notifyOn')!=='1')return;
-    const now=new Date();
-    if(now.getHours()===9&&now.getMinutes()===0){
-      const key='notified_'+now.toDateString();
-      if(localStorage.getItem(key))return;
-      localStorage.setItem(key,'1');
-      showMorningNotify();
-    }
-  },30000);
+function scheduleNotify(){
+  const d=load();d.notify=true;save(d);
+  checkMorningNotify();
 }
-
-function showMorningNotify(){
+function checkMorningNotify(){
+  const d=load();if(!d.notify)return;
+  if(Notification.permission!=='granted')return;
+  const now=new Date();
   const tk=todayKey();
-  const tasks=getTasks().filter(t=>t.date===tk&&!t.done);
-  const s=getExpenseStats();
-  let body;
-  if(tasks.length)body=`📋 Сегодня ${tasks.length} ${tasks.length===1?'дело':'дел'}: ${tasks.slice(0,3).map(t=>t.title).join(', ')}${tasks.length>3?'…':''}`;
-  else body='🎉 На сегодня дел нет — отличный день!';
-  body+=`\n💰 Баланс: ${s.balance>=0?'+':''}${fmtMoney(s.balance)}₽`;
-  try{new Notification('☀️ Доброе утро!',{body,icon:'📋'});}catch(e){}
+  if(d.lastNotify===tk)return;
+  if(now.getHours()>=9){
+    const tasks=getTasks().filter(t=>!t.done&&t.date===tk);
+    const s=getExpenseStats();
+    let body='';
+    if(tasks.length)body='📋 Дел на сегодня: '+tasks.length+'. ';
+    else body='✅ На сегодня дел нет. ';
+    body+='💰 Баланс: '+(s.balance>=0?'+':'')+fmtMoney(s.balance)+'₽';
+    new Notification('☀️ Доброе утро!',{body,icon:'data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64"><text y="50" font-size="50">📋</text></svg>'});
+    d.lastNotify=tk;save(d);
+  }
 }
 
-/* ===== INIT ===== */
+/* ===== ЗАКРЫТИЕ МОДАЛОК ПО ФОНУ ===== */
+document.querySelectorAll('.modal').forEach(m=>{
+  m.addEventListener('click',e=>{if(e.target===m)m.classList.remove('on');});
+});
+
+/* ===== ИНИЦИАЛИЗАЦИЯ ===== */
+function initHero(){
+  const now=new Date();
+  const days=['воскресенье','понедельник','вторник','среда','четверг','пятница','суббота'];
+  document.getElementById('hero-date').textContent=days[now.getDay()][0].toUpperCase()+days[now.getDay()].slice(1)+', '+now.getDate()+' '+monthNames[now.getMonth()];
+}
+
 function init(){
-  applyAccent(parseInt(localStorage.getItem('accent')||'0'));
+  const d=load();
+  if(d.accent!=null)applyAccent(d.accent);
   applyTheme();
   if(window.matchMedia){
     window.matchMedia('(prefers-color-scheme:dark)').addEventListener('change',()=>{if(getThemeMode()==='auto')applyTheme();});
   }
-  const now=new Date();
-  const hd=document.getElementById('hero-date');
-  if(hd)hd.textContent=now.toLocaleDateString('ru-RU',{weekday:'long',day:'numeric',month:'long'});
-  showQuote();
-  getCats();
-  getExpCats();
+  initHero();
+  renderQuote();
   renderNav();
-  renderFilters();
-  showStreak(parseInt(localStorage.getItem('streak')||'0'));
-  render();
-  if(localStorage.getItem('notifyOn')==='1')scheduleMorning();
+  renderStreak();
+  switchTab('all');
+  checkMorningNotify();
+  setInterval(checkMorningNotify,60*1000);
 }
 init();
-/* ===== 📱 PWA В ОДНОМ ФАЙЛЕ (manifest + иконки через canvas/blob) ===== */
-function makeIcon(size){
-  const c=document.createElement('canvas');c.width=c.height=size;
-  const ctx=c.getContext('2d');
-  const g=ctx.createLinearGradient(0,0,size,size);
-  g.addColorStop(0,'#6c5ce7');g.addColorStop(1,'#a29bfe');
-  ctx.fillStyle=g;
-  const r=size*0.22;
-  ctx.beginPath();
-  ctx.moveTo(r,0);ctx.arcTo(size,0,size,size,r);ctx.arcTo(size,size,0,size,r);
-  ctx.arcTo(0,size,0,0,r);ctx.arcTo(0,0,size,0,r);ctx.closePath();ctx.fill();
-  ctx.font=`${size*0.5}px serif`;
-  ctx.textAlign='center';ctx.textBaseline='middle';
-  ctx.fillText('📋',size/2,size*0.55);
-  return c.toDataURL('image/png');
-}
-function injectPWA(){
-  const icon192=makeIcon(192);
-  const icon512=makeIcon(512);
-  const appleIcon=document.createElement('link');
-  appleIcon.rel='apple-touch-icon';appleIcon.href=icon192;
-  document.head.appendChild(appleIcon);
-  const favicon=document.createElement('link');
-  favicon.rel='icon';favicon.href=icon192;
-  document.head.appendChild(favicon);
-  const manifest={
-    name:'Планировщик дел',short_name:'Дела',
-    description:'Умный планировщик с ИИ и финансами',
-    start_url:'.',scope:'.',display:'standalone',orientation:'portrait',
-    background_color:'#6c5ce7',theme_color:'#6c5ce7',
-    icons:[
-      {src:icon192,sizes:'192x192',type:'image/png',purpose:'any maskable'},
-      {src:icon512,sizes:'512x512',type:'image/png',purpose:'any maskable'}
-    ]
-  };
-  const blob=new Blob([JSON.stringify(manifest)],{type:'application/json'});
-  const link=document.createElement('link');
-  link.rel='manifest';link.href=URL.createObjectURL(blob);
-  document.head.appendChild(link);
-  if('serviceWorker' in navigator&&location.protocol==='https:'){
-    const swCode=`
-      const CACHE='planner-cache-v1';
-      self.addEventListener('install',e=>{self.skipWaiting();});
-      self.addEventListener('activate',e=>{e.waitUntil(self.clients.claim());});
-      self.addEventListener('fetch',e=>{
-        if(e.request.method!=='GET')return;
-        if(e.request.url.includes('groq.com'))return;
-        e.respondWith(
-          caches.open(CACHE).then(cache=>
-            cache.match(e.request).then(cached=>{
-              const fetchP=fetch(e.request).then(resp=>{
-                if(resp&&resp.status===200&&e.request.url.startsWith('http')){cache.put(e.request,resp.clone());}
-                return resp;
-              }).catch(()=>cached);
-              return cached||fetchP;
-            })
-          )
-        );
-      });`;
-    const swBlob=new Blob([swCode],{type:'text/javascript'});
-    navigator.serviceWorker.register(URL.createObjectURL(swBlob)).catch(()=>{});
-  }
-}
-
-/* ===== 📲 ПОДСКАЗКА "УСТАНОВИТЬ" ===== */
-let deferredPrompt=null;
-window.addEventListener('beforeinstallprompt',e=>{e.preventDefault();deferredPrompt=e;showInstallHint();});
-function isStandalone(){return window.matchMedia('(display-mode: standalone)').matches||window.navigator.standalone===true;}
-function isIOS(){return /iphone|ipad|ipod/i.test(navigator.userAgent)&&!window.MSStream;}
-function showInstallHint(){
-  if(isStandalone())return;
-  if(localStorage.getItem('installHintClosed'))return;
-  const bar=document.createElement('div');bar.id='install-bar';
-  bar.style.cssText='position:fixed;left:12px;right:12px;bottom:78px;z-index:9000;background:var(--card);border:1px solid var(--line);box-shadow:0 8px 30px rgba(0,0,0,.18);border-radius:16px;padding:14px 16px;display:flex;align-items:center;gap:12px;animation:pwaUp .35s ease';
-  if(isIOS()){
-    bar.innerHTML=`<span style="font-size:1.6rem">📲</span>
-      <div style="flex:1;font-size:.82rem;line-height:1.35"><b>Установи приложение!</b><br>Нажми <b>Поделиться</b> ⬆️ → <b>«На экран Домой»</b></div>
-      <button onclick="closeInstallHint()" style="border:none;background:var(--line);width:28px;height:28px;border-radius:50%;font-size:1rem;cursor:pointer">✕</button>`;
-  }else{
-    bar.innerHTML=`<span style="font-size:1.6rem">📲</span>
-      <div style="flex:1;font-size:.82rem;line-height:1.35"><b>Установить приложение?</b><br>Работает офлайн, как обычное 🚀</div>
-      <button onclick="doInstall()" style="border:none;background:var(--brand);color:#fff;padding:8px 14px;border-radius:10px;font-weight:600;cursor:pointer">Установить</button>
-      <button onclick="closeInstallHint()" style="border:none;background:var(--line);width:28px;height:28px;border-radius:50%;font-size:1rem;cursor:pointer">✕</button>`;
-  }
-  document.body.appendChild(bar);
-  if(!document.getElementById('pwa-anim')){
-    const st=document.createElement('style');st.id='pwa-anim';
-    st.textContent='@keyframes pwaUp{from{transform:translateY(120%);opacity:0}to{transform:translateY(0);opacity:1}}';
-    document.head.appendChild(st);
-  }
-}
-function closeInstallHint(){const b=document.getElementById('install-bar');if(b)b.remove();localStorage.setItem('installHintClosed','1');}
-async function doInstall(){
-  if(!deferredPrompt){closeInstallHint();return;}
-  deferredPrompt.prompt();
-  const {outcome}=await deferredPrompt.userChoice;
-  deferredPrompt=null;closeInstallHint();
-  if(outcome==='accepted')toast('Устанавливается… 🚀');
-}
-if(isIOS()&&!isStandalone())setTimeout(showInstallHint,2000);
-
-injectPWA();
 </script>
 </body>
 </html>
