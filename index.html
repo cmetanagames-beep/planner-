@@ -629,6 +629,8 @@ function saveTask(){
   if(editId){const x=t.find(a=>a.id===editId);if(x)Object.assign(x,obj);}
   else{obj.id=Date.now()+Math.floor(Math.random()*1000);obj.done=false;t.push(obj);}
   setTasks(t);closeModal();
+  if(editId){const saved=t.find(a=>a.id===editId);if(saved)scheduleLocalTimeout(saved);}
+  else scheduleLocalTimeout(obj);
   if(currentTab==='calendar')renderCalendar();else render();
   toast('Сохранено ✅');
 }
@@ -1453,8 +1455,10 @@ function confirmAI(){
   const r=pendingAI;if(!r)return;pendingAI=null;
   if(r.type==='task'){
     const t=getTasks();
-    t.push({id:Date.now()+Math.floor(Math.random()*1000),title:r.title||'Дело',module:(getCats().some(c=>c.id===r.module)?r.module:'personal'),date:r.date||'',time:r.time||'',desc:r.desc||'',pri:r.pri||'Y',repeat:'',subs:[],done:false});
+    const newTask={id:Date.now()+Math.floor(Math.random()*1000),title:r.title||'Дело',module:(getCats().some(c=>c.id===r.module)?r.module:'personal'),date:r.date||'',time:r.time||'',desc:r.desc||'',pri:r.pri||'Y',repeat:'',subs:[],done:false};
+    t.push(newTask);
     setTasks(t);addAImsg('✅ Дело добавлено!','ai');confetti();
+    scheduleLocalTimeout(newTask);
   }else if(r.type==='expense'){
     const d=load();if(!d.finance)d.finance=[];
     let cat=r.category||'Прочее';
@@ -1614,7 +1618,8 @@ function restoreLocalTimers(){
 }
   
 document.getElementById('fab').onclick=openModal;
-document.addEventListener('DOMContentLoaded',init);
+document.addEventListener('DOMContentLoaded',function(){ init(); restoreLocalTimers(); });
+  
 
 </script>
 </body>
