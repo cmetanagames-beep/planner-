@@ -1295,6 +1295,32 @@ function openHelp(){
 function closeHelp(){document.getElementById('modal-help').classList.remove('on');}
 
 /* ===== ИИ-АССИСТЕНТ ===== */
+  /* ===== ИИ-АССИСТЕНТ ===== */
+
+// ---- Хранение истории чата ----
+const AI_CHAT_KEY = 'ai_chat_history';
+const MAX_CHAT_HISTORY = 200; // не даём localStorage раздуться до бесконечности
+
+function loadChatHistory(){
+  try{ return JSON.parse(localStorage.getItem(AI_CHAT_KEY)) || []; }
+  catch(e){ return []; }
+}
+function saveChatHistoryEntry(entry){
+  const hist = loadChatHistory();
+  hist.push(entry);
+  if(hist.length > MAX_CHAT_HISTORY) hist.splice(0, hist.length - MAX_CHAT_HISTORY);
+  localStorage.setItem(AI_CHAT_KEY, JSON.stringify(hist));
+}
+function clearChatHistory(){
+  localStorage.removeItem(AI_CHAT_KEY);
+}
+function clearAIChatHistory(){
+  if(!confirm('Очистить всю историю переписки с ИИ?')) return;
+  clearChatHistory();
+  document.getElementById('ai-chat').innerHTML='';
+  aiHello();
+  toast('История чата очищена 🗑');
+}
 function addAImsg(text,who){
   const chat=document.getElementById('ai-chat');
   const el=document.createElement('div');
