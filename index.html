@@ -1450,30 +1450,53 @@ function confirmAI(){
 }
 
 /* ===== ГОЛОСОВОЙ ВВОД ===== */
-let recognition=null,recording=false;
+let recognition=null,recording=false,_finalText='';
 function toggleMic(){
   const SR=window.SpeechRecognition||window.webkitSpeechRecognition;
   if(!SR){toast('Голосовой ввод не поддерживается 😕');return;}
-  if(recording){recognition.stop();return;}
+  if(recording){try{recognition.stop();}catch(e){}return;}
+
   recognition=new SR();
-  recognition.lang='ru-RU';recognition.interimResults=false;recognition.maxAlternatives=1;
+  recognition.lang='ru-RU';
+  recognition.interimResults=true;      // ВАЖНО для iOS
+  recognition.continuous=false;
+  recognition.maxAlternatives=1;
   recording=true;
-  const btn=document.getElementById('mic');if(btn)btn.classList.add('rec');
+  _finalText='';
+  const btn=document.getElementById('mic');
+  const inp=document.getElementById('ai-input');
+  if(btn)btn.classList.add('rec');
   toast('🎤 Говори...');
+
   recognition.onresult=e=>{
-    const text=e.results[0][0].transcript;
-    const inp=document.getElementById('ai-input');
-    inp.value=text;
-    setTimeout(()=>aiSend(),200);
+    let interim='',final='';
+    for(let i=e.resultIndex;i<e.results.length;i++){
+      const tr=e.results[i][0].transcript;
+      if(e.results[i].isFinal)final+=tr;else interim+=tr;
+    }
+    if(final)_finalText=(_finalText+' '+final).trim();
+    if(inp)inp.value=(_finalText+' '+interim).trim();  // показываем вживую
   };
+
   recognition.onerror=e=>{
     recording=false;if(btn)btn.classList.remove('rec');
-    if(e.error==='not-allowed')toast('Нет доступа к микрофону 🎤');
+    if(e.error==='not-allowed'||e.error==='service-not-allowed')
+      toast('Разреши микрофон в настройках Safari 🎤');
     else if(e.error==='no-speech')toast('Не расслышал 🤔');
-    else toast('Ошибка микрофона');
+    else toast('Ошибка микрофона: '+e.error);
   };
-  recognition.onend=()=>{recording=false;if(btn)btn.classList.remove('rec');};
-  try{recognition.start();}catch(err){recording=false;if(btn)btn.classList.remove('rec');}
+
+  recognition.onend=()=>{
+    recording=false;if(btn)btn.classList.remove('rec');
+    const finalText=(_finalText||(inp?inp.value:'')||'').trim();
+    if(finalText){
+      if(inp)inp.value=finalText;
+      aiSend();                 // отправляем ТОЛЬКО после завершения
+    }
+  };
+
+  try{recognition.start();}
+  catch(err){recording=false;if(btn)btn.classList.remove('rec');toast('Не удалось запустить 🎤');}
 }
 
 
