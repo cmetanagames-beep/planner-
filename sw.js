@@ -14,7 +14,9 @@ self.addEventListener('push', e => {
     body: d.body || '',
     icon: './icon.png',
     badge: './icon.png',
-    vibrate: [50,80,50]
+    vibrate: [50,80,50],
+    requireInteraction: true,   // ← добавили: уведомление не исчезнет само (Android/desktop)
+    tag: d.taskId || 'reminder' // ← добавили: повторные пуши по той же задаче будут заменять старые, а не копиться стопкой
   }));
 });
 
