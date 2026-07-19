@@ -5,6 +5,24 @@ self.addEventListener('install',e=>{
   e.waitUntil(caches.open(CACHE).then(c=>c.addAll(ASSETS)));
   self.skipWaiting();
 });
+// ===== PUSH (для фоновых уведомлений в будущем) =====
+self.addEventListener('push', e => {
+  let d = {};
+  try { d = e.data ? e.data.json() : {}; } catch(_) {}
+  e.waitUntil(self.registration.showNotification(d.title || '⏰ Напоминание', {
+    body: d.body || '',
+    icon: './icon.png',
+    badge: './icon.png',
+    vibrate: [50,80,50]
+  }));
+});
+self.addEventListener('notificationclick', e => {
+  e.notification.close();
+  e.waitUntil(clients.matchAll({type:'window'}).then(cl => {
+    for (const c of cl) if ('focus' in c) return c.focus();
+    return clients.openWindow('./');
+  }));
+});
 
 self.addEventListener('activate',e=>{
   e.waitUntil(caches.keys().then(keys=>Promise.all(
