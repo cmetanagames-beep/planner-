@@ -1443,13 +1443,7 @@ function collectActions(r){
 }
   
 function handleAIResult(r){
-  if(r&&typeof r.chat==='string'&&r.chat.trim()){
-    let acts=collectActions(r);
-    if(!acts.length){addAImsg(r.chat,'ai');return;}
-  }
   let items=collectActions(r);
-  if(!items.length){addAImsg((r&&r.chat)||'Не понял 🤔 Попробуй иначе.','ai');return;}
-  
 
   // применим определение времени из текста к каждой задаче
   const raw=window._lastUserText||'';
@@ -1465,18 +1459,38 @@ function handleAIResult(r){
     }
   });
 
-  // отдельно покажем чат-ответы сразу
+  // чат-ответы просто покажем
   const actions=[];
   items.forEach(it=>{
     if(it.type==='chat')addAImsg(it.reply||'👍','ai');
     else actions.push(it);
   });
 
-  if(!actions.length)return;
-  // показываем ВСЕ карточки сразу
-  actions.forEach((act,i)=>renderAICard(act,i));
-  // кнопка "подтвердить всё"
-  if(actions.length>1)renderConfirmAll(actions);
+  if(!actions.length){
+    if(!items.some(it=>it.type==='chat'))addAImsg((r&&r.chat)||'Не понял 🤔 Попробуй иначе.','ai');
+    return;
+  }
+
+  // СРАЗУ создаём всё, без подтверждения
+  let nt=0,ne=0,ni=0;
+  actions.forEach(a=>{
+    applyAction(a);
+    if(a.type==='task')nt++;
+    else if(a.type==='expense')ne++;
+    else if(a.type==='income')ni++;
+  });
+
+  // отчёт что создано
+  let parts=[];
+  if(nt)parts.push('📋 дел: '+nt);
+  if(ne)parts.push('📉 расходов: '+ne);
+  if(ni)parts.push('📈 доходов: '+ni);
+  addAImsg('✅ Готово! Создал:\n'+parts.join('\n'),'ai');
+
+  confetti();vibrate([30,50,30]);checkAchievements();
+
+  // обновим списки/финансы если открыты
+  if(currentTab==='finance')renderFinance();
 }
 let aiCards={};  // храним карточки по индексу
 function renderAICard(r,idx){
