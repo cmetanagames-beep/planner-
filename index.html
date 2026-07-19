@@ -1445,7 +1445,6 @@ function collectActions(r){
 function handleAIResult(r){
   let items=collectActions(r);
 
-  // применим определение времени из текста к каждой задаче
   const raw=window._lastUserText||'';
   items.forEach(it=>{
     if(it.type==='task'){
@@ -1459,7 +1458,6 @@ function handleAIResult(r){
     }
   });
 
-  // чат-ответы просто покажем
   const actions=[];
   items.forEach(it=>{
     if(it.type==='chat')addAImsg(it.reply||'👍','ai');
@@ -1471,25 +1469,80 @@ function handleAIResult(r){
     return;
   }
 
-  // СРАЗУ создаём всё, без подтверждения
-  let nt=0,ne=0,ni=0;
+  // создаём всё и запоминаем id для удаления
+  const created=[];
   actions.forEach(a=>{
-    applyAction(a);
-    if(a.type==='task')nt++;
-    else if(a.type==='expense')ne++;
-    else if(a.type==='income')ni++;
+    const newId=applyActionReturn(a);
+    created.push({type:a.type,id:newId,data:a});
   });
 
-  // отчёт что создано
-  let parts=[];
-  if(nt)parts.push('📋 дел: '+nt);
-  if(ne)parts.push('📉 расходов: '+ne);
-  if(ni)parts.push('📈 доходов: '+ni);
-  addAImsg('✅ Готово! Создал:\n'+parts.join('\n'),'ai');
-
   confetti();vibrate([30,50,30]);checkAchievements();
+  if(currentTab==='finance')renderFinance();
 
-  // обновим списки/финансы если открыты
+  renderResultList(created);
+}
+
+// создаёт запись и возвращает её id
+function applyActionReturn(r){
+  if(!r)return null;
+  const id=Date.now()+Math.floor(Math.random()*100000);
+  if(r.type==='task'){
+    const t=getTasks();
+    t.push({id,title:r.title||'Дело',module:(getCats().some(c=>c.id===r.module)?r.module:'personal'),date:r.date||'',time:r.time||'',desc:r.desc||'',pri:r.pri||'Y',repeat:'',subs:[],done:false});
+    setTasks(t);
+    const saved=getTasks().find(x=>x.id===id);
+    if(saved)scheduleLocalTimeout(saved);
+  }else if(r.type==='expense'){
+    const d=load();if(!d.finance)d.finance=[];
+    let cat=r.category||'Прочее';
+    if(!getExpCats().some(c=>c.name===cat))cat='Прочее';
+    d.finance.push({id,date:r.date||todayKey(),desc:r.desc||'',amount:Number(r.amount)||0,category:cat});
+    save(d);checkBudgetAlert(cat);
+  }else if(r.type==='income'){
+    const d=load();if(!d.income)d.income=[];
+    d.income.push({id,date:r.date||todayKey(),desc:'',amount:Number(r.amount)||0,source:r.source||'Доход'});
+    save(d);
+  }
+  return id;
+}
+
+// показываем список созданного с кнопкой удаления
+function renderResultList(created){
+  const chat=document.getElementById('ai-chat');
+  const card=document.createElement('div');
+  card.className='ai-card';
+  card.id='result-'+Date.now();
+  let rows='<h4>✅ Создано:</h4>';
+  created.forEach(c=>{
+    const d=c.data;
+    let line='';
+    if(c.type==='task'){
+      line=`📋 ${esc(d.title||'Дело')}`;
+      if(d.date)line+=` · ${fmtDate(d.date)}`;
+      if(d.time)line+=` 🕐 ${esc(d.time)}`;
+    }else if(c.type==='expense'){
+      const st=catStyleOf(d.category);
+      line=`${st.i} -${fmtMoney(d.amount)}₽ · ${esc(d.category||'Прочее')}`;
+      if(d.desc)line+=` (${esc(d.desc)})`;
+    }else if(c.type==='income'){
+      line=`📈 +${fmtMoney(d.amount)}₽ · ${esc(d.source||'Доход')}`;
+    }
+    rows+=`<div class="row" id="resrow-${c.id}"><span style="flex:1">${line}</span><button onclick="delFromResult('${c.type}',${c.id})" style="background:none;border:none;font-size:1.1rem;cursor:pointer;opacity:.6;padding:2px">🗑</button></div>`;
+  });
+  card.innerHTML=rows;
+  chat.appendChild(card);chat.scrollTop=chat.scrollHeight;
+}
+
+// удаление прямо из чата
+function delFromResult(type,id){
+  const d=load();
+  if(type==='task')d.tasks=(d.tasks||[]).filter(x=>x.id!==id);
+  else if(type==='expense')d.finance=(d.finance||[]).filter(x=>x.id!==id);
+  else if(type==='income')d.income=(d.income||[]).filter(x=>x.id!==id);
+  save(d);
+  const row=document.getElementById('resrow-'+id);
+  if(row){row.style.opacity='.4';row.innerHTML='<span style="flex:1;text-decoration:line-through">Удалено</span>';}
+  vibrate(20);toast('Удалено 🗑');
   if(currentTab==='finance')renderFinance();
 }
 let aiCards={};  // храним карточки по индексу
