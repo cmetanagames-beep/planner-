@@ -1361,6 +1361,15 @@ function showTyping(){
 function hideTyping(){const el=document.getElementById('typing');if(el)el.remove();}
 
 let _aiSending = false;
+const CASUAL_PATTERNS = /^(ты тут|тут ли ты|привет|здравствуй|как дела|что делаешь|алло|эй|ку|hi|hello)\??!?\.?\s*$/i;
+const ACTION_KEYWORDS = /(сегодня|завтра|послезавтра|понедельник|вторник|среду|четверг|пятниц|суббот|воскресень|через\s+\d|купил|потратил|заплатил|получил|зарплат|аванс|премия|встреч|позвонить|сходить|записать|напомни|доктор|врач|стрижк|продукт|бензин|топливо|\d+\s*(₽|руб|р\.)|потрачен)/i;
+
+function looksLikeAction(text){
+  if(/\d/.test(text)) return true;
+  if(ACTION_KEYWORDS.test(text)) return true;
+  return false;
+}
+
 async function aiSend(){
   if(_aiSending) return;
   if(Date.now() < _cooldownUntil){
@@ -1370,10 +1379,25 @@ async function aiSend(){
   }
   const inp=document.getElementById('ai-input');
   const text=inp.value.trim();if(!text)return;
-  _aiSending = true;
   window._lastUserText=text;
   inp.value='';
   addAImsg(text,'user');
+
+  // Простые фразы обрабатываем локально, без обращения к ИИ
+  if(CASUAL_PATTERNS.test(text)){
+    addAImsg('Да, я тут! 👋 Пиши, что нужно сделать или какую трату записать.','ai');
+    return;
+  }
+
+  // Если сообщение не похоже на реальное действие — не дёргаем API вообще
+  if(!looksLikeAction(text)){
+    addAImsg('Не совсем понял 🤔 Напиши конкретнее: что сделать, когда, сколько потратил/заработал.','ai');
+    return;
+  }
+
+  _aiSending = true;
+
+  _aiSending = true;
   const key=ensureApiKey();
   if(!key){addAImsg('⚠️ Нужен API-ключ Groq. Получи бесплатно на console.groq.com/keys','ai');_aiSending=false;return;}
   showTyping();
@@ -1389,7 +1413,7 @@ async function aiSend(){
     el.innerHTML='❌ Ошибка связи с ИИ. Проверь интернет и ключ.<br><small>'+esc(err.message||'')+'</small>'+
       '<div style="margin-top:8px"><button onclick="retryLastMessage(this)" style="border:none;background:var(--brand);color:#fff;border-radius:10px;padding:7px 14px;font-weight:700;cursor:pointer;font-size:.82rem">🔄 Повторить</button></div>';
     chat.appendChild(el);chat.scrollTop=chat.scrollHeight;
-  saveChatHistoryEntry({type:'msg',who:'ai',text:'❌ Ошибка связи с ИИ. Проверь интернет и ключ.\n'+(err.message||''),ts:Date.now()});
+    saveChatHistoryEntry({type:'msg',who:'ai',text:'❌ Ошибка связи с ИИ. Проверь интернет и ключ.\n'+(err.message||''),ts:Date.now()});
   } finally {
     _aiSending = false;
   }
@@ -1446,8 +1470,11 @@ async function aiParse(text){
   const nowHM=String(now.getHours()).padStart(2,'0')+':'+String(now.getMinutes()).padStart(2,'0');
   const catList=getCats().map(c=>c.id+' ('+c.name+')').join(', ');
   const expCatList=getExpCats().map(c=>c.name).join(', ');
-    const sys=`Ты помощник-планировщик. Сегодня ${today} (ГГГГ-ММ-ДД). Время ${nowHM}.
+        const sys=`Ты помощник-планировщик. Сегодня ${today} (ГГГГ-ММ-ДД). Время ${nowHM}.
 Верни ТОЛЬКО валидный JSON без markdown.
+
+⚠️ КРИТИЧЕСКИ ВАЖНО: анализируй ТОЛЬКО текущее сообщение пользователя ниже. НИКОГДА не копируй пример формата — он показан лишь для структуры JSON, а не как готовый ответ.
+Если в сообщении НЕТ конкретных дел/трат/доходов (просто приветствие, вопрос, болтовня типа "привет", "как дела", "ты тут?") — верни {"chat":"твой ответ"} и ОБЯЗАТЕЛЬНО оставь "tasks","expenses","incomes" пустыми или не включай их вообще.
 
 В сообщении может быть НЕСКОЛЬКО действий. Разложи ВСЁ по группам:
 {
@@ -1458,26 +1485,18 @@ async function aiParse(text){
 }
 Пустые группы можно опустить. Каждое дело/трату/доход — ОТДЕЛЬНЫМ элементом в своём массиве.
 
-ПРИМЕР. Сообщение: "в понедельник в 9-00 встреча, потом в 10-00 встреча по работе, во вторник к 9-00 в больницу, пришла зарплата 50000, купил воду 900, подгузники 2200"
-Ответ:
-{"tasks":[
- {"type":"task","title":"Встреча","date":"ПН","time":"09:00","module":"personal","pri":"Y","desc":""},
- {"type":"task","title":"Встреча по работе","date":"ПН","time":"10:00","module":"work","pri":"Y","desc":""},
- {"type":"task","title":"Больница","date":"ВТ","time":"09:00","module":"personal","pri":"Y","desc":""}
-],"expenses":[
- {"type":"expense","amount":900,"category":"Продукты","desc":"вода","date":"${today}"},
- {"type":"expense","amount":2200,"category":"Дети","desc":"подгузники","date":"${today}"}
-],"incomes":[
- {"type":"income","amount":50000,"source":"Зарплата","date":"${today}"}
-]}
-(ПН/ВТ замени реальными датами ГГГГ-ММ-ДД!)
+ФОРМАТ ДАТ ДЛЯ ПРИМЕРА (не копируй значения, только структуру!):
+{"tasks":[{"type":"task","title":"НАЗВАНИЕ_ИЗ_СООБЩЕНИЯ","date":"ГГГГ-ММ-ДД","time":"ЧЧ:ММ","module":"personal","pri":"Y","desc":""}],
+"expenses":[{"type":"expense","amount":ЧИСЛО_ИЗ_СООБЩЕНИЯ,"category":"КАТЕГОРИЯ","desc":"","date":"ГГГГ-ММ-ДД"}],
+"incomes":[{"type":"income","amount":ЧИСЛО_ИЗ_СООБЩЕНИЯ,"source":"ИСТОЧНИК","date":"ГГГГ-ММ-ДД"}]}
 
 Категории дел: ${catList}. По умолчанию personal.
 Категории трат: ${expCatList}. Не подходит — "Прочее".
 Приоритет: R=важно, Y=обычно, B=потом.
 Даты: "сегодня"=${today}, "завтра", "послезавтра", дни недели, "через неделю".
 Время: "9-00","9:00","в 9 утра" → "09:00". Всегда возвращай time если оно есть.
-Источники дохода: Зарплата, Аванс, Премия, Подработка, Продажа, Прочее.`;
+Источники дохода: Зарплата, Аванс, Премия, Подработка, Продажа, Прочее.
+Ещё раз: если сообщение — это НЕ про дела/траты/доходы, а просто разговор — верни только {"chat":"..."}.`;
 
   const res=await fetchWithRetry(API_URL,{
     method:'POST',
