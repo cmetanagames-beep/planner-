@@ -1816,7 +1816,8 @@ async function subscribePush() {
 
     // Получаем публичный ключ с сервера
     const keyResp = await fetch(PUSH_SERVER + '/key');
-    const publicKey = await keyResp.text();
+    const keyData = await keyResp.json();
+    const publicKey = keyData.key;
 
     // Подписываемся
     const sub = await reg.pushManager.subscribe({
