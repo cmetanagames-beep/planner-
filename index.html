@@ -1373,10 +1373,23 @@ async function aiSend(){
     const result=await aiParse(text);
     hideTyping();
     handleAIResult(result);
-  }catch(err){
+   }catch(err){
     hideTyping();
-    addAImsg('❌ Ошибка связи с ИИ. Проверь интернет и ключ.\n'+(err.message||''),'ai');
+    const chat=document.getElementById('ai-chat');
+    const el=document.createElement('div');
+    el.className='ai-msg ai';
+    el.innerHTML='❌ Ошибка связи с ИИ. Проверь интернет и ключ.<br><small>'+esc(err.message||'')+'</small>'+
+      '<div style="margin-top:8px"><button onclick="retryLastMessage(this)" style="border:none;background:var(--brand);color:#fff;border-radius:10px;padding:7px 14px;font-weight:700;cursor:pointer;font-size:.82rem">🔄 Повторить</button></div>';
+    chat.appendChild(el);chat.scrollTop=chat.scrollHeight;
+    saveChatHistoryEntry({type:'msg',who:'ai',text:'❌ Ошибка связи с ИИ. Проверь интернет и ключ.\n'+(err.message||''),ts:Date.now()});
   }
+  function retryLastMessage(btn){
+  const text=window._lastUserText;
+  if(!text){toast('Нечего повторять');return;}
+  btn.disabled=true;btn.textContent='⏳ Повтор...';
+  const inp=document.getElementById('ai-input');
+  inp.value=text;
+  aiSend();
 }
 
 function extractTime(text){
@@ -1403,7 +1416,17 @@ function extractTime(text){
   }
   return '';
 }
-
+async function fetchWithRetry(url, options, retries=1, delay=800){
+  try{
+    return await fetch(url, options);
+  }catch(err){
+    if(retries>0){
+      await new Promise(r=>setTimeout(r, delay));
+      return fetchWithRetry(url, options, retries-1, delay);
+    }
+    throw err;
+  }
+}
 async function aiParse(text){
   const today=todayKey();
   const now=new Date();
@@ -1443,7 +1466,7 @@ async function aiParse(text){
 Время: "9-00","9:00","в 9 утра" → "09:00". Всегда возвращай time если оно есть.
 Источники дохода: Зарплата, Аванс, Премия, Подработка, Продажа, Прочее.`;
 
-  const res=await fetch(API_URL,{
+  const res=await fetchWithRetry(API_URL,{
     method:'POST',
     headers:{'Content-Type':'application/json','Authorization':'Bearer '+getApiKey()},
     body:JSON.stringify({
@@ -1453,7 +1476,7 @@ async function aiParse(text){
       max_tokens:3000,
       response_format:{type:'json_object'}
     })
-  });
+  }, 1, 800);
   if(!res.ok){
     if(res.status===401){resetApiKey();throw new Error('Неверный ключ (401)');}
     throw new Error('HTTP '+res.status);
@@ -1713,12 +1736,14 @@ function toggleMic(){
     else toast('Ошибка микрофона: '+e.error);
   };
 
-  recognition.onend=()=>{
+recognition.onend=()=>{
     recording=false;if(btn)btn.classList.remove('rec');
     const finalText=(_finalText||(inp?inp.value:'')||'').trim();
     if(finalText){
       if(inp)inp.value=finalText;
-      aiSend();                 // отправляем ТОЛЬКО после завершения
+      // Даём iOS время освободить сеть/аудио-сессию после распознавания речи —
+      // без этой паузы fetch иногда падает с "Load failed"
+      setTimeout(()=>aiSend(), 400);
     }
   };
 
