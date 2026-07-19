@@ -1360,14 +1360,22 @@ function showTyping(){
 }
 function hideTyping(){const el=document.getElementById('typing');if(el)el.remove();}
 
+let _aiSending = false;
 async function aiSend(){
+  if(_aiSending) return;
+  if(Date.now() < _cooldownUntil){
+    const sec = Math.ceil((_cooldownUntil - Date.now())/1000);
+    toast(`⏳ Подожди ещё ${sec} сек`);
+    return;
+  }
   const inp=document.getElementById('ai-input');
   const text=inp.value.trim();if(!text)return;
+  _aiSending = true;
   window._lastUserText=text;
   inp.value='';
   addAImsg(text,'user');
   const key=ensureApiKey();
-  if(!key){addAImsg('⚠️ Нужен API-ключ Groq. Получи бесплатно на console.groq.com/keys','ai');return;}
+  if(!key){addAImsg('⚠️ Нужен API-ключ Groq. Получи бесплатно на console.groq.com/keys','ai');_aiSending=false;return;}
   showTyping();
   try{
     const result=await aiParse(text);
@@ -1382,6 +1390,8 @@ async function aiSend(){
       '<div style="margin-top:8px"><button onclick="retryLastMessage(this)" style="border:none;background:var(--brand);color:#fff;border-radius:10px;padding:7px 14px;font-weight:700;cursor:pointer;font-size:.82rem">🔄 Повторить</button></div>';
     chat.appendChild(el);chat.scrollTop=chat.scrollHeight;
   saveChatHistoryEntry({type:'msg',who:'ai',text:'❌ Ошибка связи с ИИ. Проверь интернет и ключ.\n'+(err.message||''),ts:Date.now()});
+  } finally {
+    _aiSending = false;
   }
 }
 
@@ -1429,6 +1439,7 @@ async function fetchWithRetry(url, options, retries=1, delay=800){
     throw err;
   }
 }
+let _cooldownUntil = 0;
 async function aiParse(text){
   const today=todayKey();
   const now=new Date();
@@ -1475,13 +1486,18 @@ async function aiParse(text){
       model:MODEL,
       messages:[{role:'system',content:sys},{role:'user',content:text}],
       temperature:0.1,
-      max_tokens:3000,
+      max_tokens:1200,
       response_format:{type:'json_object'}
     })
   }, 1, 800);
   if(!res.ok){
     if(res.status===401){resetApiKey();throw new Error('Неверный ключ (401)');}
-    if(res.status===429){throw new Error('Слишком много запросов. Подожди ~1 минуту 🕐');}
+    if(res.status===429){
+      const retryAfter=res.headers.get('Retry-After');
+      const wait=retryAfter?parseInt(retryAfter,10)*1000:60000;
+      _cooldownUntil=Date.now()+wait;
+      throw new Error(`Слишком много запросов. Подожди ${Math.ceil(wait/1000)} сек 🕐`);
+    }
     throw new Error('HTTP '+res.status);
   }
   const data=await res.json();
