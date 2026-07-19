@@ -1053,7 +1053,7 @@ function saveIncome(o){
 }
 
 /* ===== ГОЛОСОВОЙ ВВОД ЧЕРЕЗ WHISPER (работает на iPhone!) ===== */
-let mediaRecorder=null, audioChunks=[], recording=false, recStream=null;
+let mediaRecorder=null, audioChunks=[], recording=false, recStream=null, micTimer=null;
 
 async function toggleMic(){
   if(recording){ stopRec(); return; }
