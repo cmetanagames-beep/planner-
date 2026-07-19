@@ -1570,6 +1570,49 @@ function seedDefaults(){
   if(!d.income)d.income=[];
   if(changed)save(d);
 }
+
+// ===== ЛОКАЛЬНЫЕ НАПОМИНАНИЯ (пока приложение открыто) =====
+window._localTimers = window._localTimers || {};
+
+function scheduleLocalTimeout(task){
+  if(!task || !task.date || !task.time || !task.id) return;
+  // отменяем старый таймер этого дела (если пересохранили)
+  if(window._localTimers[task.id]){
+    clearTimeout(window._localTimers[task.id]);
+    delete window._localTimers[task.id];
+  }
+  const [y,mo,d] = task.date.split('-').map(Number);
+  const [h,mi]   = task.time.split(':').map(Number);
+  const when  = new Date(y, mo-1, d, h, mi, 0).getTime();
+  const delay = when - Date.now();
+  // только ближайшие сутки (setTimeout не любит огромные значения)
+  if(delay <= 0 || delay > 86400000) return;
+
+  window._localTimers[task.id] = setTimeout(()=>{
+    // проверим, что дело ещё существует и не выполнено
+    try{
+      if(Notification.permission === 'granted'){
+        const n = new Notification('⏰ ' + (task.title || 'Напоминание'), {
+          body: 'Пора: ' + (task.title || ''),
+          icon: './icon.png'
+        });
+        n.onclick = ()=>{ window.focus(); n.close(); };
+      }
+    }catch(e){}
+    if(typeof vibrate === 'function') vibrate([50,80,50]);
+    if(typeof toast === 'function') toast('⏰ ' + (task.title || 'Напоминание'));
+    delete window._localTimers[task.id];
+  }, delay);
+}
+
+// восстановить таймеры при запуске приложения
+function restoreLocalTimers(){
+  try{
+    const list = (typeof getTasks === 'function') ? getTasks() : (window.tasks || []);
+    (list || []).forEach(t=>{ if(!t.done) scheduleLocalTimeout(t); });
+  }catch(e){}
+}
+  
 document.getElementById('fab').onclick=openModal;
 document.addEventListener('DOMContentLoaded',init);
 
