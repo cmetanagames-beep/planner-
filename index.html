@@ -374,6 +374,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;b
     <div class="field"><input id="notify-hour" type="time" value="09:00" onchange="saveNotifyHour()"></div>
     <div class="sub-h">🔑 ИИ-ключ Groq</div>
     <button class="btn ghost" onclick="resetApiKey()">🔄 Сменить ключ Groq</button>
+    <button class="btn ghost" onclick="clearAIChatHistory()">🗑 Очистить историю чата с ИИ</button>
     <div class="sub-h">Данные</div>
     <button class="btn" onclick="exportData()">📥 Скачать резервную копию</button>
     <button class="btn ghost" onclick="document.getElementById('import-file').click()">📤 Загрузить копию</button>
@@ -1321,21 +1322,34 @@ function clearAIChatHistory(){
   aiHello();
   toast('История чата очищена 🗑');
 }
-function addAImsg(text,who){
+function addAImsg(text,who,save=true){
   const chat=document.getElementById('ai-chat');
   const el=document.createElement('div');
   el.className='ai-msg '+who;el.textContent=text;
   chat.appendChild(el);chat.scrollTop=chat.scrollHeight;
+  if(save) saveChatHistoryEntry({type:'msg',who,text,ts:Date.now()});
   return el;
 }
 function aiHello(){
   const chat=document.getElementById('ai-chat');
   chat.innerHTML='';
+  const hist=loadChatHistory();
+  if(hist.length){
+    restoreChatHistory(hist);
+    return;
+  }
   addAImsg('Привет! 👋 Я твой помощник.\nПросто напиши или надиктуй, что нужно — я создам дело или запишу трату.','ai');
   const hint=document.createElement('div');
   hint.className='ai-hint';
   hint.innerHTML='Примеры:<br>• «завтра в 9 утра позвонить маме»<br>• «купить корм для кота в пятницу»<br>• «потратил 700 рублей на бензин»<br>• «получил зарплату 50000»';
   chat.appendChild(hint);
+}
+
+function restoreChatHistory(hist){
+  hist.forEach(entry=>{
+    if(entry.type==='msg') addAImsg(entry.text, entry.who, false);
+    else if(entry.type==='card') renderResultList(entry.created, false);
+  });
 }
 function showTyping(){
   const chat=document.getElementById('ai-chat');
@@ -1535,7 +1549,7 @@ function applyActionReturn(r){
 }
 
 // показываем список созданного с кнопкой удаления
-function renderResultList(created){
+function renderResultList(created,save=true){
   const chat=document.getElementById('ai-chat');
   const card=document.createElement('div');
   card.className='ai-card';
@@ -1559,8 +1573,8 @@ function renderResultList(created){
   });
   card.innerHTML=rows;
   chat.appendChild(card);chat.scrollTop=chat.scrollHeight;
+  if(save) saveChatHistoryEntry({type:'card',created,ts:Date.now()});
 }
-
 // удаление прямо из чата
 function delFromResult(type,id){
   const d=load();
