@@ -1781,7 +1781,10 @@ function restoreLocalTimers(){
   }catch(e){}
 }
   
-document.getElementById('fab').onclick=openModal;
+document.getElementById('fab').onclick=function(){
+  if(currentTab==='finance') openExpModal();
+  else openModal();
+};
 document.addEventListener('DOMContentLoaded',function(){ init(); restoreLocalTimers(); });
   
 // ============ ФОНОВЫЕ ПУШ-УВЕДОМЛЕНИЯ ============
