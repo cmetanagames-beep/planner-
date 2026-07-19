@@ -1443,7 +1443,6 @@ function collectActions(r){
 }
   
 function handleAIResult(r){
-  if(window._lastAIRaw){addAImsg('🔧 СЫРОЙ ОТВЕТ ИИ:\n'+window._lastAIRaw,'ai');}
   if(r&&typeof r.chat==='string'&&r.chat.trim()){
     let acts=collectActions(r);
     if(!acts.length){addAImsg(r.chat,'ai');return;}
@@ -1474,18 +1473,18 @@ function handleAIResult(r){
   });
 
   if(!actions.length)return;
-
-  aiQueue=actions;
-  showNextAICard();
+  // показываем ВСЕ карточки сразу
+  actions.forEach((act,i)=>renderAICard(act,i));
+  // кнопка "подтвердить всё"
+  if(actions.length>1)renderConfirmAll(actions);
 }
-
-function showNextAICard(){
-  if(!aiQueue.length){pendingAI=null;return;}
-  const r=aiQueue.shift();
-  pendingAI=r;
+let aiCards={};  // храним карточки по индексу
+function renderAICard(r,idx){
+  aiCards[idx]=r;
   const chat=document.getElementById('ai-chat');
   const card=document.createElement('div');
   card.className='ai-card';
+  card.dataset.idx=idx;
   if(r.type==='task'){
     card.innerHTML=`<h4>📋 Создать дело?</h4>
       <div class="row"><span>Название</span><b>${esc(r.title||'—')}</b></div>
@@ -1494,7 +1493,7 @@ function showNextAICard(){
       <div class="row"><span>Категория</span><b>${modLabel[r.module]||'📋 Личное'}</b></div>
       <div class="row"><span>Приоритет</span><b>${r.pri==='R'?'🔴 Важно':r.pri==='B'?'🔵 Потом':'🟡 Средне'}</b></div>
       ${r.desc?`<div class="row"><span>Заметка</span><b>${esc(r.desc)}</b></div>`:''}
-      <div class="ai-actions"><button class="yes" onclick="confirmAI()">✅ Создать</button><button class="no" onclick="cancelAI()">✖️ Отмена</button></div>`;
+      <div class="ai-actions"><button class="yes" onclick="confirmOne(${idx})">✅ Создать</button><button class="no" onclick="cancelOne(${idx})">✖️</button></div>`;
   }else if(r.type==='expense'){
     const st=catStyleOf(r.category);
     card.innerHTML=`<h4>💰 Записать расход?</h4>
@@ -1502,43 +1501,70 @@ function showNextAICard(){
       <div class="row"><span>Категория</span><b>${st.i} ${esc(r.category||'Прочее')}</b></div>
       ${r.desc?`<div class="row"><span>Коммент</span><b>${esc(r.desc)}</b></div>`:''}
       <div class="row"><span>Дата</span><b>${fmtDate(r.date)||r.date}</b></div>
-      <div class="ai-actions"><button class="yes" onclick="confirmAI()">✅ Записать</button><button class="no" onclick="cancelAI()">✖️ Отмена</button></div>`;
+      <div class="ai-actions"><button class="yes" onclick="confirmOne(${idx})">✅ Записать</button><button class="no" onclick="cancelOne(${idx})">✖️</button></div>`;
   }else if(r.type==='income'){
     card.innerHTML=`<h4>💵 Записать доход?</h4>
       <div class="row"><span>Сумма</span><b>+${fmtMoney(r.amount)} ₽</b></div>
       <div class="row"><span>Источник</span><b>${esc(r.source||'Доход')}</b></div>
       <div class="row"><span>Дата</span><b>${fmtDate(r.date)||r.date}</b></div>
-      <div class="ai-actions"><button class="yes" onclick="confirmAI()">✅ Записать</button><button class="no" onclick="cancelAI()">✖️ Отмена</button></div>`;
+      <div class="ai-actions"><button class="yes" onclick="confirmOne(${idx})">✅ Записать</button><button class="no" onclick="cancelOne(${idx})">✖️</button></div>`;
   }
   chat.appendChild(card);chat.scrollTop=chat.scrollHeight;
 }
- function cancelAI(){
-  pendingAI=null;
-  addAImsg('Ок, отменил 👌','ai');
-  showNextAICard();  // покажем следующую, если есть
+
+function renderConfirmAll(actions){
+  const chat=document.getElementById('ai-chat');
+  const bar=document.createElement('div');
+  bar.className='ai-card';bar.id='confirm-all-bar';
+  bar.style.borderLeftColor='var(--brand)';
+  bar.innerHTML=`<h4>⚡ Всего действий: ${actions.length}</h4>
+    <div class="ai-actions"><button class="yes" onclick="confirmAllAI()">✅ Создать всё</button><button class="no" onclick="cancelAllAI()">✖️ Отменить всё</button></div>`;
+  chat.appendChild(bar);chat.scrollTop=chat.scrollHeight;
 }
-function confirmAI(){
-  const r=pendingAI;if(!r)return;pendingAI=null;
+
+function applyAction(r){
+  if(!r)return;
   if(r.type==='task'){
     const t=getTasks();
-    const newTask={id:Date.now()+Math.floor(Math.random()*1000),title:r.title||'Дело',module:(getCats().some(c=>c.id===r.module)?r.module:'personal'),date:r.date||'',time:r.time||'',desc:r.desc||'',pri:r.pri||'Y',repeat:'',subs:[],done:false};
-    t.push(newTask);
-    setTasks(t);addAImsg('✅ Дело добавлено!','ai');confetti();
-    scheduleLocalTimeout(newTask);
+    const nt={id:Date.now()+Math.floor(Math.random()*10000),title:r.title||'Дело',module:(getCats().some(c=>c.id===r.module)?r.module:'personal'),date:r.date||'',time:r.time||'',desc:r.desc||'',pri:r.pri||'Y',repeat:'',subs:[],done:false};
+    t.push(nt);setTasks(t);scheduleLocalTimeout(nt);
   }else if(r.type==='expense'){
     const d=load();if(!d.finance)d.finance=[];
     let cat=r.category||'Прочее';
     if(!getExpCats().some(c=>c.name===cat))cat='Прочее';
-    d.finance.push({id:Date.now()+Math.floor(Math.random()*1000),date:r.date||todayKey(),desc:r.desc||'',amount:Number(r.amount)||0,category:cat});
-    save(d);addAImsg('✅ Расход записан!','ai');confetti();checkBudgetAlert(cat);
+    d.finance.push({id:Date.now()+Math.floor(Math.random()*10000),date:r.date||todayKey(),desc:r.desc||'',amount:Number(r.amount)||0,category:cat});
+    save(d);checkBudgetAlert(cat);
   }else if(r.type==='income'){
     const d=load();if(!d.income)d.income=[];
-    d.income.push({id:Date.now()+Math.floor(Math.random()*1000),date:r.date||todayKey(),desc:'',amount:Number(r.amount)||0,source:r.source||'Доход'});
-    save(d);addAImsg('✅ Доход записан!','ai');confetti();
+    d.income.push({id:Date.now()+Math.floor(Math.random()*10000),date:r.date||todayKey(),desc:'',amount:Number(r.amount)||0,source:r.source||'Доход'});
+    save(d);
   }
-  vibrate(30);checkAchievements();
-  showNextAICard();  // 👈 показываем следующую карточку
-} 
+}
+function removeCard(idx){
+  const c=document.querySelector('.ai-card[data-idx="'+idx+'"]');
+  if(c)c.remove();
+  delete aiCards[idx];
+}
+function confirmOne(idx){
+  applyAction(aiCards[idx]);
+  removeCard(idx);
+  addAImsg('✅ Готово!','ai');confetti();vibrate(30);checkAchievements();
+}
+function cancelOne(idx){
+  removeCard(idx);
+}
+function confirmAllAI(){
+  const keys=Object.keys(aiCards);
+  keys.forEach(k=>applyAction(aiCards[k]));
+  keys.forEach(k=>removeCard(k));
+  const bar=document.getElementById('confirm-all-bar');if(bar)bar.remove();
+  addAImsg('✅ Все действия выполнены!','ai');confetti();vibrate([30,50,30]);checkAchievements();
+}
+function cancelAllAI(){
+  Object.keys(aiCards).forEach(k=>removeCard(k));
+  const bar=document.getElementById('confirm-all-bar');if(bar)bar.remove();
+  addAImsg('Ок, всё отменил 👌','ai');
+}
 
 
 /* ===== ГОЛОСОВОЙ ВВОД ===== */
