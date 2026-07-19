@@ -1052,18 +1052,109 @@ function saveIncome(o){
   if(currentTab==='finance')renderFinance();
 }
 
-let recog=null,recording=false;
-function toggleMic(){
-  const SR=window.SpeechRecognition||window.webkitSpeechRecognition;
-  if(!SR){toast('Голосовой ввод не поддерживается 😔');return;}
-  if(recording){recog&&recog.stop();return;}
-  recog=new SR();recog.lang='ru-RU';recog.interimResults=false;recog.maxAlternatives=1;
-  recog.onstart=()=>{recording=true;document.getElementById('mic').classList.add('rec');};
-  recog.onend=()=>{recording=false;document.getElementById('mic').classList.remove('rec');};
-  recog.onerror=()=>{recording=false;document.getElementById('mic').classList.remove('rec');toast('Ошибка микрофона');};
-  recog.onresult=(e)=>{const txt=e.results[0][0].transcript;document.getElementById('ai-input').value=txt;setTimeout(aiSend,300);};
-  recog.start();
+/* ===== ГОЛОСОВОЙ ВВОД ЧЕРЕЗ WHISPER (работает на iPhone!) ===== */
+let mediaRecorder=null, audioChunks=[], recording=false, recStream=null;
+
+async function toggleMic(){
+  if(recording){ stopRec(); return; }
+
+  const API_KEY=ensureApiKey();
+  if(!API_KEY){ toast('🔑 Сначала добавь ключ Groq (напиши что-нибудь ИИ)'); return; }
+
+  if(!navigator.mediaDevices||!navigator.mediaDevices.getUserMedia){
+    toast('Микрофон не поддерживается 😔'); return;
+  }
+
+  try{
+    recStream=await navigator.mediaDevices.getUserMedia({audio:true});
+  }catch(err){
+    toast('Нет доступа к микрофону 🎤'); return;
+  }
+
+  // выбираем формат, который поддерживает устройство (важно для iOS)
+  let mime='';
+  const types=['audio/webm','audio/mp4','audio/aac','audio/ogg'];
+  for(const t of types){ if(MediaRecorder.isTypeSupported&&MediaRecorder.isTypeSupported(t)){mime=t;break;} }
+
+  try{
+    mediaRecorder=mime?new MediaRecorder(recStream,{mimeType:mime}):new MediaRecorder(recStream);
+  }catch(e){
+    mediaRecorder=new MediaRecorder(recStream);
+  }
+
+  audioChunks=[];
+  mediaRecorder.ondataavailable=e=>{ if(e.data.size>0)audioChunks.push(e.data); };
+  mediaRecorder.onstop=async()=>{
+    document.getElementById('mic').classList.remove('rec');
+    if(recStream){recStream.getTracks().forEach(t=>t.stop());recStream=null;}
+    const blob=new Blob(audioChunks,{type:mime||'audio/webm'});
+    if(blob.size<1000){ return; } // слишком короткая запись
+    await sendToWhisper(blob);
+  };
+
+  mediaRecorder.start();
+  recording=true;
+  document.getElementById('mic').classList.add('rec');
+  toast('🎤 Говори... нажми ещё раз, чтобы остановить');
 }
+
+function stopRec(){
+  recording=false;
+  if(mediaRecorder&&mediaRecorder.state!=='inactive'){
+    try{mediaRecorder.stop();}catch(e){}
+  }
+}
+
+async function sendToWhisper(blob){
+  const API_KEY=ensureApiKey();
+  if(!API_KEY)return;
+
+  const inp=document.getElementById('ai-input');
+  const prevPlaceholder=inp.placeholder;
+  inp.placeholder='🎧 Распознаю речь...';
+  aiTyping(true);
+
+  const ext=(blob.type.includes('mp4')||blob.type.includes('aac'))?'mp4':
+            blob.type.includes('ogg')?'ogg':'webm';
+  const fd=new FormData();
+  fd.append('file',blob,'audio.'+ext);
+  fd.append('model','whisper-large-v3-turbo');
+  fd.append('language','ru');
+  fd.append('response_format','json');
+
+  try{
+    const res=await fetch('https://api.groq.com/openai/v1/audio/transcriptions',{
+      method:'POST',
+      headers:{'Authorization':'Bearer '+API_KEY},
+      body:fd
+    });
+    const data=await res.json();
+    aiTyping(false);
+    inp.placeholder=prevPlaceholder;
+
+    if(data.error){
+      const msg=data.error.message||'Ошибка распознавания';
+      if(/api key|invalid|unauthorized|401/i.test(msg)){
+        resetApiKey();
+        toast('🔑 Ключ недействителен');
+      }else toast('⚠️ '+msg);
+      return;
+    }
+
+    const text=(data.text||'').trim();
+    if(text){
+      inp.value=text;
+      setTimeout(aiSend,200); // сразу отправляем ИИ
+    }else{
+      toast('Не расслышал 🤔 Попробуй ещё раз');
+    }
+  }catch(err){
+    aiTyping(false);
+    inp.placeholder=prevPlaceholder;
+    toast('⚠️ Ошибка сети при распознавании');
+  }
+}
+
 
 document.getElementById('fab').onclick=function(){if(currentTab==='finance')openExpModal();else openModal();};
 
