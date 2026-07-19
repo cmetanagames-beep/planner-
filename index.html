@@ -1785,6 +1785,11 @@ document.addEventListener('DOMContentLoaded',function(){ init(); restoreLocalTim
   
 // ============ ФОНОВЫЕ ПУШ-УВЕДОМЛЕНИЯ ============
 const PUSH_SERVER = 'https://push-server-4e3v.onrender.com';
+  let PUSH_USER_ID = localStorage.getItem('pushUserId');
+if (!PUSH_USER_ID) {
+  PUSH_USER_ID = 'user_' + Date.now() + '_' + Math.random().toString(36).slice(2);
+  localStorage.setItem('pushUserId', PUSH_USER_ID);
+}
 
 // Преобразование ключа
 function urlBase64ToUint8Array(base64String) {
@@ -1797,8 +1802,6 @@ function urlBase64ToUint8Array(base64String) {
   for (let i = 0; i < raw.length; i++) arr[i] = raw.charCodeAt(i);
   return arr;
 }
-
-// Подписка на пуши
 async function subscribePush() {
   try {
     if (!('serviceWorker' in navigator) || !('PushManager' in window)) {
@@ -1814,22 +1817,20 @@ async function subscribePush() {
 
     const reg = await navigator.serviceWorker.ready;
 
-    // Получаем публичный ключ с сервера
     const keyResp = await fetch(PUSH_SERVER + '/key');
     const keyData = await keyResp.json();
     const publicKey = keyData.key;
 
-    // Подписываемся
     const sub = await reg.pushManager.subscribe({
       userVisibleOnly: true,
       applicationServerKey: urlBase64ToUint8Array(publicKey.trim())
     });
 
-    // Отправляем подписку на сервер
+    // 👇 ВОТ ГЛАВНОЕ ИСПРАВЛЕНИЕ — отправляем userId + subscription
     await fetch(PUSH_SERVER + '/subscribe', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(sub)
+      body: JSON.stringify({ userId: PUSH_USER_ID, subscription: sub })
     });
 
     localStorage.setItem('pushSubscribed', 'yes');
@@ -1843,8 +1844,17 @@ async function subscribePush() {
 // Тестовый пуш
 async function testPush() {
   try {
-    await fetch(PUSH_SERVER + '/test', { method: 'POST' });
-    alert('📤 Тест отправлен! Уведомление придёт через пару секунд.');
+    const res = await fetch(PUSH_SERVER + '/test', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ userId: PUSH_USER_ID })   // 👈 обязательно передаём userId!
+    });
+    const data = await res.json();
+    if (data.ok) {
+      alert('📤 Тест отправлен! Уведомление придёт через пару секунд.');
+    } else {
+      alert('❌ Сервер ответил ошибкой: ' + (data.err || 'нет подписки'));
+    }
   } catch (err) {
     alert('❌ Ошибка теста: ' + err.message);
   }
