@@ -1,0 +1,19 @@
+{
+  "name": "Планировщик дел",
+  "short_name": "Дела",
+  "description": "Умный планировщик с ИИ, финансами и напоминаниями",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#e9ebf4",
+  "theme_color": "#6c5ce7",
+  "icons": [
+    {
+      "src": "icon.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
+}
