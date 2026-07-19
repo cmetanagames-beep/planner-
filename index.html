@@ -1369,21 +1369,28 @@ async function aiParse(text){
   const catList=getCats().map(c=>c.id+' ('+c.name+')').join(', ');
   const expCatList=getExpCats().map(c=>c.name).join(', ');
   const sys=`Ты помощник-планировщик. Сегодня ${today} (формат ГГГГ-ММ-ДД). Текущее время ${nowHM}.
-  
-Относительное время: "через N минут"=прибавь N минут к текущему времени ${nowHM}, "через N часов"=прибавь N часов. Верни результат в поле time как "ЧЧ:ММ" и date=сегодня.
-Проанализируй сообщение пользователя и верни СТРОГО JSON без пояснений.
-Определи тип: "task" (дело/напоминание), "expense" (трата/расход), "income" (доход/зарплата), "chat" (просто разговор).
 
-Для task верни: {"type":"task","title":"кратко суть","date":"ГГГГ-ММ-ДД или пусто","time":"ЧЧ:ММ или пусто","module":"id категории","pri":"R/Y/B","desc":"детали или пусто"}
-Категории дел: ${catList}. Выбери подходящую по смыслу, по умолчанию personal.
+Относительное время: "через N минут"=прибавь N минут к ${nowHM}, "через N часов"=прибавь N часов. Верни time как "ЧЧ:ММ" и date=сегодня.
+
+ВАЖНО: в одном сообщении может быть НЕСКОЛЬКО действий сразу (например дело И трата). Разбери ВСЕ и верни массив.
+
+Верни СТРОГО JSON вида:
+{"items":[ ... ]}
+где каждый элемент — одно действие одного из типов:
+
+task:    {"type":"task","title":"кратко суть","date":"ГГГГ-ММ-ДД или пусто","time":"ЧЧ:ММ или пусто","module":"id категории","pri":"R/Y/B","desc":"детали или пусто"}
+expense: {"type":"expense","amount":число,"category":"одна из [${expCatList}]","desc":"комментарий или пусто","date":"ГГГГ-ММ-ДД"}
+income:  {"type":"income","amount":число,"source":"источник","date":"ГГГГ-ММ-ДД"}
+chat:    {"type":"chat","reply":"дружелюбный короткий ответ на русском"}
+
+Если действие одно — верни массив из одного элемента.
+Если это просто разговор — верни один элемент type:chat.
+
+Категории дел: ${catList}. По умолчанию personal.
 Приоритет: R=срочно/важно, Y=обычно, B=не срочно.
 
-Для expense: {"type":"expense","amount":число,"category":"одна из [${expCatList}]","desc":"комментарий или пусто","date":"ГГГГ-ММ-ДД"}
-Для income: {"type":"income","amount":число,"source":"источник","date":"ГГГГ-ММ-ДД"}
-Для chat: {"type":"chat","reply":"дружелюбный короткий ответ на русском"}
-
-Понимай относительные даты: "сегодня"=${today}, "завтра"=следующий день, "послезавтра", дни недели, "через неделю" и т.п.
-ВАЖНО про время: если в тексте есть время в любом формате — "7:30","7-30","7.30","в 7 30","7 утра","в 15","полвосьмого" — ОБЯЗАТЕЛЬНО верни его в поле time как "ЧЧ:ММ" (например "07:30"). Не оставляй time пустым, если время указано.
+Понимай относительные даты: "сегодня"=${today}, "завтра"=следующий день, "послезавтра", дни недели, "через неделю".
+ВАЖНО про время: если есть время в любом формате — "7:30","7-30","в 7 30","7 утра" — ОБЯЗАТЕЛЬНО верни в поле time как "ЧЧ:ММ".
 "утром"=09:00, "днём"=14:00, "вечером"=19:00, "ночью"=22:00 — только если точное время НЕ указано.`;
 
   const res=await fetch(API_URL,{
@@ -1404,22 +1411,46 @@ async function aiParse(text){
   const content=data.choices[0].message.content;
   return JSON.parse(content);
 }
-
 let pendingAI=null;
+let aiQueue=[];
+
 function handleAIResult(r){
-  if(!r||!r.type){addAImsg('Не понял 🤔 Попробуй иначе.','ai');return;}
-  if(r.type==='chat'){addAImsg(r.reply||'👍','ai');return;}
-  if(r.type==='task'){
-    const raw=window._lastUserText||'';
-    // "через N минут/часов" — всегда пересчитываем сами, ИИ тут часто ошибается
-    if(/через\s+\d/i.test(raw)){
-      const t=extractTime(raw);
-      if(t){r.time=t;r.date=todayKey();}
-    }else if(!r.time){
-      const t=extractTime(raw);
-      if(t)r.time=t;
+  // ИИ теперь возвращает {items:[...]}. Поддержим и старый формат.
+  let items=[];
+  if(r&&Array.isArray(r.items))items=r.items;
+  else if(r&&r.type)items=[r];
+  else{addAImsg('Не понял 🤔 Попробуй иначе.','ai');return;}
+
+  // применим определение времени из текста к каждой задаче
+  const raw=window._lastUserText||'';
+  items.forEach(it=>{
+    if(it.type==='task'){
+      if(/через\s+\d/i.test(raw)){
+        const t=extractTime(raw);
+        if(t){it.time=t;it.date=todayKey();}
+      }else if(!it.time){
+        const t=extractTime(raw);
+        if(t)it.time=t;
+      }
     }
-  }
+  });
+
+  // отдельно покажем чат-ответы сразу
+  const actions=[];
+  items.forEach(it=>{
+    if(it.type==='chat')addAImsg(it.reply||'👍','ai');
+    else actions.push(it);
+  });
+
+  if(!actions.length)return;
+
+  aiQueue=actions;
+  showNextAICard();
+}
+
+function showNextAICard(){
+  if(!aiQueue.length){pendingAI=null;return;}
+  const r=aiQueue.shift();
   pendingAI=r;
   const chat=document.getElementById('ai-chat');
   const card=document.createElement('div');
@@ -1450,7 +1481,11 @@ function handleAIResult(r){
   }
   chat.appendChild(card);chat.scrollTop=chat.scrollHeight;
 }
-function cancelAI(){pendingAI=null;addAImsg('Ок, отменил 👌','ai');}
+ function cancelAI(){
+  pendingAI=null;
+  addAImsg('Ок, отменил 👌','ai');
+  showNextAICard();  // покажем следующую, если есть
+}
 function confirmAI(){
   const r=pendingAI;if(!r)return;pendingAI=null;
   if(r.type==='task'){
@@ -1471,7 +1506,9 @@ function confirmAI(){
     save(d);addAImsg('✅ Доход записан!','ai');confetti();
   }
   vibrate(30);checkAchievements();
-}
+  showNextAICard();  // 👈 показываем следующую карточку
+} 
+
 
 /* ===== ГОЛОСОВОЙ ВВОД ===== */
 let recognition=null,recording=false,_finalText='';
