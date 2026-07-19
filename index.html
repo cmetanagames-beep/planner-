@@ -1761,15 +1761,6 @@ document.addEventListener('click',e=>{
     e.target.classList.remove('on');
   }
 });
-/* Enter в инпутах */
-document.addEventListener('keydown',e=>{
-  if(e.key!=='Enter')return;
-  const id=e.target.id;
-  if(id==='ai-input'){e.preventDefault();aiSend();}
-  else if(id==='sub-input'){e.preventDefault();addSubtask();}
-  else if(id==='cat-name'){e.preventDefault();saveCat();}
-  else if(id==='expcat-name'){e.preventDefault();saveExpCat();}
-});
 
 /* ===== ИНИЦИАЛИЗАЦИЯ ===== */
 function init(){
