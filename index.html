@@ -1381,9 +1381,11 @@ async function aiSend(){
     el.innerHTML='❌ Ошибка связи с ИИ. Проверь интернет и ключ.<br><small>'+esc(err.message||'')+'</small>'+
       '<div style="margin-top:8px"><button onclick="retryLastMessage(this)" style="border:none;background:var(--brand);color:#fff;border-radius:10px;padding:7px 14px;font-weight:700;cursor:pointer;font-size:.82rem">🔄 Повторить</button></div>';
     chat.appendChild(el);chat.scrollTop=chat.scrollHeight;
-    saveChatHistoryEntry({type:'msg',who:'ai',text:'❌ Ошибка связи с ИИ. Проверь интернет и ключ.\n'+(err.message||''),ts:Date.now()});
+  saveChatHistoryEntry({type:'msg',who:'ai',text:'❌ Ошибка связи с ИИ. Проверь интернет и ключ.\n'+(err.message||''),ts:Date.now()});
   }
-  function retryLastMessage(btn){
+}
+
+function retryLastMessage(btn){
   const text=window._lastUserText;
   if(!text){toast('Нечего повторять');return;}
   btn.disabled=true;btn.textContent='⏳ Повтор...';
