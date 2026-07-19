@@ -1092,7 +1092,7 @@ async function toggleMic(){
     await sendToWhisper(blob);
   };
 
-  mediaRecorder.start();
+    mediaRecorder.start(1000); // сбрасываем данные каждую секунду — важно для длинных записей
   recording=true;
   document.getElementById('mic').classList.add('rec');
   toast('🎤 Говори... нажми ещё раз, чтобы остановить');
