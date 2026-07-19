@@ -8,9 +8,7 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="Дела">
 <meta name="mobile-web-app-capable" content="yes">
-<meta name="theme-color" content="#6c5ce7" id="meta-theme">\
-<link rel="manifest" href="manifest.json">
-<link rel="apple-touch-icon" href="icon.png">
+<meta name="theme-color" content="#6c5ce7" id="meta-theme">
 <style>
 body{background:#e9ebf4;display:flex;flex-direction:column;align-items:center}
 body.dark{background:#0e0f1c}
@@ -1349,12 +1347,6 @@ function init(){
   setInterval(checkMorningNotify,60*1000);
 }
 init();
-/* ===== PWA: Service Worker ===== */
-if('serviceWorker' in navigator){
-  window.addEventListener('load',()=>{
-    navigator.serviceWorker.register('sw.js').catch(e=>console.log('SW error',e));
-  });
-}
 </script>
 </body>
 </html>
