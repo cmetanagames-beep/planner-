@@ -1014,10 +1014,32 @@ const modLabel=new Proxy({},{get:(_,id)=>catLabel(id)});
 const DEFAULT_EXPCATS=[
   {name:'Продукты',i:'🛒',c:'#00b894'},{name:'Топливо',i:'⛽',c:'#e17055'},{name:'Кафе',i:'🍔',c:'#fdcb6e'},
   {name:'Транспорт',i:'🚌',c:'#0984e3'},{name:'Одежда',i:'👕',c:'#e84393'},{name:'Развлечения',i:'🎮',c:'#6c5ce7'},
-  {name:'Здоровье',i:'💊',c:'#00cec9'},{name:'Дом',i:'🏠',c:'#fab1a0'},{name:'Дети',i:'👶',c:'#fd79a8'},
+  {name:'Жильё',i:'🏠',c:'#6c5ce7'}, 
+  {name:'Коммуналка',i:'💡',c:'#0984e3'},
+  {name:'Здоровье',i:'💊',c:'#00cec9'},{name:'Дом',i:'🛋️',c:'#fab1a0'},{name:'Дети',i:'👶',c:'#fd79a8'},
   {name:'Авто',i:'🚗',c:'#e17055'},{name:'Огород',i:'🌱',c:'#00b894'},{name:'Прочее',i:'📦',c:'#b2bec3'}
 ];
-function getExpCats(){const d=load();if(!d.expcats){d.expcats=JSON.parse(JSON.stringify(DEFAULT_EXPCATS));save(d);}return d.expcats;}
+function getExpCats(){
+  const d=load();
+  if(!d.expcats){
+    d.expcats=JSON.parse(JSON.stringify(DEFAULT_EXPCATS));
+    save(d);
+  }
+  // МИГРАЦИЯ: добавляем новые категории старым юзерам
+  const need=[
+    {name:'Жильё',i:'🏠',c:'#6c5ce7'},
+    {name:'Коммуналка',i:'💡',c:'#0984e3'}
+  ];
+  let changed=false;
+  need.forEach(nc=>{
+    if(!d.expcats.some(c=>c.name===nc.name)){
+      d.expcats.splice(d.expcats.length-1,0,nc); // перед "Прочее"
+      changed=true;
+    }
+  });
+  if(changed)save(d);
+  return d.expcats;
+}
 function setExpCats(c){const d=load();d.expcats=c;save(d);}
 const CAT_COLORS=['#00b894','#e17055','#fdcb6e','#0984e3','#e84393','#6c5ce7','#00cec9','#fab1a0','#fd79a8','#a29bfe','#55efc4','#ffeaa7'];
 function catStyleOf(name){const c=getExpCats().find(x=>x.name===name);return c||{i:'📦',c:'#b2bec3'};}
@@ -2333,10 +2355,12 @@ function tryLocalCommand(text){
         getExpCats().forEach(c=>{if(low.includes(c.name.toLowerCase()))cat=c.name;});
         if(!cat){
           if(/вод[аыу]|продукт|еда|магаз|хлеб|молоко/.test(low))cat='Продукты';
-          else if(/бензин|топлив|заправ/.test(low))cat='Топливо';
-          else if(/кафе|ресторан|обед|кофе/.test(low))cat='Кафе';
-          else if(/подгуз|памперс|детск|малыш/.test(low))cat=findOrNull('Дети');
-          else if(/корм|собак|кошк|кот|питом|животн|ветеринар/.test(low))cat=findOrNull('Питомцы');
+         else if(/бензин|топлив|заправ/.test(low))cat='Топливо';
+         else if(/кафе|ресторан|обед|кофе/.test(low))cat='Кафе';
+         else if(/квартир|аренд|ипотек|квартплат|жиль|съём|съем/.test(low))cat=findOrNull('Жильё');   // ← ДОБАВЬ
+         else if(/коммунал|свет|электр|газ|отоплен|интернет/.test(low))cat=findOrNull('Коммуналка');  // ← ДОБАВЬ
+         else if(/подгуз|памперс|детск|малыш/.test(low))cat=findOrNull('Дети');
+         else if(/корм|собак|кошк|кот|питом|животн|ветеринар/.test(low))cat=findOrNull('Питомцы');
         }
         if(!cat){
           const guess=/корм|собак|кошк|питом/.test(low)?'Питомцы':/подгуз|детск/.test(low)?'Дети':'Прочее';
@@ -2488,7 +2512,14 @@ async function aiParse(text){
 "incomes":[{"type":"income","amount":ЧИСЛО_ИЗ_СООБЩЕНИЯ,"source":"ИСТОЧНИК","date":"ГГГГ-ММ-ДД"}]}
 
 Категории дел: ${catList}. По умолчанию personal.
-Категории трат: ${expCatList}. Если трата НЕ подходит ни под одну — придумай НОВОЕ короткое название категории (1 слово), например для корма животным → "Питомцы", для лекарств → "Здоровье". НЕ пихай в "Продукты" всё подряд! "Продукты" — только еда для людей.
+Категории трат: ${expCatList}. Если трата НЕ подходит ни под одну — придумай НОВОЕ короткое название категории (1 слово), например для корма животным → "Питомцы", для лекарств → "Здоровье". НЕ пихай в "Продукты" всё подряд! "Продукты" — ТОЛЬКО еда для людей (хлеб, молоко, овощи). 
+НИКОГДА не пихай сюда квартиру, аренду, коммуналку, услуги!
+Примеры правильных категорий:
+- "за квартиру", "аренда", "ипотека", "квартплата" → категория "Жильё"
+- "коммуналка", "свет", "вода", "газ", "интернет" → "Коммуналка"  
+- "бензин", "заправка" → "Топливо"
+- "корм", "ветеринар" → "Питомцы"
+Если сомневаешься — создай НОВУЮ точную категорию, НЕ бросай в "Продукты".
 Приоритет: R=важно, Y=обычно, B=потом.
 Даты: "сегодня"=${today}, "завтра", "послезавтра", дни недели, "через неделю".
 Время: "9-00","9:00","в 9 утра" → "09:00". Всегда возвращай time если оно есть.
