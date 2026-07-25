@@ -623,6 +623,77 @@ body.dark .shop-item::after,body.dark .ai-msg .bubble::after{opacity:.35}
 
 /* Тонкий бегущий блик при нажатии на карточку */
 .task:active::after{opacity:.9;transition:opacity .2s}
+  /* ========== ЖИВЫЕ ДЕТАЛИ ========== */
+
+/* Пилюля тянется как жидкость при переходе */
+#nav-pill{
+  transition:left .42s cubic-bezier(.5,-0.3,.3,1.4),
+             width .42s cubic-bezier(.5,-0.3,.3,1.4),
+             transform .42s cubic-bezier(.34,1.5,.5,1),
+             opacity .2s!important;
+}
+/* Класс морфинга — пилюля растягивается и сжимается по ходу */
+#nav-pill.morphing{
+  animation:pillStretch .42s cubic-bezier(.5,0,.4,1);
+}
+@keyframes pillStretch{
+  0%{border-radius:22px}
+  40%{border-radius:22px/40px;transform:scaleY(.82) scaleX(1.05)}
+  70%{transform:scaleY(1.08) scaleX(.97)}
+  100%{border-radius:22px;transform:scale(1)}
+}
+/* Хвостик-капля, что «догоняет» пилюлю */
+#nav-pill::after{
+  content:'';position:absolute;top:50%;
+  width:14px;height:14px;border-radius:50%;
+  background:inherit;transform:translateY(-50%);
+  opacity:0;transition:opacity .2s;
+}
+#nav-pill.morph-right::after{right:-4px}
+#nav-pill.morph-left::after{left:-4px}
+#nav-pill.morphing::after{
+  opacity:.7;animation:tailDrop .42s ease-out;
+}
+@keyframes tailDrop{0%{transform:translateY(-50%) scale(1)}60%{transform:translateY(-50%) scale(.4)}100%{opacity:0;transform:translateY(-50%) scale(0)}}
+  /* ===== КАПЛЯ ВОДЫ НА FAB ===== */
+.fab{overflow:visible}
+.fab .ripple{
+  position:absolute;border-radius:50%;pointer-events:none;
+  background:radial-gradient(circle,rgba(255,255,255,.6),rgba(255,255,255,0) 70%);
+  transform:translate(-50%,-50%) scale(0);
+  animation:fabRipple .6s ease-out forwards;
+}
+@keyframes fabRipple{
+  0%{transform:translate(-50%,-50%) scale(0);opacity:.9}
+  100%{transform:translate(-50%,-50%) scale(4);opacity:0}
+}
+.fab.drop{animation:fabDrop .5s cubic-bezier(.34,1.6,.5,1)}
+@keyframes fabDrop{
+  0%{transform:scale(1)}
+  30%{transform:scale(.82) translateY(2px)}
+  55%{transform:scale(1.12) translateY(-3px);border-radius:52% 48% 55% 45%/48% 52% 48% 52%}
+  100%{transform:scale(1);border-radius:50%}
+}
+
+/* ===== HAPTIC-МИКРОАНИМАЦИИ НАЖАТИЙ ===== */
+.task,.hstat,.filters button,.nav button,.hero-btns button,
+.ai-suggest button,.btn,.seg button,.shop-item,.cal-cell,
+.streak-chip,.weather-chip,.assign-btn{
+  transition:transform .18s cubic-bezier(.34,1.6,.5,1),
+             box-shadow .2s,background .2s,color .2s;
+}
+.task:active,.hstat:active,.filters button:active,
+.ai-suggest button:active,.assign-btn:active{
+  transform:scale(.96)!important;
+}
+.nav button:active{transform:scale(.9)!important}
+.hero-btns button:active{transform:scale(.84)!important}
+.btn:active{transform:scale(.97)!important}
+.seg button:active{transform:scale(.93)!important}
+
+/* Чекбокс — упругий «щелчок» */
+.chk,.sc,.sbox,.box{
+  transition:.28s cubic-bez
 </style>
 </head>
 <body>
@@ -668,7 +739,7 @@ body.dark .shop-item::after,body.dark .ai-msg .bubble::after{opacity:.35}
   <button class="send-btn" onclick="aiSend()">➤</button>
 </div>
 
-<button class="fab" id="fab" onclick="fabAction()">+</button>
+<button class="fab" id="fab" onclick="fabRipple(event);fabAction()">+</button>
 
 <div class="nav" id="nav"></div>
 
@@ -1031,20 +1102,49 @@ function renderNav(){
   requestAnimationFrame(moveNavPill);
 }
 
+let _lastPillLeft=null;
 function moveNavPill(){
   const nav=document.getElementById('nav');
   const pill=document.getElementById('nav-pill');
   if(!nav||!pill)return;
   const active=nav.querySelector('button.active');
   if(!active){pill.style.opacity='0';return;}
-  pill.style.left=active.offsetLeft+'px';
-  pill.style.width=active.offsetWidth+'px';
+  const newLeft=active.offsetLeft;
+  const newW=active.offsetWidth;
+
+  // определяем направление
+  pill.classList.remove('morph-left','morph-right','morphing');
+  if(_lastPillLeft!==null&&Math.abs(newLeft-_lastPillLeft)>2){
+    pill.classList.add(newLeft>_lastPillLeft?'morph-right':'morph-left');
+    void pill.offsetWidth; // рестарт анимации
+    pill.classList.add('morphing');
+    setTimeout(()=>pill.classList.remove('morphing','morph-left','morph-right'),430);
+  }
+  _lastPillLeft=newLeft;
+
+  pill.style.left=newLeft+'px';
+  pill.style.width=newW+'px';
   pill.style.opacity='1';
-  // подкрутить скролл к активной вкладке
   active.scrollIntoView({inline:'center',block:'nearest',behavior:'smooth'});
 }
 window.addEventListener('resize',()=>setTimeout(moveNavPill,50));
-function switchTab(tab){
+function fabRipple(e){
+  const fab=document.getElementById('fab');
+  if(!fab)return;
+  const rect=fab.getBoundingClientRect();
+  const r=document.createElement('span');
+  r.className='ripple';
+  const x=(e&&e.clientX?e.clientX:rect.left+rect.width/2)-rect.left;
+  const y=(e&&e.clientY?e.clientY:rect.top+rect.height/2)-rect.top;
+  r.style.left=x+'px';r.style.top=y+'px';
+  r.style.width=r.style.height=rect.width+'px';
+  fab.appendChild(r);
+  fab.classList.add('drop');
+  setTimeout(()=>{r.remove();fab.classList.remove('drop');},600);
+  vibrate(15);
+}
+  
+  function switchTab(tab){
   currentTab=tab;
   const isAI=tab==='ai',isFin=tab==='finance',isCal=tab==='calendar',isHabits=tab==='habits';
   const hideList=isAI||isFin;
@@ -2516,14 +2616,14 @@ function handleAIResult(r){
     }
   });
 
-  const actions=[];
+    const actions=[];
   items.forEach(it=>{
-    if(it.type==='chat')addAImsg(it.reply||'👍','ai');
+    if(it.type==='chat')aiAddMsg('ai',esc(it.reply||it.chat||'👍'));
     else actions.push(it);
   });
 
   if(!actions.length){
-    if(!items.some(it=>it.type==='chat'))addAImsg((r&&r.chat)||'Не понял 🤔 Попробуй иначе.','ai');
+    if(!items.some(it=>it.type==='chat'))aiAddMsg('ai',esc((r&&r.chat)||'Не понял 🤔 Попробуй иначе.'));
     return;
   }
 
@@ -2655,6 +2755,11 @@ function initApp(){
 
   // приветствие ключа при первом ИИ
   checkAchievements();
+    // Haptic-подобная вибрация на все интерактивные тапы
+  document.addEventListener('pointerdown',e=>{
+    const el=e.target.closest('button,.task,.chk,.sc,.hstat,.cal-cell,.assign-btn,.streak-chip,.weather-chip,.shop-item');
+    if(el)vibrate(8);
+  },{passive:true});
 }
 
 document.addEventListener('DOMContentLoaded',initApp);
