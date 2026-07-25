@@ -1898,21 +1898,6 @@ function tryLocalCommand(text){
   if(anyDone){checkAchievements();return results.join('<br><br>');}
   return null;
 }
-  // дело: "напомни завтра купить хлеб"
-  if(/напомн|создай дело|добавь дело|закинь|скинь дело|нужно|надо|запланируй|встреч|поставь дело|дело по|запиши дело|не забыть/.test(low)){
-    let date=todayKey();
-    if(/завтра/.test(low)){const d=new Date();d.setDate(d.getDate()+1);date=d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');}
-    let title=text.replace(/напомни|создай дело|добавь дело|нужно|надо|запланируй|завтра|сегодня|мне/gi,'').trim();
-     const tm=low.match(/в\s*(\d{1,2})[:.]?(\d{2})?/);let time='';
-        if(tm){const hh=tm[1]||tm[3];const mm=tm[2]||'00';time=String(hh).padStart(2,'0')+':'+mm;title=title.replace(/(?:в|на|к)?\s*\d{1,2}[:.\-]?\d{0,2}(?:\s*ч)?/,'').trim();}
-    if(title.length>1){
-      const t=getTasks();const obj={id:Date.now(),title:title.charAt(0).toUpperCase()+title.slice(1),module:'personal',date,time,desc:'',pri:'Y',done:false};t.push(obj);setTasks(t);scheduleLocalTimeout(obj);
-      return `✅ Создал дело: <b>${esc(obj.title)}</b><br>📅 ${fmtDate(date)}${time?' 🕐 '+time:''}`;
-    }
-  }
-  return null;
-}
-
 function buildContext(){
   const tasks=getTasks();const tk=todayKey();
   const today=tasks.filter(t=>t.date===tk&&!t.done);
