@@ -694,25 +694,25 @@ body.dark .shop-item::after,body.dark .ai-msg .bubble::after{opacity:.35}
 /* Чекбокс — упругий «щелчок» */
 .chk,.sc,.sbox,.box{
   transition:.28s cubic-bez
-  /* ===== ФИКС: панель ввода ИИ над плавающей навигацией ===== */
+/* ===== ФИКС ПАНЕЛИ ВВОДА ИИ (над меню) ===== */
 .ai-input-bar{
-  bottom:92px!important;               /* выше плавающего меню */
+  bottom:96px!important;               /* поднимаем над плавающим меню */
   left:50%!important;
   transform:translateX(-50%)!important;
-  width:calc(100% - 28px)!important;
-  max-width:452px!important;
-  border-radius:24px!important;
+  width:calc(100% - 24px)!important;
+  max-width:456px!important;
+  border-radius:26px!important;
   border:1px solid var(--lg-brd)!important;
-  box-shadow:0 8px 28px rgba(20,20,60,.18)!important;
+  box-shadow:0 10px 30px rgba(20,20,60,.22)!important;
   padding:8px 10px!important;
 }
 @media(max-width:520px){
-  .ai-input-bar{width:calc(100% - 20px)!important}
+  .ai-input-bar{width:calc(100% - 16px)!important}
 }
 
-/* Чат ИИ — отступ снизу, чтобы не залезал под панель ввода */
-#ai-view{padding-bottom:170px!important}
-.ai-suggest{margin-bottom:8px!important}
+/* Чат ИИ — большой отступ снизу, чтобы контент не прятался */
+#ai-view{padding-bottom:200px!important}
+.ai-suggest{margin-bottom:6px!important;padding-bottom:6px!important}
 </style>
 </head>
 <body>
