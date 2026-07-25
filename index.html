@@ -874,8 +874,8 @@ function renderHabits(){
     });
     rows+=`<div style="display:flex;align-items:center;gap:8px;padding:10px 0;border-bottom:1px solid var(--line)">
       <div style="font-size:1.3rem">${h.icon}</div>
-      <div style="flex:1;min-width:0">
-        <div style="font-weight:700;font-size:.9rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${h.name}</div>
+            <div style="flex:1;min-width:70px">
+        <div style="font-weight:700;font-size:.9rem;word-break:break-word">${h.name}</div>
         <div style="font-size:.7rem;color:var(--muted)">🔥 ${st} ${st===1?'день':st>=2&&st<=4?'дня':'дней'}</div>
       </div>
       <div style="display:flex;gap:4px">${cells}</div>
@@ -2014,7 +2014,7 @@ async function aiParse(text){
 "incomes":[{"type":"income","amount":ЧИСЛО_ИЗ_СООБЩЕНИЯ,"source":"ИСТОЧНИК","date":"ГГГГ-ММ-ДД"}]}
 
 Категории дел: ${catList}. По умолчанию personal.
-Категории трат: ${expCatList}. Не подходит — "Прочее".
+Категории трат: ${expCatList}. Если трата НЕ подходит ни под одну — придумай НОВОЕ короткое название категории (1 слово), например для корма животным → "Питомцы", для лекарств → "Здоровье". НЕ пихай в "Продукты" всё подряд! "Продукты" — только еда для людей.
 Приоритет: R=важно, Y=обычно, B=потом.
 Даты: "сегодня"=${today}, "завтра", "послезавтра", дни недели, "через неделю".
 Время: "9-00","9:00","в 9 утра" → "09:00". Всегда возвращай time если оно есть.
