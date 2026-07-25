@@ -330,7 +330,7 @@ body.dark::before{opacity:.55}
   <button class="send-btn" onclick="aiSend()">➤</button>
 </div>
 
-<button class="fab" id="fab" onclick="openModal()">+</button>
+<button class="fab" id="fab" onclick="fabAction()">+</button>
 
 <div class="nav" id="nav"></div>
 
@@ -833,6 +833,10 @@ function editTask(id){
 
 function fillModuleSelect(){
   document.getElementById('f-module').innerHTML=getCats().map(c=>`<option value="${c.id}">${c.emoji} ${esc(c.name)}</option>`).join('');
+}
+  function fabAction(){
+  if(currentTab==='finance')openExpModal();
+  else openModal();
 }
 function openModal(){
   editId=null;fillModuleSelect();fillAssignSelect();editSubs=[];
