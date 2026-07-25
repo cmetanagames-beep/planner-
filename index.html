@@ -762,7 +762,7 @@ function render(){
   if(filterState==='active')tasks=tasks.filter(t=>!t.done);
   else if(filterState==='done')tasks=tasks.filter(t=>t.done);
   else if(filterState==='today')tasks=tasks.filter(t=>t.date===tk&&!t.done);
-  renderStats();
+  renderStats();renderSmartHint();
   const overdueCount=getTasks().filter(t=>isOverdue(t)&&t.date<tk).length;
   let head='';
   if(overdueCount&&filterState!=='done'){
@@ -793,7 +793,25 @@ function rescheduleOverdue(){
   if(!n){toast('Нет просроченных');return;}
   setTasks(t);render();confetti();vibrate(30);toast('➡️ Перенесено на сегодня: '+n);
 }
-
+function renderSmartHint(){
+  const box=document.getElementById('quoteChip');
+  if(!box)return;
+  const tasks=getTasks();
+  const tk=todayKey();
+  const tmr=new Date();tmr.setDate(tmr.getDate()+1);
+  const tmrKey=tmr.getFullYear()+'-'+String(tmr.getMonth()+1).padStart(2,'0')+'-'+String(tmr.getDate()).padStart(2,'0');
+  const todayLeft=tasks.filter(t=>t.date===tk&&!t.done).length;
+  const tmrCount=tasks.filter(t=>t.date===tmrKey&&!t.done).length;
+  const over=tasks.filter(t=>isOverdue(t)&&t.date<tk).length;
+  let msg='';
+  if(over>0)msg=`⚠️ Просрочено ${over} — займись!`;
+  else if(todayLeft>0)msg=`📌 Сегодня осталось: ${todayLeft} ${todayLeft===1?'дело':todayLeft<=4?'дела':'дел'}`;
+  else if(tmrCount>0)msg=`🌅 Завтра тебя ждёт: ${tmrCount} ${tmrCount===1?'дело':tmrCount<=4?'дела':'дел'}`;
+  else msg=`🎉 Всё чисто — отдыхай!`;
+  box.textContent=msg;
+  box.style.display='';
+}
+  
 function renderStats(){
   const el=document.getElementById('hero-stats');
   let tasks=getTasks();
