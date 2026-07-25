@@ -1460,7 +1460,7 @@ function scheduleLocalTimeout(t){
 }
 
 /* ===== СЕМЬЯ + ПУШИ (сервер) ===== */
-const FAMILY_SERVER='http://pushevgen.duckdns.org/'; // ← замени на свой адрес сервера
+const FAMILY_SERVER='https://pushevgen.duckdns.org'; // без слэша на конце, через https!
 let PUSH_USER_ID=localStorage.getItem('push_user_id')||'';
 if(!PUSH_USER_ID){PUSH_USER_ID='u_'+Date.now()+'_'+Math.random().toString(36).slice(2,8);localStorage.setItem('push_user_id',PUSH_USER_ID);}
 const VAPID_PUBLIC=localStorage.getItem('vapid_public')||''; // подставится с сервера при подписке
