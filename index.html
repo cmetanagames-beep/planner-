@@ -1813,23 +1813,91 @@ function aiTyping(){
 }
 function aiStopTyping(){const t=document.getElementById('ai-typing');if(t)t.remove();}
 
+  const WEEKDAYS={'понедельник':1,'понедельн':1,'пн':1,'вторник':2,'вт':2,'сред':3,'ср':3,'четверг':4,'чт':4,'пятниц':5,'пт':5,'суббот':6,'сб':6,'воскрес':0,'вс':0};
+function nextWeekday(target){
+  const d=new Date();const cur=d.getDay();
+  let diff=(target-cur+7)%7;if(diff===0)diff=7;
+  d.setDate(d.getDate()+diff);
+  return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
+}
+function dateFromText(low){
+  if(/послезавтра/.test(low)){const d=new Date();d.setDate(d.getDate()+2);return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');}
+  if(/завтра/.test(low)){const d=new Date();d.setDate(d.getDate()+1);return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');}
+  for(const w in WEEKDAYS){if(low.includes(w))return nextWeekday(WEEKDAYS[w]);}
+  return todayKey();
+}
+function timeFromText(low){
+  const tm=low.match(/(\d{1,2})[:.\-](\d{2})|(?:в|к|на)\s*(\d{1,2})(?:\s|ч|$)/);
+  if(tm){const hh=tm[1]||tm[3];const mm=tm[2]||'00';return String(hh).padStart(2,'0')+':'+mm;}
+  return '';
+}
+function findOrNull(name){return getExpCats().some(c=>c.name===name)?name:null;}
+let pendingCat=null;
+
 function tryLocalCommand(text){
-  const low=text.toLowerCase();
-  // трата: "потратил 500 на продукты"
-  const expM=low.match(/потрат\w*\s+(\d+)|(\d+)\s*(?:р|руб|₽)/);
-  if(expM&&/(потрат|купил|заплат|отдал|ушло)/.test(low)){
-    const amount=Number(expM[1]||expM[2]);
-    if(amount){
-      let cat='Прочее';
-      getExpCats().forEach(c=>{if(low.includes(c.name.toLowerCase()))cat=c.name;});
-      if(/продукт|еда|магаз|хлеб|молоко/.test(low))cat='Продукты';
-      else if(/бензин|топлив|заправ/.test(low))cat='Топливо';
-      else if(/кафе|ресторан|обед|кофе/.test(low))cat='Кафе';
-      const d=load();if(!d.finance)d.finance=[];d.finance.push({id:Date.now(),date:todayKey(),desc:text,amount,category:cat});save(d);
-      checkBudgetAlert(cat);checkAchievements();
-      return `✅ Записал расход: <b>${fmtMoney(amount)}₽</b> — ${catStyleOf(cat).i} ${cat}`;
+  const parts=text.split(/[\n,;]|(?:\s+(?:после|потом|затем|также|так[- ]?же|ещё|еще|а)\s+)/i).map(s=>s.trim()).filter(s=>s.length>2);
+  let results=[];let anyDone=false;
+  parts.forEach(part=>{
+    const low=part.toLowerCase();
+    if(/зарплат|аванс|преми|получил|пришл\w* деньг|доход/.test(low)){
+      const am=low.match(/(\d[\d\s]*)\s*(?:р|руб|₽|тыс)/);
+      let amount=am?Number(am[1].replace(/\s/g,'')):0;
+      if(/тыс/.test(low)&&amount<1000)amount*=1000;
+      let src='Зарплата';
+      if(/аванс/.test(low))src='Аванс';else if(/преми/.test(low))src='Премия';
+      const d=load();if(!d.income)d.income=[];
+      d.income.push({id:Date.now()+Math.floor(Math.random()*9999),date:todayKey(),desc:part,amount:amount||0,source:src});
+      save(d);anyDone=true;
+      results.push(amount?`💵 Доход: <b>+${fmtMoney(amount)}₽</b> (${src})`:`💵 Отметил доход (${src}). Сумму допиши в Финансах`);
+      return;
     }
-  }
+    const expM=low.match(/(\d[\d\s]*)\s*(?:р|руб|₽)/)||low.match(/(?:на|за|потрат\w*)\s+(\d[\d\s]*)/);
+    if(expM&&/(потрат|купил|заплат|отдал|ушло|на\s+\d|за\s+\d)/.test(low)){
+      const amount=Number(expM[1].replace(/\s/g,''));
+      if(amount){
+        let cat=null;
+        getExpCats().forEach(c=>{if(low.includes(c.name.toLowerCase()))cat=c.name;});
+        if(!cat){
+          if(/вод[аыу]|продукт|еда|магаз|хлеб|молоко/.test(low))cat='Продукты';
+          else if(/бензин|топлив|заправ/.test(low))cat='Топливо';
+          else if(/кафе|ресторан|обед|кофе/.test(low))cat='Кафе';
+          else if(/подгуз|памперс|детск|малыш/.test(low))cat=findOrNull('Дети');
+          else if(/корм|собак|кошк|кот|питом|животн|ветеринар/.test(low))cat=findOrNull('Питомцы');
+        }
+        if(!cat){
+          const guess=/корм|собак|кошк|питом/.test(low)?'Питомцы':/подгуз|детск/.test(low)?'Дети':'Прочее';
+          pendingCat={amount,desc:part,guess};
+          results.push(`🤔 Трата <b>${fmtMoney(amount)}₽</b> — не нашёл категорию. Создать «<b>${guess}</b>»? Напиши «да» или название`);
+          anyDone=true;return;
+        }
+        const d=load();if(!d.finance)d.finance=[];
+        d.finance.push({id:Date.now()+Math.floor(Math.random()*9999),date:todayKey(),desc:part,amount,category:cat});
+        save(d);checkBudgetAlert(cat);anyDone=true;
+        results.push(`💰 Расход: <b>${fmtMoney(amount)}₽</b> — ${catStyleOf(cat).i} ${cat}`);
+        return;
+      }
+    }
+    if(/напомн|создай|добавь|закинь|скинь|нужно|надо|запланируй|встреч|поставь|запиши|не забыть|сходить|съездить|к \d|в больниц/.test(low)){
+      const date=dateFromText(low);
+      const time=timeFromText(low);
+      let title=part
+        .replace(/напомни|создай дело|создай|добавь дело|добавь|закинь дело|закинь|скинь|нужно|надо|запланируй|поставь дело|поставь|запиши дело|запиши|не забыть|мне|у меня/gi,'')
+        .replace(/послезавтра|завтра|сегодня/gi,'')
+        .replace(/в понедельник|во вторник|в среду|в четверг|в пятницу|в субботу|в воскресенье|в пн|во вт|в ср|в чт|в пт|в сб|в вс/gi,'')
+        .replace(/(?:в|к|на)\s*\d{1,2}[:.\-]?\d{0,2}(?:\s*ч)?/gi,'')
+        .replace(/\s+/g,' ').trim();
+      if(title.length>1){
+        const t=getTasks();
+        const obj={id:Date.now()+Math.floor(Math.random()*9999),title:title.charAt(0).toUpperCase()+title.slice(1),module:'personal',date,time,desc:'',pri:'Y',done:false};
+        t.push(obj);setTasks(t);scheduleLocalTimeout(obj);anyDone=true;
+        results.push(`✅ <b>${esc(obj.title)}</b> — 📅 ${fmtDate(date)}${time?' 🕐 '+time:''}`);
+        return;
+      }
+    }
+  });
+  if(anyDone){checkAchievements();return results.join('<br><br>');}
+  return null;
+}
   // дело: "напомни завтра купить хлеб"
   if(/напомн|создай дело|добавь дело|закинь|скинь дело|нужно|надо|запланируй|встреч|поставь дело|дело по|запиши дело|не забыть/.test(low)){
     let date=todayKey();
@@ -1866,7 +1934,27 @@ async function aiSend(){
   const text=inp.value.trim();if(!text)return;
   inp.value='';aiAddMsg('user',esc(text));
   document.getElementById('ai-suggest').innerHTML='';
-
+  if(pendingCat){
+    const low=text.toLowerCase().trim();
+    let catName=pendingCat.guess;
+    if(/^(да|давай|ага|ок|создай|конечно|угу)$/.test(low)){catName=pendingCat.guess;}
+    else if(low!=='нет'&&low.length>1&&low.length<20){catName=text.trim();}
+    if(low!=='нет'){
+      const cats=getExpCats();
+      if(!cats.some(c=>c.name===catName)){
+        const color=CAT_COLORS[cats.length%CAT_COLORS.length];
+        const emoji=/питом|собак|корм/.test(catName.toLowerCase())?'🐶':/дет|подгуз/.test(catName.toLowerCase())?'👶':'📦';
+        cats.splice(cats.length-1,0,{name:catName,i:emoji,c:color});
+        setExpCats(cats);
+      }
+      const d=load();if(!d.finance)d.finance=[];
+      d.finance.push({id:Date.now()+Math.floor(Math.random()*9999),date:todayKey(),desc:pendingCat.desc,amount:pendingCat.amount,category:catName});
+      save(d);checkBudgetAlert(catName);
+      aiAddMsg('ai',`✅ Создал категорию «<b>${esc(catName)}</b>» и записал трату <b>${fmtMoney(pendingCat.amount)}₽</b>`);
+      pendingCat=null;confetti();return;
+    }
+    pendingCat=null;aiAddMsg('ai','Ок, не создаю 👌');return;
+  }
   // локальные команды
   const local=tryLocalCommand(text);
   if(local){aiAddMsg('ai',local);confetti();if(currentTab==='ai'){}return;}
