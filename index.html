@@ -717,7 +717,7 @@ function switchTab(tab){
   if(isAI){document.getElementById('fab').style.display='none';if(!document.getElementById('ai-chat').children.length)aiHello();}
   else if(isFin)renderFinance();
   else if(isCal)renderCalendar();
-  lse if(isHabits)renderHabits();
+  else if(isHabits)renderHabits();
   else render();
   renderNav();
 }
