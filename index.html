@@ -190,6 +190,8 @@ body.dark::before{opacity:.55}
 .cal-cell .dot{position:absolute;bottom:5px;width:6px;height:6px;border-radius:50%;background:var(--ok)}
 .cal-cell .dot.over{background:var(--bad)}
 .cal-cell.today .dot{background:#fff}
+.cal-cell.weekend{color:#e5484d}
+.cal-cell.today.weekend{color:#fff}
 
 /* Финансы */
 .fin-hero{background:linear-gradient(135deg,var(--brand),var(--brand2));color:#fff;margin:12px 16px;border-radius:24px;padding:18px;box-shadow:var(--shadow)}
@@ -968,14 +970,17 @@ function renderCalendar(){
   let html=`<div class="calendar">
     <div class="cal-head"><button onclick="calNav(-1)">‹</button><span>${monthFull[m]} ${y}</span><button onclick="calNav(1)">›</button></div>
     <div class="cal-grid">`;
-  dow.forEach(d=>html+=`<div class="cal-dow">${d}</div>`);
+  dow.forEach((d,i)=>html+=`<div class="cal-dow" style="${i>=5?'color:#e5484d':''}">${d}</div>`);
   for(let i=0;i<startDow;i++)html+=`<div></div>`;
-  for(let d=1;d<=daysInMonth;d++){
+    for(let d=1;d<=daysInMonth;d++){
     const k=y+'-'+String(m+1).padStart(2,'0')+'-'+String(d).padStart(2,'0');
     const list=byDay[k]||[];
     const hasOver=list.some(t=>!t.done&&k<tk);
     const hasTask=list.some(t=>!t.done);
+    const cellDow=(startDow+d-1)%7;
+    const isWeekend=cellDow===5||cellDow===6;
     let cls='cal-cell';
+    if(isWeekend)cls+=' weekend';
     if(k===tk)cls+=' today';
     if(k===calSel)cls+=' sel';
     html+=`<div class="${cls}" onclick="calPick('${k}')">${d}${hasTask?`<span class="dot ${hasOver?'over':''}"></span>`:''}</div>`;
