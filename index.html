@@ -104,7 +104,7 @@ body.dark::before{opacity:.55}
 .fab:active{transform:translateX(180px) scale(.88)}
 
 .nav{position:fixed;bottom:0;left:50%;transform:translateX(-50%);width:480px;max-width:100%;background:var(--glass);backdrop-filter:blur(20px);display:flex;border-top:1px solid var(--line);z-index:30;overflow-x:auto;box-shadow:0 -6px 24px rgba(0,0,0,.08)}
-.nav button{flex:1 0 auto;min-width:60px;border:none;background:none;padding:11px 4px 15px;color:var(--muted);font-size:.68rem;
+.nav button{flex:1 0 auto;min-width:60px;border:none;background:none;padding:11px 4px 15px;color:var(--muted);font-size:.68rem;cursor:pointer;display:flex;flex-direction:column;align-items:center;gap:3px;white-space:nowrap;position:relative;transition:color .2s}
 .nav button.active{color:var(--brand)}
 .nav button.active::before{content:'';position:absolute;top:0;left:50%;transform:translateX(-50%);width:26px;height:3px;border-radius:3px;background:linear-gradient(90deg,var(--brand),var(--brand2));box-shadow:0 0 10px var(--brand)}
 .nav button i{font-size:1.35rem;font-style:normal;transition:transform .2s}
