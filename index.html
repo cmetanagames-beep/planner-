@@ -1475,7 +1475,7 @@ async function subscribePush(){
     const perm=await Notification.requestPermission();
     if(perm!=='granted'){toast('Разреши уведомления для пушей');return;}
     const reg=await navigator.serviceWorker.ready;
-    const keyResp=await fetch(FAMILY_SERVER+'/vapidPublicKey').then(r=>r.json()).catch(()=>null);
+    const keyResp=await fetch(FAMILY_SERVER+'/key').then(r=>r.json()).catch(()=>null);
     const pub=keyResp&&keyResp.key?keyResp.key:VAPID_PUBLIC;
     if(!pub){toast('Сервер пушей не настроен');return;}
     localStorage.setItem('vapid_public',pub);
