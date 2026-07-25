@@ -785,7 +785,7 @@ body.light-accent-body .fab{color:#1a1d2e!important}
     <h3 id="modal-title">Новое дело</h3>
     <div class="field"><label>Что нужно сделать?</label><input id="f-title" placeholder="Например: заменить масло"></div>
     <div class="field"><label>Категория</label><select id="f-module"></select></div>
-    <div class="field"><label>👤 Поручить (кому)</label><select id="f-assign"><option value="">Себе</option></select></div>
+    <div class="field" id="assign-field" style="display:none"><label>👤 Поручить (кому)</label><select id="f-assign"><option value="">Себе</option></select></div>
     <div class="two-col">
       <div class="field"><label>Дата</label><input id="f-date" type="date"></div>
       <div class="field"><label>🕐 Время</label><input id="f-time" type="time"></div>
@@ -1261,7 +1261,7 @@ function taskCardHTML(t){
       ${t.desc?`<div class="t-desc">${esc(t.desc)}</div>`:''}
       ${subs.length?`<div class="subtasks">${subs.map((s,i)=>`<div class="subtask ${s.done?'done':''}"><div class="sc ${s.done?'on':''}" onclick="toggleSubtask(${t.id},${i})">${s.done?'✓':''}</div><span>${esc(s.t)}</span></div>`).join('')}</div>`:''}
     </div>
-    <div class="t-acts"><button onclick="openAssign(${t.id})" title="Поручить">📤</button><button onclick="editTask(${t.id})">✏️</button><button onclick="delTask(${t.id})">🗑</button></div>
+        <div class="t-acts">${getFamilyState()?`<button onclick="openAssign(${t.id})" title="Поручить">📤</button>`:''}<button onclick="editTask(${t.id})">✏️</button><button onclick="delTask(${t.id})">🗑</button></div>
   </div>`;
 }
 
@@ -1489,6 +1489,8 @@ function openModal(){
 async function fillAssignSelect(){
   const sel=document.getElementById('f-assign');
   if(!sel)return;
+  const field=document.getElementById('assign-field');
+  if(field)field.style.display=getFamilyState()?'block':'none';
   const fam=getFamilyState();
   if(!fam){ sel.innerHTML='<option value="">Себе</option>'; return; }
   sel.innerHTML='<option value="">Себе</option>';
@@ -1935,10 +1937,20 @@ function openExpModal(){
   expType='exp';pickType('exp');expShared=false;renderSharedBox();
   document.getElementById('e-amount').value='';document.getElementById('e-desc').value='';document.getElementById('e-date').value=todayKey();
   document.getElementById('e-cat').innerHTML=getExpCats().map(c=>`<option value="${esc(c.name)}">${c.i} ${esc(c.name)}</option>`).join('');
+  // Семейную трату показываем только в семье
+  const shTog=document.getElementById('e-shared-toggle');
+  if(shTog)shTog.style.display=getFamilyState()?'flex':'none';
   document.getElementById('modal-exp').classList.add('on');
 }
 function closeExpModal(){document.getElementById('modal-exp').classList.remove('on');}
-function pickType(t){expType=t;document.getElementById('type-exp').classList.toggle('on',t==='exp');document.getElementById('type-inc').classList.toggle('on',t==='inc');document.getElementById('e-cat-field').style.display=t==='exp'?'block':'none';document.getElementById('e-src-field').style.display=t==='inc'?'block':'none';document.getElementById('e-shared-toggle').style.display=t==='exp'?'flex':'none';}
+function pickType(t){
+  expType=t;
+  document.getElementById('type-exp').classList.toggle('on',t==='exp');
+  document.getElementById('type-inc').classList.toggle('on',t==='inc');
+  document.getElementById('e-cat-field').style.display=t==='exp'?'block':'none';
+  document.getElementById('e-src-field').style.display=t==='inc'?'block':'none';
+  document.getElementById('e-shared-toggle').style.display=(t==='exp'&&getFamilyState())?'flex':'none';
+}
 function toggleExpShared(){expShared=!expShared;renderSharedBox();}
 function renderSharedBox(){document.getElementById('e-shared-box').classList.toggle('on',expShared);document.getElementById('e-shared-box').textContent=expShared?'✓':'';}
 function saveExpModal(){
