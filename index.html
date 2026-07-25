@@ -1577,7 +1577,7 @@ async function pullAssignedTasks(){
   if(!PUSH_USER_ID)return;
   try{const r=await fetch(FAMILY_SERVER+'/inbox',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({userId:PUSH_USER_ID})});const d=await r.json();
     if(d.ok&&d.tasks&&d.tasks.length){const t=getTasks();let n=0;
-      d.tasks.forEach(a=>{if(!t.some(x=>x.assignId===a.assignId)){t.push({id:Date.now()+Math.floor(Math.random()*10000),assignId:a.assignId,title:a.title,module:a.module||'personal',date:a.date||todayKey(),time:a.time||'',desc:a.desc||'',pri:a.pri||'Y',done:false,fromUserId:a.fromUserId,fromName:a.fromName});n++;});};
+      d.tasks.forEach(a=>{if(!t.some(x=>x.assignId===a.assignId)){t.push({id:Date.now()+Math.floor(Math.random()*10000),assignId:a.assignId,title:a.title,module:a.module||'personal',date:a.date||todayKey(),time:a.time||'',desc:a.desc||'',pri:a.pri||'Y',done:false,fromUserId:a.fromUserId,fromName:a.fromName});n++;}});
       if(n){setTasks(t);toast('📥 Новых поручений: '+n);if(currentTab!=='ai'&&currentTab!=='finance')render();}}}
   catch(e){}
 }
