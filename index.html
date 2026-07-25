@@ -249,6 +249,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;b
     <h3 id="modal-title">Новое дело</h3>
     <div class="field"><label>Что нужно сделать?</label><input id="f-title" placeholder="Например: заменить масло"></div>
     <div class="field"><label>Категория</label><select id="f-module"></select></div>
+    <div class="field"><label>👤 Поручить (кому)</label><select id="f-assign"><option value="">Себе</option></select></div>
     <div class="two-col">
       <div class="field"><label>Дата</label><input id="f-date" type="date"></div>
       <div class="field"><label>🕐 Время</label><input id="f-time" type="time"></div>
@@ -626,7 +627,7 @@ function fillModuleSelect(){
   document.getElementById('f-module').innerHTML=getCats().map(c=>`<option value="${c.id}">${c.emoji} ${esc(c.name)}</option>`).join('');
 }
 function openModal(){
-  editId=null;fillModuleSelect();editSubs=[];
+  editId=null;fillModuleSelect();fillAssignSelect();editSubs=[];
   document.getElementById('modal-title').textContent='Новое дело';
   document.getElementById('f-title').value='';
   const validCat=getCats().some(c=>c.id===currentTab);
@@ -638,21 +639,51 @@ function openModal(){
   renderSubList();pickPri('Y');
   document.getElementById('modal').classList.add('on');
 }
+  // заполняем выпадающий список "кому поручить"
+async function fillAssignSelect(){
+  const sel=document.getElementById('f-assign');
+  if(!sel)return;
+  const fam=getFamilyState();
+  // если не в семье — только "Себе"
+  if(!fam){ sel.innerHTML='<option value="">Себе</option>'; return; }
+  sel.innerHTML='<option value="">Себе</option>';
+  try{
+    const r=await fetch(FAMILY_SERVER+'/family/list',{
+      method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({userId:PUSH_USER_ID})
+    });
+    const data=await r.json();
+    if(data.ok){
+      data.members.filter(m=>m.userId!==PUSH_USER_ID).forEach(m=>{
+        const o=document.createElement('option');
+        o.value=m.userId; o.textContent='👤 '+m.name;
+        sel.appendChild(o);
+      });
+    }
+  }catch(e){}
+}
 function closeModal(){document.getElementById('modal').classList.remove('on');}
 function pickPri(p){currentPri=p;document.querySelectorAll('#modal .seg button').forEach(b=>b.classList.toggle('on',b.dataset.pri===p));}
-function saveTask(){
-  const title=document.getElementById('f-title').value.trim();
-  if(!title){toast('Введи название');return;}
-  const obj={title,module:document.getElementById('f-module').value,date:document.getElementById('f-date').value||'',time:document.getElementById('f-time').value||'',desc:document.getElementById('f-desc').value.trim(),pri:currentPri,repeat:document.getElementById('f-repeat').value||'',subs:editSubs.slice()};
-  const t=getTasks();
-  if(editId){const x=t.find(a=>a.id===editId);if(x)Object.assign(x,obj);}
-  else{obj.id=Date.now()+Math.floor(Math.random()*1000);obj.done=false;t.push(obj);}
-  setTasks(t);closeModal();
+function   setTasks(t);
+  // проверяем — кому поручить?
+  const assignTo=document.getElementById('f-assign')?document.getElementById('f-assign').value:'';
+  if(assignTo){
+    // поручаем другому — шлём на сервер
+    fetch(FAMILY_SERVER+'/family/assign',{
+      method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({userId:PUSH_USER_ID,toUserId:assignTo,task:{
+        title:obj.title,desc:obj.desc||'',date:obj.date||'',time:obj.time||'',pri:obj.pri||'Y',module:obj.module||'personal'
+      }})
+    }).then(r=>r.json()).then(d=>{
+      if(d.ok)toast('✅ Поручено!');
+      else toast('Задача создана (поручить не вышло)');
+    }).catch(()=>toast('Задача создана (нет связи для поручения)'));
+  }
+  closeModal();
   if(editId){const saved=t.find(a=>a.id===editId);if(saved)scheduleLocalTimeout(saved);}
   else scheduleLocalTimeout(obj);
   if(currentTab==='calendar')renderCalendar();else render();
-  toast('Сохранено ✅');
-}
+  if(!assignTo)toast('Сохранено ✅');
 
 let editSubs=[];
 function renderSubList(){
