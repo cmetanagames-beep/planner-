@@ -211,6 +211,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;b
       <div class="quote-chip" id="quoteChip"></div>
     </div>
     <div class="hero-btns">
+      <button onclick="openFamily()" title="Семья">👨‍👩‍👦</button>
       <button onclick="openHelp()" title="Возможности">❓</button>
       <button onclick="openSettings()" title="Настройки">⚙️</button>
       <button onclick="subscribePush()" title="Включить фоновые пуши">📲</button>
@@ -391,6 +392,21 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;b
   </div>
 </div>
 
+  <div class="modal" id="modal-family">
+  <div class="sheet">
+    <h3>👨‍👩‍👦 Семья</h3>
+    <div id="family-body"></div>
+  </div>
+</div>
+
+<div class="modal" id="modal-assign">
+  <div class="sheet">
+    <h3>📋 Кому поручить?</h3>
+    <div id="assign-body"></div>
+    <button class="btn ghost" onclick="closeAssign()">Отмена</button>
+  </div>
+</div>
+  
 <div class="modal" id="modal-help">
   <div class="sheet">
     <h3>✨ Что умеет приложение</h3>
@@ -523,7 +539,7 @@ function taskCardHTML(t){
       ${t.desc?`<div class="t-desc">${esc(t.desc)}</div>`:''}
       ${subs.length?`<div class="subtasks">${subs.map((s,i)=>`<div class="subtask ${s.done?'done':''}"><div class="sc ${s.done?'on':''}" onclick="toggleSubtask(${t.id},${i})">${s.done?'✓':''}</div><span>${esc(s.t)}</span></div>`).join('')}</div>`:''}
     </div>
-    <div class="t-acts"><button onclick="editTask(${t.id})">✏️</button><button onclick="delTask(${t.id})">🗑</button></div>
+        <div class="t-acts"><button onclick="openAssign(${t.id})" title="Поручить">📤</button><button onclick="editTask(${t.id})">✏️</button><button onclick="delTask(${t.id})">🗑</button></div>
   </div>`;
 }
 
@@ -1816,6 +1832,8 @@ function init(){
   checkAchievements();
   if('Notification'in window&&Notification.permission==='granted')scheduleNotifyCheck();
   syncPushData();
+    checkInbox();
+  setInterval(checkInbox, 60000); // проверяем поручения раз в минуту
 
   // Регистрируем service worker (если файл sw.js есть рядом — для PWA-офлайна)
   if('serviceWorker'in navigator){
@@ -1880,6 +1898,205 @@ document.getElementById('fab').onclick=function(){
   else openModal();
 };
 document.addEventListener('DOMContentLoaded',function(){ init(); restoreLocalTimers(); });
+// ============ 👨‍👩‍👦 СЕМЬЯ / ДЕЛЕГИРОВАНИЕ ============
+const FAMILY_SERVER = 'https://pushevgen.duckdns.org';
+
+function getFamilyState(){ return load().family || null; }
+function setFamilyState(f){ const d=load(); d.family=f; save(d); }
+
+// открыть окно семьи
+async function openFamily(){
+  document.getElementById('modal-family').classList.add('on');
+  const fam = getFamilyState();
+  if(!fam){
+    renderFamilyEmpty();
+  }else{
+    document.getElementById('family-body').innerHTML='<p style="color:var(--muted)">Загрузка...</p>';
+    await refreshFamily();
+  }
+}
+function closeFamily(){ document.getElementById('modal-family').classList.remove('on'); }
+
+// экран "нет семьи"
+function renderFamilyEmpty(){
+  document.getElementById('family-body').innerHTML=`
+    <p style="font-size:.85rem;color:var(--muted);margin-bottom:14px">Создай семью и поделись кодом с близкими — или войди по коду.</p>
+    <div class="field"><label>Твоё имя</label><input id="fam-name" placeholder="Например: Женя"></div>
+    <button class="btn" onclick="familyCreate()">➕ Создать семью</button>
+    <div class="sub-h">или войти по коду</div>
+    <div class="field"><label>Код семьи</label><input id="fam-code" placeholder="Например: A7K2" maxlength="4" style="text-transform:uppercase"></div>
+    <button class="btn ghost" onclick="familyJoin()">🔑 Войти в семью</button>
+    <button class="btn ghost" onclick="closeFamily()" style="margin-top:16px">Закрыть</button>`;
+}
+
+// создать семью
+async function familyCreate(){
+  const name=(document.getElementById('fam-name').value||'').trim();
+  if(!name){ toast('Введи своё имя'); return; }
+  try{
+    const r=await fetch(FAMILY_SERVER+'/family/create',{
+      method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({userId:PUSH_USER_ID,name})
+    });
+    const data=await r.json();
+    if(!data.ok){ toast('Ошибка: '+(data.err||'')); return; }
+    setFamilyState({code:data.familyCode,name:data.name});
+    confetti();toast('Семья создана! 🎉');
+    await refreshFamily();
+  }catch(e){ toast('Нет связи с сервером ❌'); }
+}
+
+// войти в семью
+async function familyJoin(){
+  const name=(document.getElementById('fam-name').value||'').trim();
+  const code=(document.getElementById('fam-code').value||'').trim().toUpperCase();
+  if(!name){ toast('Введи своё имя'); return; }
+  if(!code){ toast('Введи код семьи'); return; }
+  try{
+    const r=await fetch(FAMILY_SERVER+'/family/join',{
+      method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({userId:PUSH_USER_ID,name,familyCode:code})
+    });
+    const data=await r.json();
+    if(!data.ok){ toast('Ошибка: '+(data.err||'')); return; }
+    setFamilyState({code:data.familyCode,name:data.name});
+    confetti();toast('Ты в семье! 👨‍👩‍👦');
+    await refreshFamily();
+  }catch(e){ toast('Нет связи с сервером ❌'); }
+}
+
+// обновить список семьи
+async function refreshFamily(){
+  const fam=getFamilyState();
+  if(!fam)return;
+  try{
+    const r=await fetch(FAMILY_SERVER+'/family/list',{
+      method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({userId:PUSH_USER_ID})
+    });
+    const data=await r.json();
+    if(!data.ok){ setFamilyState(null); renderFamilyEmpty(); return; }
+    fam.members=data.members; setFamilyState(fam);
+    renderFamilyList(data);
+  }catch(e){
+    document.getElementById('family-body').innerHTML='<p style="color:var(--bad)">Нет связи с сервером ❌</p><button class="btn ghost" onclick="closeFamily()">Закрыть</button>';
+  }
+}
+
+// показать состав семьи
+function renderFamilyList(data){
+  const others=data.members.filter(m=>m.userId!==PUSH_USER_ID);
+  let html=`
+    <div style="background:var(--bg);border-radius:14px;padding:14px;text-align:center;margin-bottom:14px">
+      <small style="color:var(--muted)">Код семьи (поделись им 👇)</small>
+      <div style="font-size:1.8rem;font-weight:800;letter-spacing:4px;color:var(--brand);margin-top:4px">${esc(data.familyCode)}</div>
+    </div>
+    <div class="sub-h">Участники · ${data.members.length}</div>`;
+  data.members.forEach(m=>{
+    const me=m.userId===PUSH_USER_ID;
+    html+=`<div class="cat-item"><span class="emo">${me?'🧑':'👤'}</span><span class="nm">${esc(m.name)}${me?' (ты)':''}</span></div>`;
+  });
+  if(!others.length){
+    html+=`<p style="font-size:.82rem;color:var(--muted);margin-top:10px">Пока ты один. Дай код близким, чтобы они вошли! 💌</p>`;
+  }
+  html+=`<button class="btn ghost" onclick="familyLeave()" style="margin-top:16px;color:var(--bad)">🚪 Выйти из семьи</button>
+    <button class="btn ghost" onclick="closeFamily()">Закрыть</button>`;
+  document.getElementById('family-body').innerHTML=html;
+}
+
+// выйти из семьи
+async function familyLeave(){
+  if(!confirm('Выйти из семьи?'))return;
+  try{
+    await fetch(FAMILY_SERVER+'/family/leave',{
+      method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({userId:PUSH_USER_ID})
+    });
+  }catch(e){}
+  setFamilyState(null);renderFamilyEmpty();toast('Ты вышел из семьи 🚪');
+}
+
+// ===== ПОРУЧИТЬ ЗАДАЧУ =====
+let _assignTask=null;
+async function openAssign(taskId){
+  const fam=getFamilyState();
+  if(!fam){ toast('Сначала создай семью 👨‍👩‍👦'); openFamily(); return; }
+  const t=getTasks().find(x=>x.id===taskId);
+  if(!t){ toast('Задача не найдена'); return; }
+  _assignTask=t;
+  document.getElementById('modal-assign').classList.add('on');
+  document.getElementById('assign-body').innerHTML='<p style="color:var(--muted)">Загрузка...</p>';
+  // обновим список семьи
+  try{
+    const r=await fetch(FAMILY_SERVER+'/family/list',{
+      method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({userId:PUSH_USER_ID})
+    });
+    const data=await r.json();
+    if(!data.ok){ document.getElementById('assign-body').innerHTML='<p style="color:var(--bad)">Ошибка семьи</p>'; return; }
+    const others=data.members.filter(m=>m.userId!==PUSH_USER_ID);
+    if(!others.length){
+      document.getElementById('assign-body').innerHTML='<p style="color:var(--muted)">В семье пока нет других участников. Дай им код семьи! 💌</p>';
+      return;
+    }
+    let html=`<p style="font-size:.85rem;color:var(--muted);margin-bottom:12px">Задача: <b>${esc(t.title)}</b></p>`;
+    others.forEach(m=>{
+      html+=`<button class="btn" style="margin-bottom:8px" onclick="assignTo('${m.userId}','${esc(m.name)}')">👤 ${esc(m.name)}</button>`;
+    });
+    document.getElementById('assign-body').innerHTML=html;
+  }catch(e){
+    document.getElementById('assign-body').innerHTML='<p style="color:var(--bad)">Нет связи ❌</p>';
+  }
+}
+function closeAssign(){ document.getElementById('modal-assign').classList.remove('on'); _assignTask=null; }
+
+async function assignTo(toUserId,name){
+  if(!_assignTask)return;
+  const task={
+    title:_assignTask.title, desc:_assignTask.desc||'', date:_assignTask.date||'',
+    time:_assignTask.time||'', pri:_assignTask.pri||'Y', module:_assignTask.module||'personal'
+  };
+  try{
+    const r=await fetch(FAMILY_SERVER+'/family/assign',{
+      method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({userId:PUSH_USER_ID,toUserId,task})
+    });
+    const data=await r.json();
+    if(!data.ok){ toast('Ошибка: '+(data.err||'')); return; }
+    confetti();vibrate([30,50,30]);
+    toast('✅ Поручено: '+name);
+    closeAssign();
+  }catch(e){ toast('Нет связи ❌'); }
+}
+
+// ===== ПРОВЕРКА ВХОДЯЩИХ ПОРУЧЕНИЙ =====
+async function checkInbox(){
+  if(!PUSH_USER_ID)return;
+  try{
+    const r=await fetch(FAMILY_SERVER+'/family/inbox',{
+      method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({userId:PUSH_USER_ID})
+    });
+    const data=await r.json();
+    if(!data.ok||!data.items||!data.items.length)return;
+    const t=getTasks();
+    data.items.forEach(it=>{
+      const task=it.task||{};
+      t.push({
+        id:Date.now()+Math.floor(Math.random()*100000),
+        title:(task.title||'Задача')+' (от '+it.fromName+')',
+        module:(getCats().some(c=>c.id===task.module)?task.module:'personal'),
+        date:task.date||'',time:task.time||'',desc:task.desc||'',
+        pri:task.pri||'Y',repeat:'',subs:[],done:false
+      });
+    });
+    setTasks(t);
+    confetti();vibrate([40,60,40]);
+    toast('📬 Новых поручений: '+data.items.length);
+    if(currentTab!=='finance'&&currentTab!=='ai')render();
+  }catch(e){}
+}
+
   
 // ============ ФОНОВЫЕ ПУШ-УВЕДОМЛЕНИЯ ============
 const PUSH_SERVER = 'https://pushevgen.duckdns.org/';
