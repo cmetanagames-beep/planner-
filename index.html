@@ -1831,9 +1831,10 @@ function init(){
   aiHello();
   checkAchievements();
   if('Notification'in window&&Notification.permission==='granted')scheduleNotifyCheck();
-  syncPushData();
-    checkInbox();
-  setInterval(checkInbox, 60000); // проверяем поручения раз в минуту
+    syncPushData();
+  setTimeout(()=>{
+    try{ checkInbox(); setInterval(checkInbox, 60000); }catch(e){}
+  }, 1500);
 
   // Регистрируем service worker (если файл sw.js есть рядом — для PWA-офлайна)
   if('serviceWorker'in navigator){
