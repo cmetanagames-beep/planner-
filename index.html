@@ -1540,8 +1540,26 @@ function saveMyProfile(){
   fetch(FAMILY_SERVER+'/profile',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({userId:PUSH_USER_ID,name:d.myName,role:d.myRole})}).catch(()=>{});
 }
 async function createFamily(){
-  if(!getMyName()){toast('Сначала введи имя');return;}saveMyProfile();
-  try{const r=await fetch(FAMILY_SERVER+'/family/create',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({userId:PUSH_USER_ID,name:getMyName(),role:getMyRole()})});const d=await r.json();if(d.ok){const s=load();s.familyId=d.familyId;save(s);confetti();toast('👨‍👩‍👦 Семья создана!');renderFamily();}}
+  if(!getMyName()){toast('Сначала введи имя');return;}
+  saveMyProfile();
+  try{
+    const r=await fetch(FAMILY_SERVER+'/family/create',{
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({userId:PUSH_USER_ID,name:getMyName(),role:getMyRole()})
+    });
+    const d=await r.json();
+    if(d.ok){
+      const s=load();
+      s.familyId=d.familyCode;   // ← ИСПРАВЛЕНО: было d.familyId, стало d.familyCode
+      save(s);
+      confetti();
+      toast('👨‍👩‍👦 Семья создана! Код: '+d.familyCode);
+      renderFamily();
+    } else {
+      toast(d.err||'Ошибка создания');
+    }
+  }
   catch(e){toast('Сервер недоступен');}
 }
 async function joinFamily(){
