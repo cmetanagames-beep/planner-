@@ -664,11 +664,17 @@ async function fillAssignSelect(){
 }
 function closeModal(){document.getElementById('modal').classList.remove('on');}
 function pickPri(p){currentPri=p;document.querySelectorAll('#modal .seg button').forEach(b=>b.classList.toggle('on',b.dataset.pri===p));}
-function   setTasks(t);
+function saveTask(){
+  const title=document.getElementById('f-title').value.trim();
+  if(!title){toast('Введи название');return;}
+  const obj={title,module:document.getElementById('f-module').value,date:document.getElementById('f-date').value||'',time:document.getElementById('f-time').value||'',desc:document.getElementById('f-desc').value.trim(),pri:currentPri,repeat:document.getElementById('f-repeat').value||'',subs:editSubs.slice()};
+  const t=getTasks();
+  if(editId){const x=t.find(a=>a.id===editId);if(x)Object.assign(x,obj);}
+  else{obj.id=Date.now()+Math.floor(Math.random()*1000);obj.done=false;t.push(obj);}
+  setTasks(t);
   // проверяем — кому поручить?
   const assignTo=document.getElementById('f-assign')?document.getElementById('f-assign').value:'';
   if(assignTo){
-    // поручаем другому — шлём на сервер
     fetch(FAMILY_SERVER+'/family/assign',{
       method:'POST',headers:{'Content-Type':'application/json'},
       body:JSON.stringify({userId:PUSH_USER_ID,toUserId:assignTo,task:{
@@ -684,6 +690,8 @@ function   setTasks(t);
   else scheduleLocalTimeout(obj);
   if(currentTab==='calendar')renderCalendar();else render();
   if(!assignTo)toast('Сохранено ✅');
+}
+
 
 let editSubs=[];
 function renderSubList(){
