@@ -1919,6 +1919,7 @@ async function aiSend(){
   const text=inp.value.trim();if(!text)return;
   inp.value='';aiAddMsg('user',esc(text));
   document.getElementById('ai-suggest').innerHTML='';
+
   if(pendingCat){
     const low=text.toLowerCase().trim();
     let catName=pendingCat.guess;
@@ -1940,35 +1941,110 @@ async function aiSend(){
     }
     pendingCat=null;aiAddMsg('ai','Ок, не создаю 👌');return;
   }
-  // локальные команды
-  const local=tryLocalCommand(text);
-  if(local){aiAddMsg('ai',local);confetti();if(currentTab==='ai'){}return;}
 
-  // погода напрямую
   if(isWeatherQuery(text)){
     const w=weatherSummaryText();
     if(w){aiAddMsg('ai','🌤️ '+w.replace(/\n/g,'<br>'));return;}
   }
 
   const key=ensureApiKey();
-  if(!key){aiAddMsg('ai','🔑 Чтобы я мог думать, нужен бесплатный ключ Groq.<br>Нажми на меня ещё раз и вставь ключ с console.groq.com/keys');return;}
+  if(!key){
+    const local=tryLocalCommand(text);
+    if(local){aiAddMsg('ai',local);confetti();return;}
+    aiAddMsg('ai','🔑 Нужен бесплатный ключ Groq. Нажми на меня ещё раз и вставь ключ с console.groq.com/keys');
+    return;
+  }
 
   aiTyping();
+
+  const looksLikeCommand=/напомн|создай|добавь|запиши|встреч|надо|нужно|купил|потрат|заплат|зарплат|получил|доход|расход|трат|съезд|сходить|позвон|не забы|\d+\s*(р|руб|₽)|в \d{1,2}[:.\- ]|завтра|послезавтра|понедельн|вторник|сред|четверг|пятниц|суббот|воскрес/i.test(text);
+
+  if(looksLikeCommand){
+    const ok=await aiParseCommands(text);
+    if(ok)return;
+  }
+
   aiHistory.push({role:'user',content:text});
   if(aiHistory.length>10)aiHistory=aiHistory.slice(-10);
-
   const sys={role:'system',content:`Ты — дружелюбный русскоязычный ассистент в приложении-планировщике для семьи. Отвечай коротко, по делу, с эмодзи. Помогай с планированием дел, финансами, бытом, огородом, авто. Контекст пользователя: ${buildContext()}`};
-
   try{
     const r=await fetch(API_URL,{method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer '+key},body:JSON.stringify({model:MODEL,messages:[sys,...aiHistory],temperature:0.7,max_tokens:600})});
     aiStopTyping();
-    if(r.status===401){resetApiKey();aiAddMsg('ai','🔑 Ключ недействителен. Введи новый — просто напиши что-нибудь ещё раз.');return;}
-    if(!r.ok){aiAddMsg('ai','😔 Ошибка сервера ИИ ('+r.status+'). Попробуй позже.');return;}
+    if(r.status===401){resetApiKey();aiAddMsg('ai','🔑 Ключ недействителен. Попробуй ещё раз.');return;}
+    if(!r.ok){aiAddMsg('ai','😔 Ошибка сервера ИИ ('+r.status+').');return;}
     const d=await r.json();
     const answer=d.choices?.[0]?.message?.content||'Не смог ответить 😔';
     aiHistory.push({role:'assistant',content:answer});
     aiAddMsg('ai',esc(answer).replace(/\n/g,'<br>').replace(/\*\*(.+?)\*\*/g,'<b>$1</b>'));
-  }catch(e){aiStopTyping();aiAddMsg('ai','😔 Нет связи с ИИ. Проверь интернет.');}
+  }catch(e){aiStopTyping();aiAddMsg('ai','😔 Нет связи с ИИ.');}
+}
+
+async function aiParseCommands(text){
+  const key=getApiKey();
+  const today=new Date();
+  const dow=['воскресенье','понедельник','вторник','среда','четверг','пятница','суббота'][today.getDay()];
+  const cats=getExpCats().map(c=>c.name).join(', ');
+
+  const sys={role:'system',content:
+`Ты парсер команд планировщика. Пользователь пишет БЕЗ запятых, сплошным текстом. Раздели его сообщение на отдельные действия и верни СТРОГО JSON-массив, без пояснений.
+
+Сегодня: ${todayKey()} (${dow}).
+
+Каждый элемент — один из типов:
+1. Дело: {"type":"task","title":"...","date":"YYYY-MM-DD","time":"HH:MM"}
+2. Расход: {"type":"expense","amount":число,"category":"...","desc":"..."}
+3. Доход: {"type":"income","amount":число,"source":"Зарплата|Аванс|Премия|Прочее","desc":"..."}
+
+Правила:
+- Даты: "завтра"=+1 день, "послезавтра"=+2, дни недели=ближайший будущий такой день. Нет даты у дела — ставь сегодня.
+- Время "9-00","9.00","в 9","к 9 часам" = "09:00". Нет времени — пустая строка "".
+- Категории расходов выбирай ТОЛЬКО из: ${cats}. Вода/еда/хлеб/молоко=Продукты, бензин=Топливо, подгузники/детское=Дети. Если не подходит — "Прочее".
+- "купил/потратил/заплатил X на Y" = расход. "получил/зарплата/премия" = доход.
+- Заголовок дела делай коротким и с большой буквы, без слов "напомни","надо","смотри".
+- Если ничего не понял — верни [].`};
+
+  try{
+    const r=await fetch(API_URL,{method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer '+key},body:JSON.stringify({model:MODEL,messages:[sys,{role:'user',content:text}],temperature:0.1,max_tokens:900})});
+    if(!r.ok){aiStopTyping();return false;}
+    const d=await r.json();
+    let raw=d.choices?.[0]?.message?.content||'';
+    const m=raw.match(/\[[\s\S]*\]/);
+    if(!m){aiStopTyping();return false;}
+    let items;
+    try{items=JSON.parse(m[0]);}catch(e){aiStopTyping();return false;}
+    if(!Array.isArray(items)||!items.length){aiStopTyping();return false;}
+
+    aiStopTyping();
+    const results=[];
+    const dd=load();
+    if(!dd.finance)dd.finance=[];
+    if(!dd.income)dd.income=[];
+    const tasks=getTasks();
+
+    items.forEach(it=>{
+      if(it.type==='task'&&it.title){
+        const obj={id:Date.now()+Math.floor(Math.random()*99999),title:it.title,module:'personal',date:it.date||todayKey(),time:it.time||'',desc:'',pri:'Y',done:false};
+        tasks.push(obj);scheduleLocalTimeout(obj);
+        results.push(`✅ <b>${esc(it.title)}</b> — 📅 ${fmtDate(obj.date)}${obj.time?' 🕐 '+obj.time:''}`);
+      }
+      else if(it.type==='expense'&&it.amount){
+        let cat=it.category||'Прочее';
+        if(!getExpCats().some(c=>c.name===cat))cat='Прочее';
+        dd.finance.push({id:Date.now()+Math.floor(Math.random()*99999),date:todayKey(),desc:it.desc||'',amount:Number(it.amount),category:cat});
+        results.push(`💰 Расход: <b>${fmtMoney(it.amount)}₽</b> — ${catStyleOf(cat).i} ${cat}`);
+      }
+      else if(it.type==='income'&&it.amount){
+        dd.income.push({id:Date.now()+Math.floor(Math.random()*99999),date:todayKey(),desc:it.desc||'',amount:Number(it.amount),source:it.source||'Прочее'});
+        results.push(`💵 Доход: <b>+${fmtMoney(it.amount)}₽</b> (${it.source||'Прочее'})`);
+      }
+    });
+
+    if(!results.length)return false;
+    setTasks(tasks);save(dd);
+    checkAchievements();confetti();vibrate(40);
+    aiAddMsg('ai',results.join('<br><br>'));
+    return true;
+  }catch(e){aiStopTyping();return false;}
 }
 
 /* ===== ИНИЦИАЛИЗАЦИЯ ===== */
