@@ -545,7 +545,7 @@ body.dark::before{opacity:.55}
 <div class="toast" id="toast"></div>
 
 <script>
-const API_URL='https://corsproxy.io/?url='+encodeURIComponent('https://api.groq.com/openai/v1/chat/completions');
+const API_URL='https://api.groq.com/openai/v1/chat/completions';
 const MODEL='llama-3.1-8b-instant';
 const AI_KEY_STORE='groq_api_key';
 function getApiKey(){return localStorage.getItem(AI_KEY_STORE)||'';}
@@ -1916,9 +1916,9 @@ function buildContext(){
 
 async function aiSend(){
   const inp=document.getElementById('ai-input');
-  const text=inp.value.trim();if(!text)return;
+    const text=inp.value.trim();if(!text)return;
+  window._lastUserText=text;
   inp.value='';aiAddMsg('user',esc(text));
-  document.getElementById('ai-suggest').innerHTML='';
 
   if(pendingCat){
     const low=text.toLowerCase().trim();
@@ -1960,9 +1960,17 @@ async function aiSend(){
   const looksLikeCommand=/напомн|создай|добавь|запиши|встреч|надо|нужно|купил|потрат|заплат|зарплат|получил|доход|расход|трат|съезд|сходить|позвон|не забы|\d+\s*(р|руб|₽)|в \d{1,2}[:.\- ]|завтра|послезавтра|понедельн|вторник|сред|четверг|пятниц|суббот|воскрес/i.test(text);
 
   if(looksLikeCommand){
-    const ok=await aiParseCommands(text);
-    if(ok)return;
-  }
+    try{
+      const result=await aiParse(text);
+      aiStopTyping();
+      handleAIResult(result);
+      return;
+    }catch(err){
+      aiStopTyping();
+      aiAddMsg('ai','❌ Ошибка ИИ: '+esc(err.message||''));
+      return;
+    }
+}
 
   aiHistory.push({role:'user',content:text});
   if(aiHistory.length>10)aiHistory=aiHistory.slice(-10);
@@ -1979,81 +1987,244 @@ async function aiSend(){
   }catch(e){aiStopTyping();aiAddMsg('ai','😔 Нет связи с ИИ.');}
 }
 
-async function aiParseCommands(text){
-  const key=getApiKey();
-  const today=new Date();
-  const dow=['воскресенье','понедельник','вторник','среда','четверг','пятница','суббота'][today.getDay()];
-  const expCats=getExpCats().map(c=>c.name).join(', ');
+async function aiParse(text){
+  const today=todayKey();
+  const now=new Date();
+  const nowHM=String(now.getHours()).padStart(2,'0')+':'+String(now.getMinutes()).padStart(2,'0');
+  const catList=getCats().map(c=>c.id+' ('+c.name+')').join(', ');
+  const expCatList=getExpCats().map(c=>c.name).join(', ');
+        const sys=`Ты помощник-планировщик. Сегодня ${today} (ГГГГ-ММ-ДД). Время ${nowHM}.
+Верни ТОЛЬКО валидный JSON без markdown.
 
-  const sys={role:'system',content:
-`Ты парсер команд планировщика. Пользователь пишет БЕЗ запятых. Раздели сообщение на действия и верни СТРОГО JSON-массив, без пояснений.
-Сегодня: ${todayKey()} (${dow}).
-Типы:
-1. Дело: {"type":"task","title":"...","date":"YYYY-MM-DD","time":"HH:MM"}
-2. Расход: {"type":"expense","amount":число,"category":"...","desc":"..."}
-3. Доход: {"type":"income","amount":число,"source":"Зарплата","desc":"..."}
-Правила:
-- "завтра"=+1,"послезавтра"=+2,дни недели=ближайший будущий. Нет даты — сегодня.
-- "9-00","в 9"="09:00". Нет времени — "".
-- category выбирай из: ${expCats}. Вода/еда=Продукты,бензин=Топливо,подгузники=Дети. ЕСЛИ нет подходящей (корм/собака/кошка) — придумай НОВОЕ слово: Питомцы, Здоровье. НЕ пиши "Прочее" если можно точнее.
-- Заголовок дела: коротко, с большой буквы, без "напомни/надо/смотри".
-- Ничего не понял — [].`};
+⚠️ КРИТИЧЕСКИ ВАЖНО: анализируй ТОЛЬКО текущее сообщение пользователя ниже. НИКОГДА не копируй пример формата — он показан лишь для структуры JSON, а не как готовый ответ.
+Если в сообщении НЕТ конкретных дел/трат/доходов (просто приветствие, вопрос, болтовня типа "привет", "как дела", "ты тут?") — верни {"chat":"твой ответ"} и ОБЯЗАТЕЛЬНО оставь "tasks","expenses","incomes" пустыми или не включай их вообще.
 
+В сообщении может быть НЕСКОЛЬКО действий. Разложи ВСЁ по группам:
+{
+ "tasks":[{"type":"task","title":"суть","date":"ГГГГ-ММ-ДД","time":"ЧЧ:ММ или пусто","module":"id","pri":"R/Y/B","desc":""}],
+ "expenses":[{"type":"expense","amount":число,"category":"из списка","desc":"","date":"ГГГГ-ММ-ДД"}],
+ "incomes":[{"type":"income","amount":число,"source":"источник","date":"ГГГГ-ММ-ДД"}],
+ "chat":"текст, только если это болтовня без действий"
+}
+Пустые группы можно опустить. Каждое дело/трату/доход — ОТДЕЛЬНЫМ элементом в своём массиве.
+
+ФОРМАТ ДАТ ДЛЯ ПРИМЕРА (не копируй значения, только структуру!):
+{"tasks":[{"type":"task","title":"НАЗВАНИЕ_ИЗ_СООБЩЕНИЯ","date":"ГГГГ-ММ-ДД","time":"ЧЧ:ММ","module":"personal","pri":"Y","desc":""}],
+"expenses":[{"type":"expense","amount":ЧИСЛО_ИЗ_СООБЩЕНИЯ,"category":"КАТЕГОРИЯ","desc":"","date":"ГГГГ-ММ-ДД"}],
+"incomes":[{"type":"income","amount":ЧИСЛО_ИЗ_СООБЩЕНИЯ,"source":"ИСТОЧНИК","date":"ГГГГ-ММ-ДД"}]}
+
+Категории дел: ${catList}. По умолчанию personal.
+Категории трат: ${expCatList}. Не подходит — "Прочее".
+Приоритет: R=важно, Y=обычно, B=потом.
+Даты: "сегодня"=${today}, "завтра", "послезавтра", дни недели, "через неделю".
+Время: "9-00","9:00","в 9 утра" → "09:00". Всегда возвращай time если оно есть.
+Источники дохода: Зарплата, Аванс, Премия, Подработка, Продажа, Прочее.
+Ещё раз: если сообщение — это НЕ про дела/траты/доходы, а просто разговор — верни только {"chat":"..."}.`;
+
+  const res=await fetchWithRetry(API_URL,{
+    method:'POST',
+    headers:{'Content-Type':'application/json','Authorization':'Bearer '+getApiKey()},
+    body:JSON.stringify({
+      model:MODEL,
+      messages:[{role:'system',content:sys},{role:'user',content:text}],
+      temperature:0.1,
+      max_tokens:1200,
+      response_format:{type:'json_object'}
+    })
+  }, 1, 800);
+  if(!res.ok){
+    if(res.status===401){resetApiKey();throw new Error('Неверный ключ (401)');}
+    if(res.status===429){
+      const retryAfter=res.headers.get('Retry-After');
+      const wait=retryAfter?parseInt(retryAfter,10)*1000:60000;
+      _cooldownUntil=Date.now()+wait;
+      throw new Error(`Слишком много запросов. Подожди ${Math.ceil(wait/1000)} сек 🕐`);
+    }
+    throw new Error('HTTP '+res.status);
+  }
+  const data=await res.json();
+  const content=data.choices[0].message.content;
+  window._lastAIRaw=content;
+  return JSON.parse(content);
+}
+  /* ===== НЕДОСТАЮЩИЕ ФУНКЦИИ ДВИЖКА ИИ ===== */
+let _cooldownUntil = 0;
+
+async function fetchWithRetry(url, options, retries=1, delay=800){
   try{
-    const r=await fetch(API_URL,{method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer '+key},body:JSON.stringify({model:MODEL,messages:[sys,{role:'user',content:text}],temperature:0.1,max_tokens:900})});
-    if(!r.ok){aiStopTyping();return false;}
-    const d=await r.json();
-    let raw=d.choices?.[0]?.message?.content||'';
-    const m=raw.match(/\[[\s\S]*\]/);
-    if(!m){aiStopTyping();return false;}
-    let items;
-    try{items=JSON.parse(m[0]);}catch(e){aiStopTyping();return false;}
-    if(!Array.isArray(items)||!items.length){aiStopTyping();return false;}
+    return await fetch(url, options);
+  }catch(err){
+    if(retries>0){
+      await new Promise(r=>setTimeout(r, delay));
+      return fetchWithRetry(url, options, retries-1, delay);
+    }
+    throw err;
+  }
+}
 
-    aiStopTyping();
-    const results=[];
-    const dd=load();
-    if(!dd.tasks)dd.tasks=[];
-    if(!dd.finance)dd.finance=[];
-    if(!dd.income)dd.income=[];
-    if(!dd.expcats)dd.expcats=JSON.parse(JSON.stringify(DEFAULT_EXPCATS));
+function extractTime(text){
+  if(!text)return '';
+  let rel=text.match(/через\s+(\d{1,3})\s*(мин|минут|минуты|минуту|час|часа|часов)/i);
+  if(rel){
+    const n=+rel[1];
+    const now=new Date();
+    if(/час/i.test(rel[2]))now.setHours(now.getHours()+n);
+    else now.setMinutes(now.getMinutes()+n);
+    return String(now.getHours()).padStart(2,'0')+':'+String(now.getMinutes()).padStart(2,'0');
+  }
+  let m=text.match(/(\b[01]?\d|2[0-3])\s*[:.\-\s]\s*(\d{2})\b/);
+  if(m){
+    let h=Math.min(23,+m[1]), mi=Math.min(59,+m[2]);
+    return String(h).padStart(2,'0')+':'+String(mi).padStart(2,'0');
+  }
+  m=text.match(/\bв?\s*([01]?\d|2[0-3])\s*(утра|вечера|дня|час|часов|часа)?\b/i);
+  if(m&&/утра|вечера|дня|час|часов|часа/i.test(text)){
+    let h=+m[1];
+    if(/вечера/i.test(text)&&h<12)h+=12;
+    return String(Math.min(23,h)).padStart(2,'0')+':00';
+  }
+  return '';
+}
 
-    items.forEach(it=>{
-      if(it.type==='task'&&it.title){
-        const obj={id:Date.now()+Math.floor(Math.random()*99999),title:it.title,module:'personal',date:it.date||todayKey(),time:it.time||'',desc:'',pri:'Y',done:false,subs:[]};
-        dd.tasks.push(obj);
-        results.push(`✅ <b>${esc(it.title)}</b> — 📅 ${fmtDate(obj.date)}${obj.time?' 🕐 '+obj.time:''}`);
+function renderResultList(created){
+  const chat=document.getElementById('ai-chat');
+  const div=document.createElement('div');
+  div.className='ai-msg ai';
+  let rows='<div class="bubble"><b>✅ Создано:</b>';
+  created.forEach(c=>{
+    const d=c.data;
+    let line='';
+    if(c.type==='task'){
+      line=`📋 ${esc(d.title||'Дело')}`;
+      if(d.date)line+=` · ${fmtDate(d.date)}`;
+      if(d.time)line+=` 🕐 ${esc(d.time)}`;
+    }else if(c.type==='expense'){
+      const st=catStyleOf(d.category);
+      line=`${st.i} -${fmtMoney(d.amount)}₽ · ${esc(d.category||'Прочее')}`;
+    }else if(c.type==='income'){
+      line=`📈 +${fmtMoney(d.amount)}₽ · ${esc(d.source||'Доход')}`;
+    }
+    rows+=`<br><span id="resrow-${c.id}">${line} <span onclick="delFromResult('${c.type}',${c.id})" style="cursor:pointer;opacity:.6">🗑</span></span>`;
+  });
+  rows+='</div>';
+  div.innerHTML=rows;
+  chat.appendChild(div);chat.scrollTop=chat.scrollHeight;
+  renderNav();renderStreak();
+  if(currentTab==='finance')renderFinance();
+  else if(currentTab==='calendar')renderCalendar();
+  else if(currentTab!=='ai')render();
+}
+
+function delFromResult(type,id){
+  const d=load();
+  if(type==='task')d.tasks=(d.tasks||[]).filter(x=>x.id!==id);
+  else if(type==='expense')d.finance=(d.finance||[]).filter(x=>x.id!==id);
+  else if(type==='income')d.income=(d.income||[]).filter(x=>x.id!==id);
+  save(d);
+  const row=document.getElementById('resrow-'+id);
+  if(row){row.style.opacity='.4';row.innerHTML='<s>Удалено</s>';}
+  vibrate(20);toast('Удалено 🗑');
+  if(currentTab==='finance')renderFinance();
+  else if(currentTab==='calendar')renderCalendar();
+  else if(currentTab!=='ai')render();
+}
+
+let pendingAI=null;
+let aiQueue=[];
+
+// Рекурсивно достаём все действия из любой структуры ответа ИИ
+function collectActions(r){
+  let out=[];
+  const validTypes=['task','expense','income','chat'];
+  function walk(node){
+    if(!node)return;
+    if(Array.isArray(node)){node.forEach(walk);return;}
+    if(typeof node==='object'){
+      // это готовое действие?
+      if(node.type&&validTypes.includes(node.type)){out.push(node);return;}
+      // иначе обходим все поля (items, tasks, expenses, income и т.п.)
+      Object.keys(node).forEach(k=>walk(node[k]));
+    }
+  }
+  walk(r);
+  return out;
+}
+  
+function handleAIResult(r){
+  let items=collectActions(r);
+
+  const raw=window._lastUserText||'';
+  items.forEach(it=>{
+    if(it.type==='task'){
+      if(/через\s+\d/i.test(raw)){
+        const t=extractTime(raw);
+        if(t){it.time=t;it.date=todayKey();}
+      }else if(!it.time){
+        const t=extractTime(raw);
+        if(t)it.time=t;
       }
-      else if(it.type==='expense'&&it.amount){
-        let cat=(it.category||'Прочее').trim();
-        if(!dd.expcats.some(c=>c.name===cat)){
-          const color=CAT_COLORS[dd.expcats.length%CAT_COLORS.length];
-          const low=cat.toLowerCase();
-          const emoji=/питом|собак|кошк|корм|животн/.test(low)?'🐶':/дет|подгуз/.test(low)?'👶':/здоров|лекарств|аптек/.test(low)?'💊':'📦';
-          dd.expcats.splice(dd.expcats.length-1,0,{name:cat,i:emoji,c:color});
-        }
-        dd.finance.push({id:Date.now()+Math.floor(Math.random()*99999),date:todayKey(),desc:it.desc||'',amount:Number(it.amount),category:cat});
-        const st=dd.expcats.find(c=>c.name===cat)||{i:'📦'};
-        results.push(`💰 Расход: <b>${fmtMoney(it.amount)}₽</b> — ${st.i} ${cat}`);
-      }
-      else if(it.type==='income'&&it.amount){
-        dd.income.push({id:Date.now()+Math.floor(Math.random()*99999),date:todayKey(),desc:it.desc||'',amount:Number(it.amount),source:it.source||'Прочее'});
-        results.push(`💵 Доход: <b>+${fmtMoney(it.amount)}₽</b> (${it.source||'Прочее'})`);
-      }
-    });
+    }
+  });
 
-    if(!results.length)return false;
+  const actions=[];
+  items.forEach(it=>{
+    if(it.type==='chat')addAImsg(it.reply||'👍','ai');
+    else actions.push(it);
+  });
 
-    save(dd);
-    dd.tasks.forEach(t=>{if(t.date&&t.time)scheduleLocalTimeout(t);});
-    checkAchievements();confetti();vibrate(40);
-    aiAddMsg('ai',results.join('<br><br>'));
-    renderNav();renderStreak();
-    if(currentTab==='finance')renderFinance();
-    else if(currentTab==='calendar')renderCalendar();
-    else render();
-    return true;
-  }catch(e){aiStopTyping();return false;}
+  if(!actions.length){
+    if(!items.some(it=>it.type==='chat'))addAImsg((r&&r.chat)||'Не понял 🤔 Попробуй иначе.','ai');
+    return;
+  }
+
+  // создаём всё и запоминаем id для удаления
+  const created=[];
+  actions.forEach(a=>{
+    const newId=applyActionReturn(a);
+    created.push({type:a.type,id:newId,data:a});
+  });
+
+  confetti();vibrate([30,50,30]);checkAchievements();
+  if(currentTab==='finance')renderFinance();
+
+  renderResultList(created);
+}
+
+// создаёт запись и возвращает её id
+function applyActionReturn(r){
+  if(!r)return null;
+  const id=Date.now()+Math.floor(Math.random()*100000);
+  if(r.type==='task'){
+    const t=getTasks();
+    t.push({id,title:r.title||'Дело',module:(getCats().some(c=>c.id===r.module)?r.module:'personal'),date:r.date||'',time:r.time||'',desc:r.desc||'',pri:r.pri||'Y',repeat:'',subs:[],done:false});
+    setTasks(t);
+    const saved=getTasks().find(x=>x.id===id);
+    if(saved)scheduleLocalTimeout(saved);
+  }else if(r.type==='expense'){
+    const d=load();if(!d.finance)d.finance=[];
+    let cat=(r.category||'Прочее').trim();
+    if(cat && !getExpCats().some(c=>c.name===cat)){
+      const cats=getExpCats();
+      const color=CAT_COLORS[cats.length%CAT_COLORS.length];
+      const low=cat.toLowerCase();
+      const emoji=/питом|собак|кошк|корм|животн|ветеринар/.test(low)?'🐶'
+        :/дет|подгуз|малыш/.test(low)?'👶'
+        :/здоров|лекарств|аптек|таблет/.test(low)?'💊'
+        :/книг|образован|учеб/.test(low)?'📚'
+        :/красот|космет|салон|стрижк/.test(low)?'💇'
+        :'📦';
+      cats.splice(cats.length-1,0,{name:cat,i:emoji,c:color});
+      setExpCats(cats);
+    }
+       if(!cat)cat='Прочее';
+    d.finance.push({id,date:r.date||todayKey(),desc:r.desc||'',amount:Number(r.amount)||0,category:cat});
+    save(d);checkBudgetAlert(cat);
+  }else if(r.type==='income'){
+    const d=load();if(!d.income)d.income=[];
+    d.income.push({id,date:r.date||todayKey(),desc:'',amount:Number(r.amount)||0,source:r.source||'Доход'});
+    save(d);
+  }
+  return id;
 }
 /* ===== ИНИЦИАЛИЗАЦИЯ ===== */
 function openHelp(){
