@@ -401,6 +401,107 @@ body:not(.dark) .toast{background:rgba(255,255,255,.75)!important}
   border-color:var(--lg-brd)!important;
 }
 .cal-cell.today{box-shadow:0 4px 14px color-mix(in srgb,var(--brand) 50%,transparent),inset 0 1px 0 rgba(255,255,255,.4)!important}
+  /* ========== LIQUID GLASS HERO ========== */
+
+/* Шапка — стеклянная с жидким переливом вместо плоского градиента */
+.hero{
+  background:linear-gradient(135deg,
+    color-mix(in srgb,var(--brand) 92%,#fff),
+    var(--brand2))!important;
+  border-radius:0 0 34px 34px!important;
+  box-shadow:0 16px 44px color-mix(in srgb,var(--brand) 45%,transparent),
+             inset 0 1px 0 rgba(255,255,255,.4)!important;
+  overflow:hidden;
+}
+/* Жидкие светящиеся пятна внутри шапки */
+.hero::after{
+  content:''!important;position:absolute!important;
+  top:-40%!important;right:-20%!important;width:70%!important;height:180%!important;
+  background:radial-gradient(circle,rgba(255,255,255,.35),transparent 60%)!important;
+  animation:heroBlob 12s ease-in-out infinite alternate!important;
+  pointer-events:none;
+}
+.hero::before{
+  content:'';position:absolute;bottom:-50%;left:-15%;
+  width:60%;height:150%;border-radius:50%;
+  background:radial-gradient(circle,color-mix(in srgb,var(--brand2) 60%,transparent),transparent 65%);
+  animation:heroBlob2 15s ease-in-out infinite alternate;
+  pointer-events:none;z-index:0;
+}
+@keyframes heroBlob{0%{transform:translate(0,0) scale(1)}100%{transform:translate(-30px,30px) scale(1.25)}}
+@keyframes heroBlob2{0%{transform:translate(0,0) scale(1)}100%{transform:translate(40px,-20px) scale(1.15)}}
+.hero-top,.hero-stats{position:relative;z-index:1}
+
+/* Круглые кнопки сверху — чистое стекло с бликом */
+.hero-btns button{
+  background:rgba(255,255,255,.16)!important;
+  backdrop-filter:blur(12px) saturate(160%)!important;
+  -webkit-backdrop-filter:blur(12px) saturate(160%)!important;
+  border:1px solid rgba(255,255,255,.35)!important;
+  border-radius:15px!important;
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.55),
+             inset 0 -2px 6px rgba(0,0,0,.1),
+             0 3px 10px rgba(0,0,0,.12)!important;
+}
+.hero-btns button:active{
+  transform:scale(.86)!important;
+  background:rgba(255,255,255,.4)!important;
+}
+
+/* Статы (0/0/0) — матовые стеклянные плитки */
+.hstat{
+  background:rgba(255,255,255,.14)!important;
+  backdrop-filter:blur(16px) saturate(160%)!important;
+  -webkit-backdrop-filter:blur(16px) saturate(160%)!important;
+  border:1px solid rgba(255,255,255,.28)!important;
+  border-radius:20px!important;
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.5),
+             inset 0 -3px 10px rgba(0,0,0,.08),
+             0 6px 18px rgba(0,0,0,.1)!important;
+  position:relative;overflow:hidden;
+}
+.hstat::before{
+  content:'';position:absolute;inset:0;pointer-events:none;
+  background:linear-gradient(135deg,rgba(255,255,255,.4),transparent 45%);
+}
+.hstat b{text-shadow:0 2px 8px rgba(0,0,0,.15)}
+
+/* Чипы серии/погоды/подсказки — стеклянные пилюли */
+.streak-chip,.weather-chip{
+  background:rgba(255,255,255,.18)!important;
+  backdrop-filter:blur(12px) saturate(160%)!important;
+  -webkit-backdrop-filter:blur(12px) saturate(160%)!important;
+  border:1px solid rgba(255,255,255,.35)!important;
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.5),0 3px 10px rgba(0,0,0,.1)!important;
+}
+.streak-chip:active,.weather-chip:active{transform:scale(.95)}
+
+/* ===== ФИЛЬТРЫ (Активные/Сегодня/…) — стеклянные ===== */
+.filters button{
+  background:var(--lg-bg)!important;
+  backdrop-filter:blur(16px) saturate(170%)!important;
+  -webkit-backdrop-filter:blur(16px) saturate(170%)!important;
+  border:1px solid var(--lg-brd)!important;
+  border-radius:22px!important;
+  box-shadow:inset 0 1px 0 var(--lg-hi)!important;
+}
+.filters button.active{
+  background:linear-gradient(135deg,var(--brand),var(--brand2))!important;
+  border-color:transparent!important;
+  box-shadow:0 6px 18px color-mix(in srgb,var(--brand) 50%,transparent),
+             inset 0 1px 0 rgba(255,255,255,.4)!important;
+  color:#fff!important;
+}
+
+/* Поиск — стеклянная строка */
+#search{
+  background:var(--lg-bg)!important;
+  backdrop-filter:blur(16px) saturate(170%)!important;
+  -webkit-backdrop-filter:blur(16px) saturate(170%)!important;
+  border:1px solid var(--lg-brd)!important;
+  box-shadow:inset 0 1px 0 var(--lg-hi),inset 0 -2px 6px rgba(0,0,0,.04)!important;
+  border-radius:16px!important;
+}
 </style>
 </head>
 <body>
