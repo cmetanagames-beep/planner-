@@ -1983,25 +1983,39 @@ async function aiParseCommands(text){
   const key=getApiKey();
   const today=new Date();
   const dow=['воскресенье','понедельник','вторник','среда','четверг','пятница','суббота'][today.getDay()];
-  const cats=getExpCats().map(c=>c.name).join(', ');
+  const expCats=getExpCats().map(c=>c.name).join(', ');
+  const taskCats=getCats().map(c=>`${c.id}=${c.name}`).join(', ');
 
   const sys={role:'system',content:
-`Ты парсер команд планировщика. Пользователь пишет БЕЗ запятых, сплошным текстом. Раздели его сообщение на отдельные действия и верни СТРОГО JSON-массив, без пояснений.
+`Ты парсер команд планировщика. Пользователь пишет БЕЗ запятых, сплошным текстом. Раздели сообщение на отдельные действия и верни СТРОГО JSON-массив, без пояснений.
 
 Сегодня: ${todayKey()} (${dow}).
 
-Каждый элемент — один из типов:
-1. Дело: {"type":"task","title":"...","date":"YYYY-MM-DD","time":"HH:MM"}
+Типы элементов:
+1. Дело: {"type":"task","title":"...","date":"YYYY-MM-DD","time":"HH:MM","module":"id"}
 2. Расход: {"type":"expense","amount":число,"category":"...","desc":"..."}
 3. Доход: {"type":"income","amount":число,"source":"Зарплата|Аванс|Премия|Прочее","desc":"..."}
 
-Правила:
-- Даты: "завтра"=+1 день, "послезавтра"=+2, дни недели=ближайший будущий такой день. Нет даты у дела — ставь сегодня.
-- Время "9-00","9.00","в 9","к 9 часам" = "09:00". Нет времени — пустая строка "".
-- Категории расходов выбирай ТОЛЬКО из: ${cats}. Вода/еда/хлеб/молоко=Продукты, бензин=Топливо, подгузники/детское=Дети. Если не подходит — "Прочее".
-- "купил/потратил/заплатил X на Y" = расход. "получил/зарплата/премия" = доход.
-- Заголовок дела делай коротким и с большой буквы, без слов "напомни","надо","смотри".
-- Если ничего не понял — верни [].`};
+Правила ДАТ и ВРЕМЕНИ:
+- "завтра"=+1 день, "послезавтра"=+2, дни недели=ближайший будущий такой день. Нет даты — сегодня.
+- "9-00","9.00","в 9","к 9 часам"="09:00". Нет времени — "".
+
+Правила КАТЕГОРИЙ ДЕЛ (module) — выбери id из: ${taskCats}
+- работа/встреча по работе/офис/совещание = work
+- машина/авто/масло/шины/заправка(как дело) = car
+- огород/грядки/полив/посадка/дача = farm
+- всё остальное личное (больница/врач/встреча/дом) = personal
+
+Правила КАТЕГОРИЙ РАСХОДОВ (category) — выбери ТОЧНО из: ${expCats}
+- вода/еда/хлеб/молоко/продукты = Продукты
+- бензин/топливо = Топливо
+- подгузники/детское/игрушки = Дети
+- ЕСЛИ подходящей категории НЕТ в списке — придумай НОВОЕ короткое название (1 слово с большой буквы), например корм/собака/кошка = Питомцы, лекарство = Здоровье.
+
+Прочее:
+- "купил/потратил/заплатил X на Y"=расход. "получил/зарплата/премия"=доход.
+- Заголовок дела: коротко, с большой буквы, без слов "напомни","надо","смотри","в понедельник".
+- Ничего не понял — верни [].`};
 
   try{
     const r=await fetch(API_URL,{method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer '+key},body:JSON.stringify({model:MODEL,messages:[sys,{role:'user',content:text}],temperature:0.1,max_tokens:900})});
@@ -2020,16 +2034,27 @@ async function aiParseCommands(text){
     if(!dd.finance)dd.finance=[];
     if(!dd.income)dd.income=[];
     const tasks=getTasks();
+    const validModules=getCats().map(c=>c.id);
 
     items.forEach(it=>{
       if(it.type==='task'&&it.title){
-        const obj={id:Date.now()+Math.floor(Math.random()*99999),title:it.title,module:'personal',date:it.date||todayKey(),time:it.time||'',desc:'',pri:'Y',done:false};
+        let mod=it.module||'personal';
+        if(!validModules.includes(mod))mod='personal';
+        const obj={id:Date.now()+Math.floor(Math.random()*99999),title:it.title,module:mod,date:it.date||todayKey(),time:it.time||'',desc:'',pri:'Y',done:false};
         tasks.push(obj);scheduleLocalTimeout(obj);
-        results.push(`✅ <b>${esc(it.title)}</b> — 📅 ${fmtDate(obj.date)}${obj.time?' 🕐 '+obj.time:''}`);
+        results.push(`✅ <b>${esc(it.title)}</b> — ${catLabel(mod)} · 📅 ${fmtDate(obj.date)}${obj.time?' 🕐 '+obj.time:''}`);
       }
       else if(it.type==='expense'&&it.amount){
-        let cat=it.category||'Прочее';
-        if(!getExpCats().some(c=>c.name===cat))cat='Прочее';
+        let cat=(it.category||'Прочее').trim();
+        // если категории нет — создаём её автоматически
+        if(!getExpCats().some(c=>c.name===cat)){
+          const cats=getExpCats();
+          const color=CAT_COLORS[cats.length%CAT_COLORS.length];
+          const low=cat.toLowerCase();
+          const emoji=/питом|собак|кошк|корм|животн/.test(low)?'🐶':/дет|подгуз/.test(low)?'👶':/здоров|лекарств|аптек/.test(low)?'💊':/одежд/.test(low)?'👕':'📦';
+          cats.splice(cats.length-1,0,{name:cat,i:emoji,c:color});
+          setExpCats(cats);
+        }
         dd.finance.push({id:Date.now()+Math.floor(Math.random()*99999),date:todayKey(),desc:it.desc||'',amount:Number(it.amount),category:cat});
         results.push(`💰 Расход: <b>${fmtMoney(it.amount)}₽</b> — ${catStyleOf(cat).i} ${cat}`);
       }
@@ -2043,9 +2068,15 @@ async function aiParseCommands(text){
     setTasks(tasks);save(dd);
     checkAchievements();confetti();vibrate(40);
     aiAddMsg('ai',results.join('<br><br>'));
+
+    // ОБНОВЛЯЕМ экраны, чтобы дела/траты сразу появились
+    renderNav();
+    if(currentTab==='finance')renderFinance();
+    else if(currentTab!=='ai')render();
+
     return true;
   }catch(e){aiStopTyping();return false;}
-}
+} 
 
 /* ===== ИНИЦИАЛИЗАЦИЯ ===== */
 function openHelp(){
