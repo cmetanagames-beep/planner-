@@ -718,6 +718,22 @@ body.dark .shop-item::after,body.dark .ai-msg .bubble::after{opacity:.35}
 /* Чат ИИ — большой отступ снизу, чтобы контент не прятался */
 #ai-view{padding-bottom:200px!important}
 .ai-suggest{margin-bottom:6px!important;padding-bottom:6px!important}
+  /* ===== ФИКС 1: SAFE-AREA (чёлка айфона) ===== */
+.hero{padding-top:max(24px,env(safe-area-inset-top))!important}
+
+/* ===== ФИКС 2: КОНТРАСТ ДЛЯ СВЕТЛЫХ АКЦЕНТОВ ===== */
+/* Когда акцент светлый (бирюза/жёлтый) — текст в hero тёмный */
+.hero.light-accent,
+.hero.light-accent h1,
+.hero.light-accent .date{color:#1a1d2e!important}
+.hero.light-accent .streak-chip,
+.hero.light-accent .weather-chip,
+.hero.light-accent .quote-chip,
+.hero.light-accent .hstat{color:#1a1d2e!important}
+.hero.light-accent .hstat b{text-shadow:none!important}
+.hero.light-accent .hero-btns button{color:#1a1d2e!important}
+/* FAB на светлом акценте — тёмный "+" для контраста */
+body.light-accent-body .fab{color:#1a1d2e!important}
 </style>
 </head>
 <body>
@@ -732,15 +748,12 @@ body.dark .shop-item::after,body.dark .ai-msg .bubble::after{opacity:.35}
       <div id="weatherChip" class="weather-chip" style="display:none" onclick="refreshWeather(true)"></div>
     </div>
     <div class="hero-btns">
-      <button onclick="openFamily()" title="Семья">👨‍👩‍👦</button>
-      <button onclick="openShopping()" title="Список покупок">🛒</button>
-      <button onclick="openHelp()" title="Возможности">❓</button>
-      <button onclick="openSettings()" title="Настройки">⚙️</button>
-      <button onclick="subscribePush()" title="Включить фоновые пуши">📲</button>
-      <button onclick="testPush()" title="Тест пуша">🧪</button>
-      <button onclick="requestNotify()" title="Напоминания">🔔</button>
-      <button onclick="toggleTheme()" title="Тема">🌙</button>
-    </div>
+  <button onclick="openFamily()" title="Семья">👨‍👩‍👦</button>
+  <button onclick="openShopping()" title="Список покупок">🛒</button>
+  <button onclick="openHelp()" title="Возможности">❓</button>
+  <button onclick="openSettings()" title="Настройки">⚙️</button>
+  <button onclick="toggleTheme()" title="Тема">🌙</button>
+</div>
   </div>
   <div class="hero-stats" id="hero-stats"></div>
 </div>
@@ -910,8 +923,10 @@ body.dark .shop-item::after,body.dark .ai-msg .bubble::after{opacity:.35}
       <div class="box" id="quiet-box"></div>
       <div class="lbl">Включить тихие часы</div>
     </div>
-    <div class="sub-h">🔑 ИИ-ключ Groq</div>
-    <button class="btn ghost" onclick="resetApiKey()">🔄 Сменить ключ Groq</button>
+    <div class="sub-h">📲 Пуши и напоминания</div>
+    <button class="btn ghost" onclick="subscribePush()">📲 Включить фоновые пуши</button>
+    <button class="btn ghost" onclick="requestNotify()">🔔 Разрешить напоминания</button>
+    <button class="btn ghost" onclick="testPush()">🧪 Тест пуша</button>
     <button class="btn ghost" onclick="clearAIChatHistory()">🗑 Очистить историю чата с ИИ</button>
     <div class="sub-h">Данные</div>
     <button class="btn" onclick="exportData()">📥 Скачать резервную копию</button>
@@ -2024,6 +2039,20 @@ function applyAccent(){
   document.documentElement.style.setProperty('--brand',a);
   document.documentElement.style.setProperty('--brand2',b);
   const meta=document.getElementById('meta-theme');if(meta)meta.content=a;
+  // Определяем яркость акцента → тёмный текст для светлых цветов
+  const light=isLightColor(a);
+  document.querySelectorAll('.hero').forEach(h=>h.classList.toggle('light-accent',light));
+  document.body.classList.toggle('light-accent-body',light);
+}
+// Вычисляет яркость HEX-цвета (true = светлый, нужен тёмный текст)
+function isLightColor(hex){
+  const c=hex.replace('#','');
+  const r=parseInt(c.substr(0,2),16);
+  const g=parseInt(c.substr(2,2),16);
+  const bl=parseInt(c.substr(4,2),16);
+  // формула яркости (luminance)
+  const lum=(0.299*r+0.587*g+0.114*bl);
+  return lum>150; // порог: выше — светлый
 }
 function renderColorPick(){
   const d=load();const cur=d.accent||0;
