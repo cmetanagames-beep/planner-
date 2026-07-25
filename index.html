@@ -287,6 +287,113 @@ body.dark::before{opacity:.55}
 
 /* Конфетти */
 .confetti{position:fixed;width:10px;height:10px;z-index:300;pointer-events:none}
+/* ========== LIQUID GLASS ========== */
+:root{
+  --lg-blur:22px;
+  --lg-bg:rgba(255,255,255,.28);
+  --lg-brd:rgba(255,255,255,.55);
+  --lg-hi:rgba(255,255,255,.9);
+}
+body.dark{
+  --lg-bg:rgba(40,44,74,.32);
+  --lg-brd:rgba(255,255,255,.14);
+  --lg-hi:rgba(255,255,255,.35);
+}
+
+/* Общий стеклянный блик для карточек */
+.task,.shop-item,.rate-card,.budget-card,.goal-card,.fin-insight,
+.filters button,.ai-suggest button,.cal-cell{
+  position:relative;
+}
+.task::before,.shop-item::before,.budget-card::before,.goal-card::before,
+.fin-insight::before{
+  content:'';position:absolute;inset:0;border-radius:inherit;pointer-events:none;
+  background:linear-gradient(135deg,var(--lg-hi),transparent 40%);
+  opacity:.5;mix-blend-mode:overlay;
+}
+
+/* НАВИГАЦИЯ — плавающая стеклянная пилюля */
+.nav{
+  bottom:14px!important;
+  width:calc(100% - 28px)!important;max-width:452px!important;
+  left:50%!important;transform:translateX(-50%)!important;
+  border:1px solid var(--lg-brd)!important;
+  border-radius:30px!important;
+  background:var(--lg-bg)!important;
+  backdrop-filter:blur(var(--lg-blur)) saturate(180%)!important;
+  -webkit-backdrop-filter:blur(var(--lg-blur)) saturate(180%)!important;
+  box-shadow:0 8px 32px rgba(30,30,70,.22),inset 0 1px 0 var(--lg-hi),inset 0 -1px 6px rgba(255,255,255,.15)!important;
+  padding:6px 8px!important;overflow:visible!important;
+}
+@media(max-width:520px){.nav{width:calc(100% - 20px)!important;left:50%!important}}
+.nav button{border-radius:22px!important;padding:9px 4px 10px!important;z-index:2}
+.nav button.active{color:#fff!important}
+.nav button.active i{transform:scale(1.1)}
+.nav button.active::before{display:none!important} /* убрать старую полоску сверху */
+
+/* Скользящая подсветка активной вкладки */
+#nav-pill{
+  position:absolute;top:6px;bottom:6px;
+  border-radius:22px;
+  background:linear-gradient(135deg,var(--brand),var(--brand2));
+  box-shadow:0 6px 18px color-mix(in srgb,var(--brand) 55%,transparent),inset 0 1px 0 rgba(255,255,255,.4);
+  transition:left .35s cubic-bezier(.34,1.4,.5,1),width .35s cubic-bezier(.34,1.4,.5,1),opacity .2s;
+  z-index:1;pointer-events:none;opacity:0;
+}
+
+/* FAB — стеклянный с бликом */
+.fab{
+  bottom:92px!important;
+  border:1px solid var(--lg-brd);
+  box-shadow:0 8px 26px color-mix(in srgb,var(--brand) 55%,transparent),inset 0 2px 4px rgba(255,255,255,.5),inset 0 -3px 8px rgba(0,0,0,.15)!important;
+}
+
+/* HERO — глянцевый блик сверху */
+.hero{position:relative}
+.hero::before{
+  content:'';position:absolute;inset:0;border-radius:inherit;pointer-events:none;
+  background:linear-gradient(180deg,rgba(255,255,255,.28),transparent 45%);
+}
+
+/* Стеклянные кнопки-фильтры и чипы */
+.filters button,.ai-suggest button{
+  backdrop-filter:blur(var(--lg-blur)) saturate(160%)!important;
+  -webkit-backdrop-filter:blur(var(--lg-blur)) saturate(160%)!important;
+  border-color:var(--lg-brd)!important;
+  box-shadow:inset 0 1px 0 var(--lg-hi)!important;
+}
+
+/* Стеклянные модалки-шторки */
+.sheet{
+  background:var(--lg-bg)!important;
+  backdrop-filter:blur(30px) saturate(180%);
+  -webkit-backdrop-filter:blur(30px) saturate(180%);
+  border:1px solid var(--lg-brd)!important;
+  box-shadow:0 -10px 40px rgba(20,20,60,.3),inset 0 1px 0 var(--lg-hi)!important;
+}
+body:not(.dark) .sheet{background:rgba(255,255,255,.6)!important}
+
+/* Верхние круглые кнопки hero — стекло */
+.hero-btns button{
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.4),0 2px 8px rgba(0,0,0,.12);
+}
+
+/* Тост — стеклянный */
+.toast{
+  background:var(--lg-bg)!important;
+  backdrop-filter:blur(20px) saturate(180%);
+  -webkit-backdrop-filter:blur(20px) saturate(180%);
+  border:1px solid var(--lg-brd)!important;
+}
+body:not(.dark) .toast{background:rgba(255,255,255,.75)!important}
+
+/* Календарь — стеклянные ячейки с бликом */
+.cal-cell{
+  backdrop-filter:blur(10px) saturate(150%);
+  -webkit-backdrop-filter:blur(10px) saturate(150%);
+  border-color:var(--lg-brd)!important;
+}
+.cal-cell.today{box-shadow:0 4px 14px color-mix(in srgb,var(--brand) 50%,transparent),inset 0 1px 0 rgba(255,255,255,.4)!important}
 </style>
 </head>
 <body>
@@ -691,9 +798,23 @@ function renderNav(){
   html+=`<button data-tab="finance" class="${currentTab==='finance'?'active':''}" onclick="switchTab('finance')"><i>💰</i>Финансы</button>`;
   html+=`<button data-tab="ai" class="${currentTab==='ai'?'active':''}" onclick="switchTab('ai')"><i>🤖</i>ИИ</button>`;
   html+=`<button data-tab="cats" onclick="openCatModal()"><i>⚙️</i>Ещё</button>`;
-  nav.innerHTML=html;
+   nav.innerHTML='<span id="nav-pill"></span>'+html;
+  requestAnimationFrame(moveNavPill);
 }
 
+function moveNavPill(){
+  const nav=document.getElementById('nav');
+  const pill=document.getElementById('nav-pill');
+  if(!nav||!pill)return;
+  const active=nav.querySelector('button.active');
+  if(!active){pill.style.opacity='0';return;}
+  const nr=nav.getBoundingClientRect();
+  const ar=active.getBoundingClientRect();
+  pill.style.left=(active.offsetLeft)+'px';
+  pill.style.width=ar.width+'px';
+  pill.style.opacity='1';
+}
+window.addEventListener('resize',()=>setTimeout(moveNavPill,50));
 function switchTab(tab){
   currentTab=tab;
   const isAI=tab==='ai',isFin=tab==='finance',isCal=tab==='calendar',isHabits=tab==='habits';
