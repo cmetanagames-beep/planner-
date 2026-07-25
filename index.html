@@ -502,6 +502,127 @@ body:not(.dark) .toast{background:rgba(255,255,255,.75)!important}
   box-shadow:inset 0 1px 0 var(--lg-hi),inset 0 -2px 6px rgba(0,0,0,.04)!important;
   border-radius:16px!important;
 }
+/* ========== LIQUID GLASS: ЧАТ ИИ / ФИНАНСЫ / SHIMMER ========== */
+
+/* ===== 1. ПУЗЫРИ ЧАТА ИИ ===== */
+.ai-msg .bubble{
+  position:relative;overflow:hidden;
+  border:1px solid var(--lg-brd)!important;
+  backdrop-filter:blur(14px) saturate(170%);
+  -webkit-backdrop-filter:blur(14px) saturate(170%);
+}
+/* Ответы ИИ — матовое стекло */
+.ai-msg.ai .bubble{
+  background:var(--lg-bg)!important;
+  box-shadow:inset 0 1px 0 var(--lg-hi),0 6px 18px rgba(20,20,60,.12)!important;
+}
+body:not(.dark) .ai-msg.ai .bubble{background:rgba(255,255,255,.55)!important}
+/* Сообщения юзера — цветное стекло с бликом */
+.ai-msg.user .bubble{
+  background:linear-gradient(135deg,
+    color-mix(in srgb,var(--brand) 85%,#fff),
+    var(--brand2))!important;
+  border-color:transparent!important;
+  box-shadow:0 6px 18px color-mix(in srgb,var(--brand) 45%,transparent),
+             inset 0 1px 0 rgba(255,255,255,.45)!important;
+}
+/* Глянцевый блик сверху пузыря */
+.ai-msg .bubble::before{
+  content:'';position:absolute;inset:0;pointer-events:none;
+  background:linear-gradient(135deg,rgba(255,255,255,.4),transparent 42%);
+}
+/* Панель ввода ИИ — стеклянная */
+.ai-input-bar{
+  background:var(--lg-bg)!important;
+  backdrop-filter:blur(24px) saturate(180%)!important;
+  -webkit-backdrop-filter:blur(24px) saturate(180%)!important;
+  border-top:1px solid var(--lg-brd)!important;
+  box-shadow:0 -6px 22px rgba(20,20,60,.12)!important;
+}
+.ai-input-bar input{
+  background:var(--lg-bg)!important;
+  backdrop-filter:blur(12px)!important;-webkit-backdrop-filter:blur(12px)!important;
+  border:1px solid var(--lg-brd)!important;
+  box-shadow:inset 0 1px 0 var(--lg-hi)!important;
+}
+body:not(.dark) .ai-input-bar input{background:rgba(255,255,255,.6)!important}
+.send-btn{
+  box-shadow:0 4px 14px color-mix(in srgb,var(--brand) 50%,transparent),
+             inset 0 1px 0 rgba(255,255,255,.5)!important;
+}
+.mic-btn{
+  background:var(--lg-bg)!important;
+  backdrop-filter:blur(12px)!important;-webkit-backdrop-filter:blur(12px)!important;
+  border:1px solid var(--lg-brd)!important;
+  box-shadow:inset 0 1px 0 var(--lg-hi)!important;
+}
+
+/* ===== 2. ФИНАНСОВАЯ ШАПКА ===== */
+.fin-hero{
+  position:relative;overflow:hidden;
+  background:linear-gradient(135deg,
+    color-mix(in srgb,var(--brand) 92%,#fff),
+    var(--brand2))!important;
+  border:1px solid var(--lg-brd)!important;
+  border-radius:26px!important;
+  box-shadow:0 14px 40px color-mix(in srgb,var(--brand) 40%,transparent),
+             inset 0 1px 0 rgba(255,255,255,.4)!important;
+}
+/* Жидкое пятно за donut */
+.fin-hero::after{
+  content:'';position:absolute;top:-30%;right:-15%;
+  width:65%;height:160%;pointer-events:none;
+  background:radial-gradient(circle,rgba(255,255,255,.3),transparent 60%);
+  animation:heroBlob 13s ease-in-out infinite alternate;
+}
+.fin-monthnav,.fin-balance,.fin-chart{position:relative;z-index:1}
+/* Плитки Доход/Расход/Баланс — стекло */
+.fin-bal-item{
+  background:rgba(255,255,255,.14)!important;
+  backdrop-filter:blur(14px) saturate(160%)!important;
+  -webkit-backdrop-filter:blur(14px) saturate(160%)!important;
+  border:1px solid rgba(255,255,255,.28)!important;
+  border-radius:16px!important;
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.5),0 4px 14px rgba(0,0,0,.08)!important;
+  position:relative;overflow:hidden;
+}
+.fin-bal-item::before{
+  content:'';position:absolute;inset:0;pointer-events:none;
+  background:linear-gradient(135deg,rgba(255,255,255,.35),transparent 45%);
+}
+.fin-monthnav button{
+  background:rgba(255,255,255,.18)!important;
+  backdrop-filter:blur(10px)!important;-webkit-backdrop-filter:blur(10px)!important;
+  border:1px solid rgba(255,255,255,.3)!important;
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.5)!important;
+}
+/* Donut — лёгкое свечение под кольцом */
+.fin-chart svg{filter:drop-shadow(0 4px 12px rgba(0,0,0,.15))}
+.fin-chart .center b{text-shadow:0 2px 8px rgba(0,0,0,.2)}
+
+/* ===== 3. CHROMATIC SHIMMER (преломление краёв) ===== */
+/* Радужный блик по верх-левому краю карточек */
+.task::after,.budget-card::after,.goal-card::after,
+.fin-insight::after,.shop-item::after,.ai-msg .bubble::after{
+  content:'';position:absolute;inset:0;border-radius:inherit;pointer-events:none;
+  padding:1px;
+  background:linear-gradient(135deg,
+    rgba(255,80,180,.5),
+    rgba(120,120,255,.4) 25%,
+    transparent 45%,
+    transparent 70%,
+    rgba(0,220,255,.35) 90%,
+    rgba(180,120,255,.5));
+  -webkit-mask:linear-gradient(#000 0 0) content-box,linear-gradient(#000 0 0);
+  -webkit-mask-composite:xor;mask-composite:exclude;
+  opacity:.55;
+}
+body.dark .task::after,body.dark .budget-card::after,
+body.dark .goal-card::after,body.dark .fin-insight::after,
+body.dark .shop-item::after,body.dark .ai-msg .bubble::after{opacity:.35}
+
+/* Тонкий бегущий блик при нажатии на карточку */
+.task:active::after{opacity:.9;transition:opacity .2s}
 </style>
 </head>
 <body>
