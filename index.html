@@ -687,6 +687,7 @@ function renderNav(){
   let html=`<button data-tab="all" class="${currentTab==='all'?'active':''}" onclick="switchTab('all')"><i>📋</i>Все</button>`;
   html+=`<button data-tab="calendar" class="${currentTab==='calendar'?'active':''}" onclick="switchTab('calendar')"><i>📅</i>Кален.</button>`;
   cats.forEach(c=>{html+=`<button data-tab="${c.id}" class="${currentTab===c.id?'active':''}" onclick="switchTab('${c.id}')"><i>${c.emoji}</i>${esc(c.name)}</button>`;});
+  html+=`<button data-tab="habits" class="${currentTab==='habits'?'active':''}" onclick="switchTab('habits')"><i>💪</i>Привычки</button>`;
   html+=`<button data-tab="finance" class="${currentTab==='finance'?'active':''}" onclick="switchTab('finance')"><i>💰</i>Финансы</button>`;
   html+=`<button data-tab="ai" class="${currentTab==='ai'?'active':''}" onclick="switchTab('ai')"><i>🤖</i>ИИ</button>`;
   html+=`<button data-tab="cats" onclick="openCatModal()"><i>⚙️</i>Ещё</button>`;
@@ -695,26 +696,28 @@ function renderNav(){
 
 function switchTab(tab){
   currentTab=tab;
-  const isAI=tab==='ai',isFin=tab==='finance',isCal=tab==='calendar';
+  const isAI=tab==='ai',isFin=tab==='finance',isCal=tab==='calendar',isHabits=tab==='habits';
   const hideList=isAI||isFin;
   document.getElementById('ai-view').style.display=isAI?'block':'none';
   document.getElementById('ai-bar').style.display=isAI?'flex':'none';
   document.getElementById('view').style.display=isAI?'none':'block';
   document.getElementById('fab').style.display=isAI?'none':'flex';
-  document.getElementById('filters').style.display=(hideList||isCal)?'none':'flex';
-  document.getElementById('search-wrap').style.display=(hideList||isCal)?'none':'block';
-  document.querySelector('.hero-stats').style.display=(hideList||isCal)?'none':'flex';
+  document.getElementById('filters').style.display=(hideList||isCal||isHabits)?'none':'flex';
+  document.getElementById('search-wrap').style.display=(hideList||isCal||isHabits)?'none':'block';
+  document.querySelector('.hero-stats').style.display=(hideList||isCal||isHabits)?'none':'flex';
   let title='Мои дела';
   if(tab==='all')title='Мои дела';
   else if(tab==='finance')title='💰 Финансы';
   else if(tab==='ai')title='🤖 Ассистент';
   else if(tab==='calendar')title='📅 Календарь';
+  else if(tab==='habits')title='💪 Привычки';
   else title=catLabel(tab);
   document.getElementById('hero-title').textContent=title;
   document.getElementById('streakBox').style.display=hideList?'none':'inline-flex';
   if(isAI){document.getElementById('fab').style.display='none';if(!document.getElementById('ai-chat').children.length)aiHello();}
   else if(isFin)renderFinance();
   else if(isCal)renderCalendar();
+  lse if(isHabits)renderHabits();
   else render();
   renderNav();
 }
@@ -792,6 +795,107 @@ function rescheduleOverdue(){
   t.forEach(x=>{if(!x.done&&x.date&&x.date<tk){x.date=tk;n++;}});
   if(!n){toast('Нет просроченных');return;}
   setTasks(t);render();confetti();vibrate(30);toast('➡️ Перенесено на сегодня: '+n);
+}
+  /* ===== ПРИВЫЧКИ ===== */
+function getHabits(){
+  const d=load();
+  if(!d.habits)d.habits=[
+    {id:'h1',name:'Пить воду',icon:'💧',log:{}},
+    {id:'h2',name:'Зарядка',icon:'🏃',log:{}},
+    {id:'h3',name:'Чтение',icon:'📖',log:{}}
+  ];
+  return d.habits;
+}
+function saveHabits(h){const d=load();d.habits=h;save(d);}
+function last7Keys(){
+  const arr=[];
+  for(let i=6;i>=0;i--){
+    const dt=new Date();dt.setDate(dt.getDate()-i);
+    arr.push({
+      key:dt.getFullYear()+'-'+String(dt.getMonth()+1).padStart(2,'0')+'-'+String(dt.getDate()).padStart(2,'0'),
+      label:['Вс','Пн','Вт','Ср','Чт','Пт','Сб'][dt.getDay()],
+      isToday:i===0
+    });
+  }
+  return arr;
+}
+function habitStreak(h){
+  let s=0;
+  for(let i=0;i<365;i++){
+    const dt=new Date();dt.setDate(dt.getDate()-i);
+    const k=dt.getFullYear()+'-'+String(dt.getMonth()+1).padStart(2,'0')+'-'+String(dt.getDate()).padStart(2,'0');
+    if(h.log&&h.log[k])s++;else if(i>0)break;
+  }
+  return s;
+}
+function toggleHabit(id,key){
+  const habits=getHabits();
+  const h=habits.find(x=>x.id===id);
+  if(!h)return;
+  if(!h.log)h.log={};
+  if(h.log[key]){delete h.log[key];}
+  else{h.log[key]=true;vibrate(30);confetti();}
+  saveHabits(habits);
+  renderHabits();
+}
+function addHabit(){
+  const name=prompt('Название привычки:');
+  if(!name||!name.trim())return;
+  const icon=prompt('Эмодзи (например 🧘):','⭐')||'⭐';
+  const habits=getHabits();
+  habits.push({id:'h'+Date.now(),name:name.trim(),icon:icon.trim(),log:{}});
+  saveHabits(habits);
+  toast('Привычка добавлена! 💪');
+  renderHabits();
+}
+function deleteHabit(id){
+  if(!confirm('Удалить привычку?'))return;
+  saveHabits(getHabits().filter(h=>h.id!==id));
+  renderHabits();
+}
+function renderHabits(){
+  const view=document.getElementById('view');
+  if(!view)return;
+  const habits=getHabits();
+  const days=last7Keys();
+  const tk=todayKey();
+
+  let head='<div style="display:flex;gap:4px;margin-left:auto">';
+  days.forEach(d=>{head+=`<div style="width:30px;text-align:center;font-size:.6rem;color:var(--muted);font-weight:${d.isToday?'800':'600'}">${d.label}</div>`;});
+  head+='</div>';
+
+  let rows='';
+  habits.forEach(h=>{
+    const st=habitStreak(h);
+    let cells='';
+    days.forEach(d=>{
+      const on=h.log&&h.log[d.key];
+      cells+=`<div onclick="toggleHabit('${h.id}','${d.key}')" style="width:30px;height:30px;border-radius:8px;display:flex;align-items:center;justify-content:center;cursor:pointer;font-size:.85rem;${on?'background:linear-gradient(135deg,var(--brand),var(--brand2));color:#fff;box-shadow:0 2px 6px rgba(0,0,0,.15)':'background:var(--glass);border:1px solid var(--line)'}${d.isToday&&!on?';border:1.5px solid var(--brand)':''}">${on?'✓':''}</div>`;
+    });
+    rows+=`<div style="display:flex;align-items:center;gap:8px;padding:10px 0;border-bottom:1px solid var(--line)">
+      <div style="font-size:1.3rem">${h.icon}</div>
+      <div style="flex:1;min-width:0">
+        <div style="font-weight:700;font-size:.9rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${h.name}</div>
+        <div style="font-size:.7rem;color:var(--muted)">🔥 ${st} ${st===1?'день':st>=2&&st<=4?'дня':'дней'}</div>
+      </div>
+      <div style="display:flex;gap:4px">${cells}</div>
+      <div onclick="deleteHabit('${h.id}')" style="cursor:pointer;color:var(--muted);padding:4px;font-size:.9rem">✕</div>
+    </div>`;
+  });
+
+  view.innerHTML=`
+    <div style="padding:12px 16px">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
+        <h2 style="margin:0;font-size:1.1rem">💪 Мои привычки</h2>
+        <button onclick="addHabit()" style="border:none;background:linear-gradient(135deg,var(--brand),var(--brand2));color:#fff;padding:8px 14px;border-radius:12px;font-weight:700;cursor:pointer">+ Привычка</button>
+      </div>
+      <div class="budget-card">
+        <div style="display:flex;align-items:center;padding-bottom:8px;border-bottom:1px solid var(--line)">
+          <span style="font-size:.7rem;color:var(--muted);font-weight:700">ПРИВЫЧКА</span>${head}
+        </div>
+        ${habits.length?rows:'<div style="text-align:center;padding:20px;color:var(--muted)">Нет привычек. Нажми «+ Привычка» 💪</div>'}
+      </div>
+    </div>`;
 }
 function renderSmartHint(){
   const box=document.getElementById('quoteChip');
