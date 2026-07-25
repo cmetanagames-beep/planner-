@@ -1543,29 +1543,36 @@ async function createFamily(){
   if(!getMyName()){toast('Сначала введи имя');return;}
   saveMyProfile();
   try{
-    const r=await fetch(FAMILY_SERVER+'/family/create',{
-      method:'POST',
-      headers:{'Content-Type':'application/json'},
-      body:JSON.stringify({userId:PUSH_USER_ID,name:getMyName(),role:getMyRole()})
-    });
+    const r=await fetch(FAMILY_SERVER+'/family/create',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({userId:PUSH_USER_ID,name:getMyName(),role:getMyRole()})});
     const d=await r.json();
     if(d.ok){
       const s=load();
-      s.familyId=d.familyCode;   // ← ИСПРАВЛЕНО: было d.familyId, стало d.familyCode
+      s.familyId=d.familyCode;   // ← familyCode, не familyId!
       save(s);
       confetti();
       toast('👨‍👩‍👦 Семья создана! Код: '+d.familyCode);
       renderFamily();
-    } else {
-      toast(d.err||'Ошибка создания');
-    }
+    } else toast(d.err||'Ошибка создания');
   }
   catch(e){toast('Сервер недоступен');}
 }
 async function joinFamily(){
-  const code=document.getElementById('fam-code').value.trim().toUpperCase();if(!code){toast('Введи код');return;}
-  if(!getMyName()){toast('Сначала введи имя');return;}saveMyProfile();
-  try{const r=await fetch(FAMILY_SERVER+'/family/join',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({userId:PUSH_USER_ID,familyId:code,name:getMyName(),role:getMyRole()})});const d=await r.json();if(d.ok){const s=load();s.familyId=code;save(s);confetti();toast('🔗 Ты в семье!');renderFamily();}else toast(d.error||'Код не найден');}
+  const code=document.getElementById('fam-code').value.trim().toUpperCase();
+  if(!code){toast('Введи код');return;}
+  if(!getMyName()){toast('Сначала введи имя');return;}
+  saveMyProfile();
+  try{
+    const r=await fetch(FAMILY_SERVER+'/family/join',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({userId:PUSH_USER_ID,familyCode:code,name:getMyName(),role:getMyRole()})});
+    const d=await r.json();
+    if(d.ok){
+      const s=load();
+      s.familyId=d.familyCode;   // ← familyCode!
+      save(s);
+      confetti();
+      toast('🔗 Ты в семье!');
+      renderFamily();
+    } else toast(d.err||'Код не найден');   // ← d.err, не d.error!
+  }
   catch(e){toast('Сервер недоступен');}
 }
 async function loadFamilyMembers(){
