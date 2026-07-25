@@ -1882,7 +1882,7 @@ document.getElementById('fab').onclick=function(){
 document.addEventListener('DOMContentLoaded',function(){ init(); restoreLocalTimers(); });
   
 // ============ ФОНОВЫЕ ПУШ-УВЕДОМЛЕНИЯ ============
-const PUSH_SERVER = 'https://push-server-4e3v.onrender.com';
+const PUSH_SERVER = 'https://pushevgen.duckdns.org/';
   let PUSH_USER_ID = localStorage.getItem('pushUserId');
 if (!PUSH_USER_ID) {
   PUSH_USER_ID = 'user_' + Date.now() + '_' + Math.random().toString(36).slice(2);
