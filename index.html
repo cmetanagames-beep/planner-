@@ -751,8 +751,8 @@ body.light-accent-body .fab{color:#1a1d2e!important}
 <body>
 
 <div class="hero">
-  <div class="hero-top">
-    <div>
+    <div class="hero-top">
+    <div id="hero-textblock">
       <h1 id="hero-title">Мои дела</h1>
       <div class="date" id="hero-date"></div>
       <div id="streakBox" class="streak-chip" style="display:none" onclick="openAchievements()"></div>
@@ -1253,11 +1253,9 @@ function fabRipple(e){
   vibrate(15);
 }
   
- function switchTab(tab){
-  if(tab!=='today'){
-    const hero=document.querySelector('.hero');
-    if(hero)hero.style.display='';
-  }
+  function switchTab(tab){
+  const heroText=document.getElementById('hero-textblock');
+  if(heroText)heroText.style.display=(tab==='today')?'none':'';
   currentTab=tab;
   const isAI=tab==='ai',isFin=tab==='finance',isCal=tab==='calendar',isHabits=tab==='habits';
   const isMore=tab==='more',isToday=tab==='today';
@@ -2879,7 +2877,8 @@ function renderMore(){
 
 
 function renderToday(){
-  document.querySelector('.hero').style.display='none';
+  const heroText=document.getElementById('hero-textblock');
+  if(heroText)heroText.style.display='none';
   document.getElementById('filters').style.display='none';
   const view=document.getElementById('view');
   const tk=todayKey();
