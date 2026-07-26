@@ -178,8 +178,10 @@ body.dark::before{opacity:.55}
 .today-ring{display:flex;align-items:center;gap:16px;margin-top:14px}
 .ring-wrap{position:relative;width:84px;height:84px;flex:0 0 84px}
 .ring-wrap svg{position:absolute;inset:0;transform:rotate(-90deg)}
-.ring-bg{fill:none;stroke:rgba(255,255,255,.22);stroke-width:8}
-.ring-fg{fill:none;stroke:#fff;stroke-width:8;stroke-linecap:round;transition:stroke-dashoffset 1s cubic-bezier(.3,1,.4,1)}
+.ring-bg{fill:none;stroke:var(--line);stroke-width:8}
+.ring-fg{fill:none;stroke:var(--brand);stroke-width:8;stroke-linecap:round;transition:stroke-dashoffset 1s cubic-bezier(.3,1,.4,1)}
+.ring-txt b{color:var(--text)}
+.ring-txt small{color:var(--muted)}
 .ring-txt{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;z-index:2}
 .ring-txt b{font-size:1.15rem;font-weight:800;line-height:1}
 .ring-txt small{font-size:.55rem;opacity:.9;margin-top:1px}
@@ -1284,9 +1286,9 @@ function fabRipple(e){
   
   function switchTab(tab){
   const heroText=document.getElementById('hero-textblock');
-  if(heroText)heroText.style.display=(tab==='today')?'none':'';
+  if(heroText)heroText.style.display='';
   const heroBtns=document.querySelector('.hero-btns');
-  if(heroBtns)heroBtns.style.display=(tab==='today')?'none':'flex';
+  if(heroBtns)heroBtns.style.display='flex';
   currentTab=tab;
   const isAI=tab==='ai',isFin=tab==='finance',isCal=tab==='calendar',isHabits=tab==='habits';
   const isMore=tab==='more',isToday=tab==='today';
@@ -2908,9 +2910,8 @@ function renderMore(){
 
 
 function renderToday(){
-  const heroText=document.getElementById('hero-textblock');
-  if(heroText)heroText.style.display='none';
   document.getElementById('filters').style.display='none';
+  updateHero('today');  // общий заголовок как на других вкладках
   const view=document.getElementById('view');
   const tk=todayKey();
   const tasks=getTasks();
@@ -2941,22 +2942,18 @@ function renderToday(){
   // кольцо (r=32, длина окружности ≈ 201)
    const R=34, C=2*Math.PI*R, off=C-(pct/100)*C;
 
-  let html=`<div style="padding:14px 16px">
-    <div class="today-card">
-      <div class="today-greet">${greet}</div>
-      ${weatherLine}
-      <div class="today-ring">
-        <div class="ring-wrap">
-          <svg width="84" height="84" viewBox="0 0 84 84">
-            <circle class="ring-bg" cx="42" cy="42" r="${R}"></circle>
-            <circle class="ring-fg" cx="42" cy="42" r="${R}" stroke-dasharray="${C}" stroke-dashoffset="${off}"></circle>
-          </svg>
-          <div class="ring-txt"><b>${pct}%</b><small>сегодня</small></div>
-        </div>
-        <div class="ring-side">
-          <div class="rs-big">${doneToday}/${totalToday} дел</div>
-          <div class="rs-sub">${ringSub}</div>
-        </div>
+    let html=`<div style="padding:14px 16px">
+    <div class="tw-card" style="display:flex;align-items:center;gap:16px;margin-bottom:12px">
+      <div class="ring-wrap" style="--rc:var(--brand)">
+        <svg width="84" height="84" viewBox="0 0 84 84">
+          <circle class="ring-bg" cx="42" cy="42" r="${R}"></circle>
+          <circle class="ring-fg" cx="42" cy="42" r="${R}" stroke-dasharray="${C}" stroke-dashoffset="${off}"></circle>
+        </svg>
+        <div class="ring-txt"><b>${pct}%</b><small>сегодня</small></div>
+      </div>
+      <div class="ring-side">
+        <div class="rs-big">${doneToday}/${totalToday} дел</div>
+        <div class="rs-sub">${ringSub}</div>
       </div>
     </div>`;
 
