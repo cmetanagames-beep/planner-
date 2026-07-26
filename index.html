@@ -1124,7 +1124,8 @@ const NAV_SECTIONS=[
   {id:'habits',   icon:'💪', name:'Привычки'},
   {id:'shopping', icon:'🛒', name:'Покупки'},
   {id:'family',   icon:'👨‍👩‍👦', name:'Семья'},
-  {id:'ach',      icon:'🏆', name:'Награды'}
+  {id:'ach',      icon:'🏆', name:'Награды'},
+  {id:'matrix',   icon:'🎯', name:'Матрица'}
 ];
 // Набор по умолчанию (максимум 4 своих + "Ещё")
 const DEFAULT_NAV=['today','all','finance','ai'];
@@ -1288,15 +1289,15 @@ function fabRipple(e){
   if(heroBtns)heroBtns.style.display='flex';
   currentTab=tab;
   const isAI=tab==='ai',isFin=tab==='finance',isCal=tab==='calendar',isHabits=tab==='habits';
-  const isMore=tab==='more',isToday=tab==='today';
+  const isMore=tab==='more',isToday=tab==='today',isMatrix=tab==='matrix';
   const hideList=isAI||isFin;
   document.getElementById('ai-view').style.display=isAI?'block':'none';
   document.getElementById('ai-bar').style.display=isAI?'flex':'none';
   document.getElementById('view').style.display=isAI?'none':'block';
   document.getElementById('fab').style.display=(isAI||isMore)?'none':'flex';
-  document.getElementById('filters').style.display=(hideList||isCal||isHabits||isMore||isToday)?'none':'flex';
-  document.getElementById('search-wrap').style.display=(hideList||isCal||isHabits||isMore||isToday)?'none':'block';
-  document.querySelector('.hero-stats').style.display=(hideList||isCal||isHabits||isMore||isToday)?'none':'flex';
+  document.getElementById('filters').style.display=(hideList||isCal||isHabits||isMore||isToday||isMatrix)?'none':'flex';
+  document.getElementById('search-wrap').style.display=(hideList||isCal||isHabits||isMore||isToday||isMatrix)?'none':'block';
+  document.querySelector('.hero-stats').style.display=(hideList||isCal||isHabits||isMore||isToday||isMatrix)?'none':'flex';
   let title='Мои дела';
   if(tab==='all')title='Мои дела';
   else if(tab==='finance')title='💰 Финансы';
@@ -1305,6 +1306,7 @@ function fabRipple(e){
   else if(tab==='habits')title='💪 Привычки';
   else if(tab==='more')title='⚙️ Ещё';
   else if(tab==='today')title='🏠 Сегодня';
+  else if(tab==='matrix')title='🎯 Матрица Эйзенхауэра';
   else title=catLabel(tab);
 
   // Приветствие по времени суток — только на "Сегодня"
@@ -1331,6 +1333,7 @@ function fabRipple(e){
   else if(isHabits)renderHabits();
   else if(tab==='more')renderMore();
   else if(tab==='today')renderToday();
+  else if(tab==='matrix')renderMatrix();
   else render();
   renderNav();
 }
@@ -2917,7 +2920,8 @@ function renderMore(){
     habits:"switchTab('habits')",
     shopping:"openShopping()",
     family:"openFamily()",
-    ach:"openAchievements()"
+    ach:"openAchievements()",
+    matrix:"switchTab('matrix')"
   };
   let items='';
   hidden.forEach(s=>{
@@ -3028,6 +3032,63 @@ function renderToday(){
 
   view.innerHTML=html;
   attachSwipes();
+}
+/* ===== МАТРИЦА ЭЙЗЕНХАУЭРА ===== */
+function matrixQuadrant(t){
+  const tk=todayKey();
+  const tmr=new Date();tmr.setDate(tmr.getDate()+1);
+  const tmrKey=tmr.getFullYear()+'-'+String(tmr.getMonth()+1).padStart(2,'0')+'-'+String(tmr.getDate()).padStart(2,'0');
+  const important=(t.pri==='R');
+  const urgent=t.date&&t.date<=tmrKey; // сегодня, завтра или просрочено
+  if(important&&urgent)return 'q1';
+  if(important&&!urgent)return 'q2';
+  if(!important&&urgent)return 'q3';
+  return 'q4';
+}
+function renderMatrix(){
+  const view=document.getElementById('view');
+  const tasks=getTasks().filter(t=>!t.done);
+  const q={q1:[],q2:[],q3:[],q4:[]};
+  tasks.forEach(t=>q[matrixQuadrant(t)].push(t));
+
+  const meta=[
+    {k:'q1',t:'🔥 Сделать сейчас',s:'Важно и срочно',c:'var(--bad)',bg:'color-mix(in srgb,var(--bad) 12%,transparent)'},
+    {k:'q2',t:'📅 Запланировать',s:'Важно, не срочно',c:'var(--ok)',bg:'color-mix(in srgb,var(--ok) 12%,transparent)'},
+    {k:'q3',t:'📤 Делегировать',s:'Срочно, не важно',c:'var(--warn)',bg:'color-mix(in srgb,var(--warn) 14%,transparent)'},
+    {k:'q4',t:'💤 Потом / убрать',s:'Не важно, не срочно',c:'var(--muted)',bg:'color-mix(in srgb,var(--muted) 12%,transparent)'}
+  ];
+
+  let html=`<div style="padding:14px 16px">
+    <div style="font-size:.82rem;color:var(--muted);margin-bottom:14px;line-height:1.5">
+      Дела распределяются автоматически: <b>🔴 Важно</b> — по приоритету, <b>срочность</b> — по дате (сегодня/завтра). Меняй приоритет через ✏️.
+    </div>`;
+
+  meta.forEach(m=>{
+    const list=q[m.k];
+    html+=`<div style="background:${m.bg};border:1.5px solid ${m.c};border-radius:20px;padding:14px;margin-bottom:12px">
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:${list.length?'10px':'0'}">
+        <div style="flex:1"><div style="font-weight:800;font-size:.95rem;color:${m.c}">${m.t}</div>
+        <div style="font-size:.72rem;color:var(--muted)">${m.s}</div></div>
+        <div style="font-size:1.4rem;font-weight:800;color:${m.c}">${list.length}</div>
+      </div>`;
+    if(list.length){
+      list.sort((a,b)=>(a.date||'9999')<(b.date||'9999')?-1:1);
+      list.forEach(t=>{
+        const dateLbl=t.date?(t.date===todayKey()?'сегодня':fmtDate(t.date)):'без даты';
+        html+=`<div onclick="editTask(${t.id})" style="display:flex;align-items:center;gap:8px;background:var(--glass);border:1px solid var(--line);border-radius:12px;padding:10px 12px;margin-bottom:6px;cursor:pointer">
+          <div class="chk ${t.done?'on':''}" onclick="event.stopPropagation();toggleTask(${t.id})" style="margin:0">${t.done?'✓':''}</div>
+          <div style="flex:1;min-width:0">
+            <div style="font-weight:600;font-size:.88rem;word-break:break-word">${esc(t.title)}</div>
+            <div style="font-size:.7rem;color:var(--muted);margin-top:2px">${modLabel[t.module]||'📋'} · 📅 ${dateLbl}${t.time?' 🕐 '+esc(t.time):''}</div>
+          </div>
+        </div>`;
+      });
+    }
+    html+=`</div>`;
+  });
+
+  html+=`</div>`;
+  view.innerHTML=html;
 }
 function openMenuEditor(){
   renderMenuEditor();
