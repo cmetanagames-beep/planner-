@@ -1060,6 +1060,28 @@ const CAT_COLORS=['#00b894','#e17055','#fdcb6e','#0984e3','#e84393','#6c5ce7','#
 function catStyleOf(name){const c=getExpCats().find(x=>x.name===name);return c||{i:'📦',c:'#b2bec3'};}
 
 const priColor={R:'var(--bad)',Y:'var(--warn)',B:'var(--brand)'};
+  /* ===== НАСТРАИВАЕМОЕ МЕНЮ ===== */
+// Все разделы, которыми можно управлять (кроме "Ещё" — он всегда есть)
+const NAV_SECTIONS=[
+  {id:'today',    icon:'🏠', name:'Сегодня'},
+  {id:'all',      icon:'📋', name:'Дела'},
+  {id:'finance',  icon:'💰', name:'Финансы'},
+  {id:'ai',       icon:'🤖', name:'ИИ'},
+  {id:'calendar', icon:'📅', name:'Календарь'},
+  {id:'habits',   icon:'💪', name:'Привычки'},
+  {id:'shopping', icon:'🛒', name:'Покупки'},
+  {id:'family',   icon:'👨‍👩‍👦', name:'Семья'},
+  {id:'ach',      icon:'🏆', name:'Награды'}
+];
+// Набор по умолчанию (максимум 4 своих + "Ещё")
+const DEFAULT_NAV=['today','all','finance','ai'];
+function getNavConfig(){
+  const d=load();
+  if(!Array.isArray(d.navConfig)||!d.navConfig.length)return DEFAULT_NAV.slice();
+  return d.navConfig.slice(0,4);
+}
+function setNavConfig(arr){const d=load();d.navConfig=arr.slice(0,4);save(d);}
+function sectionInfo(id){return NAV_SECTIONS.find(s=>s.id===id)||null;}
 
 let currentTab='all',currentPri='Y',editId=null,expType='exp',finDate=new Date(),calDate=new Date(),calSel=null;
 let expShared=false, finScope='personal';
@@ -1151,15 +1173,16 @@ function roleInfo(id){return FAMILY_ROLES.find(r=>r.id===id)||FAMILY_ROLES[5];}
 
 function renderNav(){
   const nav=document.getElementById('nav');
-  const cats=getCats();
-  let html=`<button data-tab="all" class="${currentTab==='all'?'active':''}" onclick="switchTab('all')"><i>📋</i>Все</button>`;
-  html+=`<button data-tab="calendar" class="${currentTab==='calendar'?'active':''}" onclick="switchTab('calendar')"><i>📅</i>Кален.</button>`;
-  cats.forEach(c=>{html+=`<button data-tab="${c.id}" class="${currentTab===c.id?'active':''}" onclick="switchTab('${c.id}')"><i>${c.emoji}</i>${esc(c.name)}</button>`;});
-  html+=`<button data-tab="habits" class="${currentTab==='habits'?'active':''}" onclick="switchTab('habits')"><i>💪</i>Привычки</button>`;
-  html+=`<button data-tab="finance" class="${currentTab==='finance'?'active':''}" onclick="switchTab('finance')"><i>💰</i>Финансы</button>`;
-  html+=`<button data-tab="ai" class="${currentTab==='ai'?'active':''}" onclick="switchTab('ai')"><i>🤖</i>ИИ</button>`;
-  html+=`<button data-tab="cats" onclick="openCatModal()"><i>⚙️</i>Ещё</button>`;
-   nav.innerHTML='<span id="nav-pill"></span>'+html;
+  const cfg=getNavConfig();
+  let html='';
+  cfg.forEach(id=>{
+    const s=sectionInfo(id);
+    if(!s)return;
+    html+=`<button data-tab="${s.id}" class="${currentTab===s.id?'active':''}" onclick="switchTab('${s.id}')"><i>${s.icon}</i>${esc(s.name)}</button>`;
+  });
+  // "Ещё" — всегда последняя
+  html+=`<button data-tab="more" class="${currentTab==='more'?'active':''}" onclick="switchTab('more')"><i>⚙️</i>Ещё</button>`;
+  nav.innerHTML='<span id="nav-pill"></span>'+html;
   requestAnimationFrame(moveNavPill);
 }
 
@@ -1207,21 +1230,24 @@ function fabRipple(e){
   
   function switchTab(tab){
   currentTab=tab;
-  const isAI=tab==='ai',isFin=tab==='finance',isCal=tab==='calendar',isHabits=tab==='habits';
+    const isAI=tab==='ai',isFin=tab==='finance',isCal=tab==='calendar',isHabits=tab==='habits';
+  const isMore=tab==='more',isToday=tab==='today';
   const hideList=isAI||isFin;
   document.getElementById('ai-view').style.display=isAI?'block':'none';
   document.getElementById('ai-bar').style.display=isAI?'flex':'none';
   document.getElementById('view').style.display=isAI?'none':'block';
-  document.getElementById('fab').style.display=isAI?'none':'flex';
-  document.getElementById('filters').style.display=(hideList||isCal||isHabits)?'none':'flex';
-  document.getElementById('search-wrap').style.display=(hideList||isCal||isHabits)?'none':'block';
-  document.querySelector('.hero-stats').style.display=(hideList||isCal||isHabits)?'none':'flex';
+  document.getElementById('fab').style.display=(isAI||isMore)?'none':'flex';
+  document.getElementById('filters').style.display=(hideList||isCal||isHabits||isMore||isToday)?'none':'flex';
+  document.getElementById('search-wrap').style.display=(hideList||isCal||isHabits||isMore||isToday)?'none':'block';
+  document.querySelector('.hero-stats').style.display=(hideList||isCal||isHabits||isMore||isToday)?'none':'flex';
   let title='Мои дела';
   if(tab==='all')title='Мои дела';
   else if(tab==='finance')title='💰 Финансы';
   else if(tab==='ai')title='🤖 Ассистент';
   else if(tab==='calendar')title='📅 Календарь';
   else if(tab==='habits')title='💪 Привычки';
+  else if(tab==='more')title='⚙️ Ещё';
+  else if(tab==='today')title='🏠 Сегодня';
   else title=catLabel(tab);
   document.getElementById('hero-title').textContent=title;
   document.getElementById('streakBox').style.display=hideList?'none':'inline-flex';
@@ -1229,6 +1255,8 @@ function fabRipple(e){
   else if(isFin)renderFinance();
   else if(isCal)renderCalendar();
   else if(isHabits)renderHabits();
+  else if(tab==='more')renderMore();
+  else if(tab==='today')renderToday();
   else render();
   renderNav();
 }
@@ -2785,6 +2813,52 @@ function applyActionReturn(r){
     save(d);
   }
   return id;
+}
+  /* ===== ЭКРАН "ЕЩЁ" ===== */
+function renderMore(){
+  const view=document.getElementById('view');
+  const cfg=getNavConfig();
+  // разделы, которых НЕТ в нижнем меню — показываем тут
+  const hidden=NAV_SECTIONS.filter(s=>!cfg.includes(s.id));
+  const openers={
+    today:"switchTab('today')",
+    all:"switchTab('all')",
+    finance:"switchTab('finance')",
+    ai:"switchTab('ai')",
+    calendar:"switchTab('calendar')",
+    habits:"switchTab('habits')",
+    shopping:"openShopping()",
+    family:"openFamily()",
+    ach:"openAchievements()"
+  };
+  let items='';
+  hidden.forEach(s=>{
+    items+=`<button class="assign-btn" onclick="${openers[s.id]}">${s.icon} ${esc(s.name)}</button>`;
+  });
+  // Служебное — всегда тут
+  const service=`
+    <div class="sub-h">Настройки</div>
+    <button class="assign-btn" onclick="openMenuEditor()">🧩 Настроить меню</button>
+    <button class="assign-btn" onclick="openCatModal()">🗂 Категории</button>
+    <button class="assign-btn" onclick="openSettings()">🎨 Настройки</button>
+    <button class="assign-btn" onclick="openHelp()">❓ Возможности</button>`;
+  view.innerHTML=`<div style="padding:14px 16px">
+    ${hidden.length?'<div class="sub-h">Разделы</div>'+items:''}
+    ${service}
+  </div>`;
+}
+
+/* ===== ВРЕМЕННАЯ ЗАГЛУШКА "СЕГОДНЯ" (сделаем красиво в след. шаге) ===== */
+function renderToday(){
+  currentTab='all';               // временно показываем обычный список
+  document.getElementById('hero-title').textContent='🏠 Сегодня';
+  filterState='today';
+  document.getElementById('filters').style.display='none';
+  document.querySelector('.hero-stats').style.display='flex';
+  render();
+}
+  function openMenuEditor(){
+  toast('🧩 Настройка меню — добавим на следующем шаге');
 }
 /* ===== ИНИЦИАЛИЗАЦИЯ ===== */
 function openHelp(){
