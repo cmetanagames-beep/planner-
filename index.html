@@ -1254,8 +1254,12 @@ function fabRipple(e){
 }
   
   function switchTab(tab){
+      if(id!=='today'){
+    const hero=document.querySelector('.hero');
+    if(hero)hero.style.display='';
+  }
   currentTab=tab;
-    const isAI=tab==='ai',isFin=tab==='finance',isCal=tab==='calendar',isHabits=tab==='habits';
+  const isAI=tab==='ai',isFin=tab==='finance',isCal=tab==='calendar',isHabits=tab==='habits';
   const isMore=tab==='more',isToday=tab==='today';
   const hideList=isAI||isFin;
   document.getElementById('ai-view').style.display=isAI?'block':'none';
@@ -2873,8 +2877,10 @@ function renderMore(){
   </div>`;
 }
 
-/* ===== ВРЕМЕННАЯ ЗАГЛУШКА "СЕГОДНЯ" (сделаем красиво в след. шаге) ===== */
+
 function renderToday(){
+  document.querySelector('.hero').style.display='none';
+  document.getElementById('filters').style.display='none';
   const view=document.getElementById('view');
   const tk=todayKey();
   const tasks=getTasks();
