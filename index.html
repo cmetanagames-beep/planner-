@@ -2950,7 +2950,9 @@ function tryLocalCommand(text){
       results.push(amount?`💵 Доход: <b>+${fmtMoney(amount)}₽</b> (${src})`:`💵 Отметил доход (${src}). Сумму допиши в Финансах`);
       return;
     }
-    const expM=low.match(/(\d[\d\s]*)\s*(?:р|руб|₽)/)||low.match(/(?:на|за|потрат\w*)\s+(\d[\d\s]*)/);
+    const expM =
+  low.match(/(\d[\d\s]*)\s*(?:р|руб|₽)/i) ||
+  low.match(/(?:на|за|потрат\w*)[\s\S]*?(\d[\d\s]*)/i);
     if(expM&&/(потрат|купил|заплат|отдал|ушло|на\s+\d|за\s+\d)/.test(low)){
       const amount=Number(expM[1].replace(/\s/g,''));
       if(amount){
@@ -3048,13 +3050,19 @@ async function aiSend(){
     if(w){aiAddMsg('ai','🌤️ '+w.replace(/\n/g,'<br>'));return;}
   }
 
-  // Определяем сложность: много действий в одной фразе без запятых
-  const actionWords=(text.match(/зарплат|аванс|преми|получил|купил|потрат|заплат|отдал|ушло|встреч|напомн|сделать|пропуск|надо|нужно/gi)||[]).length;
-  const hasCommas=/[,;]/.test(text);
-  const isComplex=actionWords>=3 && !hasCommas; // 3+ действий слитно = сложно
+// Определяем, сколько действий в сообщении
+const actionWords = (
+  text.match(
+    /зарплат|аванс|преми|получил|купил|потрат|заплат|отдал|ушло|встреч|напомн|сделать|пропуск|надо|нужно|забрать|сходить/gi
+  ) || []
+).length;
 
-  // Сложную фразу сразу в ИИ (если есть ключ), простую — локально
-  const localFirst = isComplex ? null : tryLocalCommand(text);
+// Если в сообщении два и более действия,
+// отправляем всё сообщение в AI-разбор.
+// Запятая больше не должна делать фразу "простой".
+const isComplex = actionWords >= 2;
+
+const localFirst = isComplex ? null : tryLocalCommand(text);
   if(localFirst){
     aiAddMsg('ai',localFirst);
     confetti();
@@ -3328,12 +3336,28 @@ function applyActionReturn(r){
   // 🔧 нормализуем дату: если ИИ вернул слово ("сегодня","завтра","понедельник") — конвертим в ГГГГ-ММ-ДД
   let fixedDate=normalizeDate(r.date);
 
-  if(r.type==='task'){
-    const t=getTasks();
-    t.push({id,title:r.title||'Дело',module:(getCats().some(c=>c.id===r.module)?r.module:'personal'),date:fixedDate,time:r.time||'',desc:r.desc||'',pri:r.pri||'Y',repeat:'',subs:[],done:false});
-    setTasks(t);
-    const saved=getTasks().find(x=>x.id===id);
-    if(saved)scheduleLocalTimeout(saved);
+  if (r.type === 'task') {
+  const t = getTasks();
+
+  const task = {
+    id,
+    title: r.title || 'Дело',
+    module: getCats().some(c => c.id === r.module)
+      ? r.module
+      : 'personal',
+    date: fixedDate,
+    time: r.time || '',
+    desc: r.desc || '',
+    pri: r.pri || 'Y',
+    repeat: '',
+    subs: [],
+    done: false
+  };
+
+  t.push(task);
+  setTasks(t);
+  scheduleLocalTimeout(task);
+}
   }else if(r.type==='expense'){
     const d=load();if(!d.finance)d.finance=[];
     let cat=(r.category||'Прочее').trim();
