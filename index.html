@@ -174,19 +174,18 @@ body.dark::before{opacity:.55}
 .today-mini-it{flex:1;background:rgba(255,255,255,.16);border:1px solid rgba(255,255,255,.22);border-radius:14px;padding:9px;text-align:center;backdrop-filter:blur(6px)}
 .today-mini-it b{font-size:1.3rem;display:block;font-weight:800}
 .today-mini-it small{font-size:.66rem;opacity:.9} 
-  /* Кольцо прогресса */
-.today-ring{display:flex;align-items:center;gap:16px;position:relative;margin-top:14px}
-.today-ring svg{flex:0 0 auto;transform:rotate(-90deg)}
-.today-ring .ring-bg{fill:none;stroke:rgba(255,255,255,.22);stroke-width:9}
-.today-ring .ring-fg{fill:none;stroke:#fff;stroke-width:9;stroke-linecap:round;transition:stroke-dashoffset 1s cubic-bezier(.3,1,.4,1)}
-.today-ring{position:relative}
-.today-ring .ring-wrap{position:relative;width:80px;height:80px;flex:0 0 auto}
-.today-ring .ring-txt{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center}
-.today-ring .ring-txt b{font-size:1.3rem;font-weight:800;display:block;line-height:1}
-.today-ring .ring-txt small{font-size:.58rem;opacity:.9}
-.today-ring .ring-side{flex:1}
-.today-ring .ring-side .rs-big{font-size:1.05rem;font-weight:800}
-.today-ring .ring-side .rs-sub{font-size:.8rem;opacity:.92;margin-top:3px}
+/* Кольцо прогресса */
+.today-ring{display:flex;align-items:center;gap:16px;margin-top:14px}
+.ring-wrap{position:relative;width:84px;height:84px;flex:0 0 84px}
+.ring-wrap svg{position:absolute;inset:0;transform:rotate(-90deg)}
+.ring-bg{fill:none;stroke:rgba(255,255,255,.22);stroke-width:8}
+.ring-fg{fill:none;stroke:#fff;stroke-width:8;stroke-linecap:round;transition:stroke-dashoffset 1s cubic-bezier(.3,1,.4,1)}
+.ring-txt{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;z-index:2}
+.ring-txt b{font-size:1.15rem;font-weight:800;line-height:1}
+.ring-txt small{font-size:.55rem;opacity:.9;margin-top:1px}
+.ring-side{flex:1;min-width:0}
+.ring-side .rs-big{font-size:1.05rem;font-weight:800}
+.ring-side .rs-sub{font-size:.8rem;opacity:.92;margin-top:3px}
 
 /* Мини-виджеты */
 .tw-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin:6px 0 4px}
@@ -1286,6 +1285,8 @@ function fabRipple(e){
   function switchTab(tab){
   const heroText=document.getElementById('hero-textblock');
   if(heroText)heroText.style.display=(tab==='today')?'none':'';
+  const heroBtns=document.querySelector('.hero-btns');
+  if(heroBtns)heroBtns.style.display=(tab==='today')?'none':'flex';
   currentTab=tab;
   const isAI=tab==='ai',isFin=tab==='finance',isCal=tab==='calendar',isHabits=tab==='habits';
   const isMore=tab==='more',isToday=tab==='today';
@@ -2938,7 +2939,7 @@ function renderToday(){
   else ringSub=`Осталось <b>${todayTasks.length}</b> из ${totalToday}`;
 
   // кольцо (r=32, длина окружности ≈ 201)
-  const R=32, C=2*Math.PI*R, off=C-(pct/100)*C;
+   const R=34, C=2*Math.PI*R, off=C-(pct/100)*C;
 
   let html=`<div style="padding:14px 16px">
     <div class="today-card">
@@ -2946,9 +2947,9 @@ function renderToday(){
       ${weatherLine}
       <div class="today-ring">
         <div class="ring-wrap">
-          <svg width="80" height="80" viewBox="0 0 80 80">
-            <circle class="ring-bg" cx="40" cy="40" r="${R}"></circle>
-            <circle class="ring-fg" cx="40" cy="40" r="${R}" stroke-dasharray="${C}" stroke-dashoffset="${off}"></circle>
+          <svg width="84" height="84" viewBox="0 0 84 84">
+            <circle class="ring-bg" cx="42" cy="42" r="${R}"></circle>
+            <circle class="ring-fg" cx="42" cy="42" r="${R}" stroke-dasharray="${C}" stroke-dashoffset="${off}"></circle>
           </svg>
           <div class="ring-txt"><b>${pct}%</b><small>сегодня</small></div>
         </div>
