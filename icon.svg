@@ -1,0 +1,21 @@
+<svg width="512" height="512" viewBox="0 0 512 512" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#7d6cf0"/>
+      <stop offset="1" stop-color="#a29bfe"/>
+    </linearGradient>
+    <radialGradient id="glow" cx="50%" cy="36%" r="62%">
+      <stop offset="0" stop-color="#fff" stop-opacity=".9"/>
+      <stop offset="1" stop-color="#fff" stop-opacity="0"/>
+    </radialGradient>
+    <filter id="soft"><feGaussianBlur stdDeviation="10"/></filter>
+  </defs>
+  <rect width="512" height="512" rx="115" fill="url(#bg)"/>
+  <rect width="512" height="512" rx="115" fill="url(#glow)" opacity=".55"/>
+  <g filter="url(#soft)" opacity=".6">
+    <path d="M256 118 C 322 210, 352 262, 352 318 a96 96 0 0 1 -192 0 C 160 262, 190 210, 256 118 Z" fill="#fff"/>
+  </g>
+  <path d="M256 118 C 322 210, 352 262, 352 318 a96 96 0 0 1 -192 0 C 160 262, 190 210, 256 118 Z" fill="#fff"/>
+  <path d="M256 176 C 302 238, 324 274, 324 316 a68 68 0 0 1 -56 67 C 302 344, 286 252, 256 176 Z" fill="#a29bfe" opacity=".35"/>
+  <circle cx="302" cy="362" r="11" fill="#fff" opacity=".85"/>
+</svg>
