@@ -2058,7 +2058,8 @@ function renderFinance(){
   const incLog=(load().income||[]).filter(r=>r.date&&r.date.startsWith(ym)).slice().reverse();
   if(incLog.length){
     html+=`<div class="fin-log-h">💵 Доходы · ${incLog.length}</div><div class="list">`;
-       html+=incLog.map(t=>`<div class="task"><div class="bar" style="background:var(--ok)"></div><div class="t-body"><div class="t-title" style="color:var(--ok)">📈 +${fmtMoney(t.amount)}₽ · ${esc(t.source||'Доход')}</div><div class="t-meta"><span>📅 ${fmtDate(t.date)||t.date}</span></div>${t.desc?`<div class="t-desc">${esc(t.desc)}</div>`:''}</div><div class="t-acts"><button onclick="editIncome(${t.id})">✏️</button><button onclick="delIncome(${t.id})">🗑</button></div></div>`).join('')+'</div>';
+    html+=incLog.map(t=>`<div class="task"><div class="bar" style="background:var(--ok)"></div><div class="t-body"><div class="t-title" style="color:var(--ok)">📈 +${fmtMoney(t.amount)}₽ · ${esc(t.source||'Доход')}</div><div class="t-meta"><span>📅 ${fmtDate(t.date)||t.date}</span></div>${t.desc?`<div class="t-desc">${esc(t.desc)}</div>`:''}</div><div class="t-acts"><button onclick="editIncome(${t.id})">✏️</button><button onclick="delIncome(${t.id})">🗑</button></div></div>`).join('')+'</div>';
+  }
 
   const expLog=(load().finance||[]).filter(r=>r.date&&r.date.startsWith(ym)).slice().reverse();
   if(expLog.length){
