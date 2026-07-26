@@ -979,7 +979,20 @@ body.light-accent-body .fab{color:#1a1d2e!important}
     <button class="btn ghost" onclick="closeRating()" style="margin-top:16px">Закрыть</button>
   </div>
 </div>
-
+<div class="modal" id="modal-menu-editor">
+  <div class="sheet">
+    <h3>🧩 Настройка меню</h3>
+    <p style="font-size:.82rem;color:var(--muted);margin-bottom:14px">
+      Выбери до 4 разделов для нижней панели. Остальные будут в «Ещё».
+      «Ещё» всегда на месте.
+    </p>
+    <div class="sub-h">В нижней панели</div>
+    <div id="menu-editor-active"></div>
+    <div class="sub-h">В разделе «Ещё»</div>
+    <div id="menu-editor-hidden"></div>
+    <button class="btn" onclick="closeMenuEditor()" style="margin-top:16px">Готово 👍</button>
+  </div>
+</div>
 <div class="modal" id="modal-help">
   <div class="sheet">
     <h3>✨ Что умеет приложение</h3>
@@ -2857,8 +2870,71 @@ function renderToday(){
   document.querySelector('.hero-stats').style.display='flex';
   render();
 }
-  function openMenuEditor(){
-  toast('🧩 Настройка меню — добавим на следующем шаге');
+function openMenuEditor(){
+  renderMenuEditor();
+  document.getElementById('modal-menu-editor').classList.add('on');
+}
+function closeMenuEditor(){
+  document.getElementById('modal-menu-editor').classList.remove('on');
+}
+function renderMenuEditor(){
+  const cfg=getNavConfig();
+  const active=cfg.map(id=>sectionInfo(id)).filter(Boolean);
+  const hidden=NAV_SECTIONS.filter(s=>!cfg.includes(s.id));
+
+  // Активные — с стрелками порядка и кнопкой убрать
+  let a='';
+  active.forEach((s,i)=>{
+    a+=`<div class="cat-item">
+      <span class="emo">${s.icon}</span>
+      <span class="nm">${esc(s.name)}</span>
+      <button onclick="menuMove(${i},-1)" ${i===0?'style="opacity:.25"':''}>⬆️</button>
+      <button onclick="menuMove(${i},1)" ${i===active.length-1?'style="opacity:.25"':''}>⬇️</button>
+      <button onclick="menuRemove('${s.id}')">➖</button>
+    </div>`;
+  });
+  if(!active.length)a=`<div style="font-size:.82rem;color:var(--muted);padding:6px 2px">Пусто — добавь снизу</div>`;
+  document.getElementById('menu-editor-active').innerHTML=a;
+
+  // Скрытые — с кнопкой добавить
+  let h='';
+  hidden.forEach(s=>{
+    const full=active.length>=4;
+    h+=`<div class="cat-item">
+      <span class="emo">${s.icon}</span>
+      <span class="nm">${esc(s.name)}</span>
+      <button onclick="menuAdd('${s.id}')" ${full?'style="opacity:.25"':''}>➕</button>
+    </div>`;
+  });
+  if(!hidden.length)h=`<div style="font-size:.82rem;color:var(--muted);padding:6px 2px">Все разделы в панели</div>`;
+  document.getElementById('menu-editor-hidden').innerHTML=h;
+}
+function menuAdd(id){
+  const cfg=getNavConfig();
+  if(cfg.length>=4){toast('Максимум 4 раздела + «Ещё»');return;}
+  if(cfg.includes(id))return;
+  cfg.push(id);
+  setNavConfig(cfg);
+  vibrate(15);
+  renderMenuEditor();renderNav();
+}
+function menuRemove(id){
+  let cfg=getNavConfig().filter(x=>x!==id);
+  if(!cfg.length){toast('Оставь хотя бы один раздел');return;}
+  setNavConfig(cfg);
+  vibrate(15);
+  // если убрали текущую вкладку — перейдём на первую оставшуюся
+  if(currentTab===id){currentTab=cfg[0];}
+  renderMenuEditor();renderNav();
+}
+function menuMove(i,dir){
+  const cfg=getNavConfig();
+  const j=i+dir;
+  if(j<0||j>=cfg.length)return;
+  [cfg[i],cfg[j]]=[cfg[j],cfg[i]];
+  setNavConfig(cfg);
+  vibrate(10);
+  renderMenuEditor();renderNav();
 }
 /* ===== ИНИЦИАЛИЗАЦИЯ ===== */
 function openHelp(){
