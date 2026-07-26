@@ -15,7 +15,8 @@
 <link rel="manifest" href="manifest.json">
 <link rel="apple-touch-icon" href="icon.svg">
 <link rel="icon" type="image/svg+xml" href="icon.svg">
-<style>
+
+  <style>
 *{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
 :root{--bg:#f4f6fb;--card:#fff;--text:#1a1d2e;--muted:#8b90a8;--line:#e8eaf2;--brand:#6c5ce7;--brand2:#a29bfe;--ok:#00b894;--bad:#e17055;--warn:#fdcb6e;--shadow:0 10px 34px rgba(80,80,150,.14);--glass:rgba(255,255,255,.72);--blur:16px}
 body.dark{--bg:#0b0d1f;--card:#161832;--text:#eceeff;--muted:#8a90c0;--line:#282c4a;--shadow:0 12px 40px rgba(0,0,0,.5);--glass:rgba(28,30,58,.7)}
@@ -1066,6 +1067,12 @@ body.dark #nav-pill{
   0%,100%{box-shadow:0 0 20px rgba(108,92,231,.5),inset 0 1px 0 rgba(255,255,255,.4)}
   50%{box-shadow:0 0 32px rgba(108,92,231,.8),inset 0 1px 0 rgba(255,255,255,.4)}
 }
+    /* ===== ЛИНЕЙНЫЕ SVG-ИКОНКИ ===== */
+.nav button i svg{width:24px;height:24px;display:block}
+.hero-btns button svg{width:20px;height:20px;display:block;margin:auto}
+.fab svg{width:26px;height:26px}
+.nav button i{display:flex;align-items:center;justify-content:center}
+.hero-btns button{display:flex;align-items:center;justify-content:center}
 </style>
 </head>
 <body>
@@ -1091,11 +1098,11 @@ body.dark #nav-pill{
       <div id="weatherChip" class="weather-chip" style="display:none" onclick="refreshWeather(true)"></div>
     </div>
     <div class="hero-btns">
-  <button onclick="openFamily()" title="Семья">👨‍👩‍👦</button>
-  <button onclick="openShopping()" title="Список покупок">🛒</button>
-  <button onclick="openHelp()" title="Возможности">❓</button>
-  <button onclick="openSettings()" title="Настройки">⚙️</button>
-  <button onclick="toggleTheme()" title="Тема">🌙</button>
+  <button onclick="openFamily()" title="Семья"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="8" r="3"/><path d="M3 20c0-3.3 2.7-6 6-6s6 2.7 6 6"/><circle cx="17" cy="9" r="2.2"/><path d="M15.5 20c0-2.5 1.4-4.6 3.5-5.4"/></svg></button>
+  <button onclick="openShopping()" title="Покупки"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="20" r="1.4"/><circle cx="18" cy="20" r="1.4"/><path d="M2 3h3l2.4 12.4a2 2 0 002 1.6h8.5a2 2 0 002-1.6L22 7H6"/></svg></button>
+  <button onclick="openHelp()" title="Возможности"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M9.5 9a2.5 2.5 0 015 .2c0 1.7-2.5 2-2.5 3.8"/><circle cx="12" cy="17" r=".6" fill="currentColor"/></svg></button>
+  <button onclick="openSettings()" title="Настройки"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.6 1.6 0 00.3 1.8 2 2 0 11-2.8 2.8 1.6 1.6 0 00-2.7.7 1.6 1.6 0 01-3.2 0 1.6 1.6 0 00-2.7-.7 2 2 0 11-2.8-2.8 1.6 1.6 0 000-2.7 1.6 1.6 0 01.9-2.9 1.6 1.6 0 00.9-2.7 2 2 0 112.8-2.8 1.6 1.6 0 002.7-.7 1.6 1.6 0 013.2 0 1.6 1.6 0 002.7.7 2 2 0 112.8 2.8 1.6 1.6 0 000 2.7z"/></svg></button>
+  <button onclick="toggleTheme()" title="Тема"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.8A8 8 0 1111.2 3 6.5 6.5 0 0021 12.8z"/></svg></button>
 </div>
   </div>
   <div class="hero-stats" id="hero-stats"></div>
@@ -1119,7 +1126,7 @@ body.dark #nav-pill{
   <button class="send-btn" onclick="aiSend()">➤</button>
 </div>
 
-<button class="fab" id="fab" onclick="fabRipple(event);fabAction()">+</button>
+<button class="fab" id="fab" onclick="fabRipple(event);fabAction()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg></button>
 
 <div class="nav" id="nav"></div>
 
@@ -1351,6 +1358,24 @@ body.dark #nav-pill{
 <div class="toast" id="toast"></div>
 
 <script>
+  /* ===== ЕДИНЫЙ НАБОР ЛИНЕЙНЫХ ИКОНОК ===== */
+const ICONS = {
+  today: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12l9-9 9 9"/><path d="M5 10v10h14V10"/></svg>',
+  all: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M8 6h13M8 12h13M8 18h13"/><circle cx="3.5" cy="6" r="1"/><circle cx="3.5" cy="12" r="1"/><circle cx="3.5" cy="18" r="1"/></svg>',
+  finance: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="6" width="18" height="12" rx="2"/><circle cx="12" cy="12" r="2.5"/></svg>',
+  ai: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v3"/><rect x="5" y="6" width="14" height="12" rx="3"/><circle cx="9" cy="12" r="1"/><circle cx="15" cy="12" r="1"/></svg>',
+  calendar: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 9h18M8 3v4M16 3v4"/></svg>',
+  habits: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg>',
+  shopping: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="20" r="1.4"/><circle cx="18" cy="20" r="1.4"/><path d="M2 3h3l2.4 12.4a2 2 0 002 1.6h8.5a2 2 0 002-1.6L22 7H6"/></svg>',
+  family: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="8" r="3"/><path d="M3 20c0-3.3 2.7-6 6-6s6 2.7 6 6"/><circle cx="17" cy="9" r="2.2"/><path d="M15.5 20c0-2.5 1.4-4.6 3.5-5.4"/></svg>',
+  ach: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M8 21h8M12 17v4"/><path d="M7 4h10v5a5 5 0 01-10 0V4z"/><path d="M7 6H4v2a3 3 0 003 3M17 6h3v2a3 3 0 01-3 3"/></svg>',
+  matrix: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M12 3v18M3 12h18"/></svg>',
+  more: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="5" cy="12" r="1.6"/><circle cx="12" cy="12" r="1.6"/><circle cx="19" cy="12" r="1.6"/></svg>',
+  settings: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.6 1.6 0 00.3 1.8l.1.1a2 2 0 11-2.8 2.8l-.1-.1a1.6 1.6 0 00-2.7.7 1.6 1.6 0 01-3.2 0 1.6 1.6 0 00-2.7-.7l-.1.1a2 2 0 11-2.8-2.8l.1-.1A1.6 1.6 0 004.6 15a1.6 1.6 0 01-.9-2.9 1.6 1.6 0 00.9-2.7 2 2 0 112.8-2.8 1.6 1.6 0 002.7-.7 1.6 1.6 0 013.2 0 1.6 1.6 0 002.7.7 2 2 0 112.8 2.8 1.6 1.6 0 000 2.7z"/></svg>',
+  help: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M9.5 9a2.5 2.5 0 015 .2c0 1.7-2.5 2-2.5 3.8"/><circle cx="12" cy="17" r=".6" fill="currentColor"/></svg>',
+  moon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.8A8 8 0 1111.2 3 6.5 6.5 0 0021 12.8z"/></svg>',
+  plus: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>'
+};
 const API_URL='https://api.groq.com/openai/v1/chat/completions';
 const MODEL='llama-3.3-70b-versatile';
 const AI_KEY_STORE='groq_api_key';
@@ -1439,16 +1464,16 @@ const priColor={R:'var(--bad)',Y:'var(--warn)',B:'var(--brand)'};
   /* ===== НАСТРАИВАЕМОЕ МЕНЮ ===== */
 // Все разделы, которыми можно управлять (кроме "Ещё" — он всегда есть)
 const NAV_SECTIONS=[
-  {id:'today',    icon:'🏠', name:'Сегодня'},
-  {id:'all',      icon:'📋', name:'Дела'},
-  {id:'finance',  icon:'💰', name:'Финансы'},
-  {id:'ai',       icon:'🤖', name:'ИИ'},
-  {id:'calendar', icon:'📅', name:'Календарь'},
-  {id:'habits',   icon:'💪', name:'Привычки'},
-  {id:'shopping', icon:'🛒', name:'Покупки'},
-  {id:'family',   icon:'👨‍👩‍👦', name:'Семья'},
-  {id:'ach',      icon:'🏆', name:'Награды'},
-  {id:'matrix',   icon:'🎯', name:'Матрица'}
+  {id:'today',    icon:ICONS.today,    name:'Сегодня'},
+  {id:'all',      icon:ICONS.all,      name:'Дела'},
+  {id:'finance',  icon:ICONS.finance,  name:'Финансы'},
+  {id:'ai',       icon:ICONS.ai,       name:'ИИ'},
+  {id:'calendar', icon:ICONS.calendar, name:'Календарь'},
+  {id:'habits',   icon:ICONS.habits,   name:'Привычки'},
+  {id:'shopping', icon:ICONS.shopping, name:'Покупки'},
+  {id:'family',   icon:ICONS.family,   name:'Семья'},
+  {id:'ach',      icon:ICONS.ach,      name:'Награды'},
+  {id:'matrix',   icon:ICONS.matrix,   name:'Матрица'}
 ];
 // Набор по умолчанию (максимум 4 своих + "Ещё")
 const DEFAULT_NAV=['today','all','finance','ai'];
@@ -1566,7 +1591,7 @@ function renderNav(){
     html+=`<button data-tab="${s.id}" class="${currentTab===s.id?'active':''}" onclick="switchTab('${s.id}')">${badge}<i>${s.icon}</i>${esc(s.name)}</button>`;
   });
   // "Ещё" — всегда последняя
-  html+=`<button data-tab="more" class="${currentTab==='more'?'active':''}" onclick="switchTab('more')"><i>⚙️</i>Ещё</button>`;
+ html+=`<button data-tab="more" class="${currentTab==='more'?'active':''}" onclick="switchTab('more')"><i>${ICONS.more}</i>Ещё</button>`;
   nav.innerHTML='<span id="nav-pill"></span>'+html;
   requestAnimationFrame(moveNavPill);
 }
@@ -1631,13 +1656,13 @@ function fabRipple(e){
   document.querySelector('.hero-stats').style.display=(hideList||isCal||isHabits||isMore||isToday||isMatrix)?'none':'flex';
   let title='Мои дела';
   if(tab==='all')title='Мои дела';
-  else if(tab==='finance')title='💰 Финансы';
-  else if(tab==='ai')title='🤖 Ассистент';
-  else if(tab==='calendar')title='📅 Календарь';
-  else if(tab==='habits')title='💪 Привычки';
-  else if(tab==='more')title='⚙️ Ещё';
-  else if(tab==='today')title='🏠 Сегодня';
-  else if(tab==='matrix')title='🎯 Матрица Эйзенхауэра';
+else if(tab==='finance')title='Финансы';
+else if(tab==='ai')title='Ассистент';
+else if(tab==='calendar')title='Календарь';
+else if(tab==='habits')title='Привычки';
+else if(tab==='more')title='Ещё';
+else if(tab==='today')title='Сегодня';
+else if(tab==='matrix')title='Матрица Эйзенхауэра';
   else title=catLabel(tab);
 
   // Приветствие по времени суток — только на "Сегодня"
