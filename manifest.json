@@ -1,14 +1,19 @@
 {
-  "name": "Планировщик дел",
-  "short_name": "Дела",
-  "description": "Умный планировщик с ИИ, финансами и напоминаниями",
+  "name": "Lumo — освети свой день",
+  "short_name": "Lumo",
+  "description": "Дела, финансы, привычки и семья в одном месте",
   "start_url": "./",
-  "scope": "./",
   "display": "standalone",
-  "orientation": "portrait",
-  "background_color": "#e9ebf4",
+  "background_color": "#0b0d1f",
   "theme_color": "#6c5ce7",
+  "orientation": "portrait",
   "icons": [
+    {
+      "src": "icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    },
     {
       "src": "icon.png",
       "sizes": "512x512",
