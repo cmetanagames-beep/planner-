@@ -2910,7 +2910,9 @@ function handleAIResult(r){
   });
 
   confetti();vibrate([30,50,30]);checkAchievements();
-  if(currentTab==='finance')renderFinance();
+
+  // всегда синхронизируем месяц финансов с сегодняшним
+  finDate=new Date();
 
   renderResultList(created);
 }
@@ -2919,9 +2921,13 @@ function handleAIResult(r){
 function applyActionReturn(r){
   if(!r)return null;
   const id=Date.now()+Math.floor(Math.random()*100000);
+
+  // 🔧 нормализуем дату: если ИИ вернул слово ("сегодня","завтра","понедельник") — конвертим в ГГГГ-ММ-ДД
+  let fixedDate=normalizeDate(r.date);
+
   if(r.type==='task'){
     const t=getTasks();
-    t.push({id,title:r.title||'Дело',module:(getCats().some(c=>c.id===r.module)?r.module:'personal'),date:r.date||'',time:r.time||'',desc:r.desc||'',pri:r.pri||'Y',repeat:'',subs:[],done:false});
+    t.push({id,title:r.title||'Дело',module:(getCats().some(c=>c.id===r.module)?r.module:'personal'),date:fixedDate,time:r.time||'',desc:r.desc||'',pri:r.pri||'Y',repeat:'',subs:[],done:false});
     setTasks(t);
     const saved=getTasks().find(x=>x.id===id);
     if(saved)scheduleLocalTimeout(saved);
@@ -2941,15 +2947,39 @@ function applyActionReturn(r){
       cats.splice(cats.length-1,0,{name:cat,i:emoji,c:color});
       setExpCats(cats);
     }
-       if(!cat)cat='Прочее';
-    d.finance.push({id,date:r.date||todayKey(),desc:r.desc||'',amount:normAmount(r.amount),category:cat});
+    if(!cat)cat='Прочее';
+    d.finance.push({id,date:fixedDate||todayKey(),desc:r.desc||'',amount:normAmount(r.amount),category:cat});
     save(d);checkBudgetAlert(cat);
   }else if(r.type==='income'){
     const d=load();if(!d.income)d.income=[];
-    d.income.push({id,date:r.date||todayKey(),desc:'',amount:normAmount(r.amount),source:r.source||'Доход'});
+    d.income.push({id,date:fixedDate||todayKey(),desc:'',amount:normAmount(r.amount),source:r.source||'Доход'});
     save(d);
   }
   return id;
+}
+
+// 🔧 Превращает "сегодня"/"завтра"/дни недели/пустое → в дату ГГГГ-ММ-ДД
+function normalizeDate(raw){
+  if(!raw)return todayKey();
+  const s=String(raw).trim().toLowerCase();
+  // уже правильный формат ГГГГ-ММ-ДД?
+  if(/^\d{4}-\d{2}-\d{2}$/.test(s))return s;
+  // слова → используем существующий парсер dateFromText
+  return dateFromText(s);
+}
+  // Разовая починка старых записей, где дата = слово
+function fixBrokenDates(){
+  const d=load();let changed=false;
+  const fix=arr=>{
+    (arr||[]).forEach(x=>{
+      if(x.date && !/^\d{4}-\d{2}-\d{2}$/.test(x.date)){
+        x.date=dateFromText(String(x.date).toLowerCase());
+        changed=true;
+      }
+    });
+  };
+  fix(d.tasks);fix(d.finance);fix(d.income);
+  if(changed){save(d);}
 }
   /* ===== ЭКРАН "ЕЩЁ" ===== */
 function renderMore(){
@@ -3239,6 +3269,7 @@ function importData(ev){
 function initApp(){
   applyTheme();applyAccent();
   getCats();getExpCats();
+   fixBrokenDates();
   renderNav();renderStreak();
   renderHeroDate();
   switchTab('all');
