@@ -963,6 +963,10 @@ body.light-accent-body .fab{color:#1a1d2e!important}
       <div class="box" id="quiet-box"></div>
       <div class="lbl">Включить тихие часы</div>
     </div>
+        <div class="sub-h">🔑 Ключ ИИ (Groq)</div>
+    <button class="btn ghost" onclick="setupApiKey()">🔑 Ввести / изменить ключ Groq</button>
+    <button class="btn ghost" onclick="resetApiKey()">🗑 Удалить ключ ИИ</button>
+
     <div class="sub-h">📲 Пуши и напоминания</div>
     <button class="btn ghost" onclick="subscribePush()">📲 Включить фоновые пуши</button>
     <button class="btn ghost" onclick="requestNotify()">🔔 Разрешить напоминания</button>
@@ -1057,6 +1061,19 @@ function ensureApiKey(){
   return k;
 }
 function resetApiKey(){localStorage.removeItem(AI_KEY_STORE);toast('Ключ удалён. Введи новый в чате ИИ');}
+  function setupApiKey(){
+  const cur=getApiKey();
+  const k=prompt('🔑 Вставь свой Groq API ключ\n(бесплатно на console.groq.com/keys):',cur||'');
+  if(k===null)return;
+  const clean=k.trim();
+  if(clean){
+    localStorage.setItem(AI_KEY_STORE,clean);
+    toast('🔑 Ключ сохранён!');
+  }else{
+    localStorage.removeItem(AI_KEY_STORE);
+    toast('Ключ удалён');
+  }
+}
 
 const KEY='planner_data_v2';
 function load(){try{return JSON.parse(localStorage.getItem(KEY))||{}}catch(e){return{}}}
