@@ -783,44 +783,57 @@ body.light-accent-body .fab{color:#1a1d2e!important}
 /* Иконки hero — компактно в один ряд */
 .hero-btns{flex-wrap:nowrap!important;max-width:none!important;gap:6px!important}
 .hero-btns button{width:36px!important;height:36px!important;font-size:.95rem!important;border-radius:12px!important}
-  /* ═══════ КИНЕМАТОГРАФИЧНЫЙ ВХОД ═══════ */
+ /* ═══════ СПОКОЙНЫЙ ВХОД ═══════ */
 #cinematic{
   position:fixed;inset:0;z-index:99999;
   display:flex;flex-direction:column;align-items:center;justify-content:center;
-  background:radial-gradient(circle at 50% 45%,#2a2456,#0b0d1f 75%);
-  gap:26px;
-  transition:opacity .6s ease,transform .6s cubic-bezier(.5,0,.2,1);
+  background:radial-gradient(circle at 50% 45%,#1c1840,#0b0d1f 78%);
+  gap:22px;
+  transition:opacity .7s ease;
 }
-#cinematic.hide{opacity:0;transform:scale(1.15);pointer-events:none}
-.cin-logo{position:relative;width:110px;height:110px;
+#cinematic.hide{opacity:0;pointer-events:none}
+
+.cin-logo{
+  position:relative;width:104px;height:104px;
   display:flex;align-items:center;justify-content:center;
-  animation:cinLogoIn 1s cubic-bezier(.34,1.56,.5,1) both}
-@keyframes cinLogoIn{
-  0%{opacity:0;transform:scale(.3) rotate(-30deg);filter:blur(12px)}
-  60%{filter:blur(0)}
-  100%{opacity:1;transform:scale(1) rotate(0);filter:blur(0)}
+  border-radius:50%;
+  background:radial-gradient(circle at 50% 40%,#22204a,#15132e);
+  box-shadow:0 0 60px rgba(108,92,231,.35),
+             inset 0 1px 0 rgba(162,155,254,.25);
+  opacity:0;transform:scale(.9);
+  animation:cinLogoIn 1s cubic-bezier(.22,.8,.3,1) .1s forwards;
 }
-.cin-ring{position:absolute;inset:0;border-radius:50%;
-  border:3px solid transparent;
-  border-top-color:#6c5ce7;border-right-color:#a29bfe;
-  animation:cinSpin 1.1s linear infinite,cinPulse 2s ease-in-out infinite;
-  box-shadow:0 0 40px rgba(108,92,231,.6)}
-@keyframes cinSpin{to{transform:rotate(360deg)}}
-@keyframes cinPulse{50%{box-shadow:0 0 70px rgba(162,155,254,.9)}}
-.cin-emoji{font-size:3rem;animation:cinFloat 2s ease-in-out infinite}
-.cin-drop{animation:cinFloat 2s ease-in-out infinite;filter:drop-shadow(0 6px 24px rgba(162,155,254,.9))}
-.cin-title{letter-spacing:8px!important;font-size:1.8rem!important}
-.cin-tagline{color:#a29bfe;font-size:.8rem;letter-spacing:3px;margin-top:-16px;
-  opacity:0;animation:cinTitleIn .7s ease .8s both;text-transform:uppercase}
-@keyframes cinFloat{50%{transform:translateY(-6px)}}
-.cin-title{color:#fff;font-size:1.5rem;font-weight:800;letter-spacing:2px;
-  opacity:0;animation:cinTitleIn .7s cubic-bezier(.2,.8,.3,1) .5s both;
-  text-shadow:0 4px 30px rgba(108,92,231,.8)}
-@keyframes cinTitleIn{
-  from{opacity:0;transform:translateY(20px);letter-spacing:12px}
-  to{opacity:1;transform:translateY(0);letter-spacing:2px}
+@keyframes cinLogoIn{
+  to{opacity:1;transform:scale(1)}
 }
 
+/* капля мягко проявляется */
+.cin-drop{
+  opacity:0;
+  filter:drop-shadow(0 4px 20px rgba(162,155,254,.55));
+  animation:cinDropIn 1s ease .25s forwards;
+}
+@keyframes cinDropIn{
+  from{opacity:0;transform:translateY(6px)}
+  to{opacity:1;transform:translateY(0)}
+}
+
+/* название плавно проявляется */
+.cin-title{
+  color:#fff;font-size:1.6rem;font-weight:700;letter-spacing:6px;
+  opacity:0;transform:translateY(8px);
+  animation:cinTextIn .8s ease .5s forwards;
+  text-shadow:0 2px 24px rgba(108,92,231,.5);
+}
+.cin-tagline{
+  color:#a29bfe;font-size:.72rem;letter-spacing:2.5px;
+  text-transform:uppercase;margin-top:-14px;
+  opacity:0;
+  animation:cinTextIn .8s ease .7s forwards;
+}
+@keyframes cinTextIn{
+  to{opacity:1;transform:translateY(0)}
+}
 /* Каскадный вылет элементов интерфейса */
 .cin-reveal{animation:cinRevealUp .6s cubic-bezier(.34,1.4,.4,1) both}
 @keyframes cinRevealUp{
@@ -1073,14 +1086,35 @@ body.dark #nav-pill{
 .fab svg{width:26px;height:26px}
 .nav button i{display:flex;align-items:center;justify-content:center}
 .hero-btns button{display:flex;align-items:center;justify-content:center}
+    /* ===== ФИКС РАЗМЕРА SVG В СПИСКАХ ===== */
+.assign-btn{
+  align-items:center;
+}
+.assign-btn svg{
+  width:22px;
+  height:22px;
+  flex:0 0 auto;
+  stroke:var(--brand);
+}
+.cat-item .emo{
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  width:24px;
+  flex:0 0 auto;
+}
+.cat-item .emo svg{
+  width:20px;
+  height:20px;
+  stroke:var(--brand);
+}
 </style>
 </head>
 <body>
 <!-- КИНЕМАТОГРАФИЧНЫЙ ВХОД LUMO -->
 <div id="cinematic">
   <div class="cin-logo">
-    <div class="cin-ring"></div>
-    <svg class="cin-drop" width="70" height="70" viewBox="0 0 512 512">
+    <svg class="cin-drop" width="58" height="58" viewBox="0 0 512 512">
       <path d="M256 118 C 322 210, 352 262, 352 318 a96 96 0 0 1 -192 0 C 160 262, 190 210, 256 118 Z" fill="#fff"/>
       <path d="M256 176 C 302 238, 324 274, 324 316 a68 68 0 0 1 -56 67 C 302 344, 286 252, 256 176 Z" fill="#a29bfe" opacity=".4"/>
     </svg>
@@ -1896,7 +1930,7 @@ function renderSmartHint(){
   if(over>0)msg=`⚠️ Просрочено ${over} — займись!`;
   else if(todayLeft>0)msg=`📌 Сегодня осталось: ${todayLeft} ${todayLeft===1?'дело':todayLeft<=4?'дела':'дел'}`;
   else if(tmrCount>0)msg=`🌅 Завтра тебя ждёт: ${tmrCount} ${tmrCount===1?'дело':tmrCount<=4?'дела':'дел'}`;
-  else msg=`🎉 Всё чисто — отдыхай!`;
+  else msg=`На сегодня задач нет`;
   box.textContent=msg;
   box.style.display='';
 }
@@ -3929,24 +3963,22 @@ function playCinematicIntro(){
   // Каскадное появление интерфейса
   setTimeout(()=>{
     main.forEach((el,i)=>{
-      el.style.transition='opacity .6s ease,transform .6s cubic-bezier(.34,1.4,.4,1)';
-      el.style.transform='translateY(24px) scale(.97)';
+      el.style.transition='opacity .6s ease,transform .6s cubic-bezier(.34,1.2,.4,1)';
+      el.style.transform='translateY(16px)';
       setTimeout(()=>{
         el.style.opacity='1';
-        el.style.transform='translateY(0) scale(1)';
-      },i*90);
-      // Чистим инлайн-стили после анимации, чтоб не мешали
-      setTimeout(()=>{el.style.transition='';el.style.transform='';},900+i*90);
+        el.style.transform='translateY(0)';
+      },i*80);
+      setTimeout(()=>{el.style.transition='';el.style.transform='';},800+i*80);
     });
-  },1250);
+  },1700);
 
-  // Скрываем заставку
+  // Плавно гасим заставку
   setTimeout(()=>{
     cin.classList.add('hide');
-    if(navigator.vibrate)navigator.vibrate([20,40,20]);
     setTimeout(()=>cin.remove(),700);
-  },1500);
-}
+  },2000);
+  }
 </script>
 </body>
 </html>
