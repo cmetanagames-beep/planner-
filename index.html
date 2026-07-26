@@ -1350,13 +1350,13 @@ function toggleHabit(id,key){
   renderHabits();
 }
 function addHabit(){
-  const name=prompt('Название привычки:');
-  if(!name||!name.trim())return;
-  const icon=prompt('Эмодзи (например 🧘):','⭐')||'⭐';
+  const name=(document.getElementById('habit-name')?.value||'').trim();
+  const icon=(document.getElementById('habit-icon')?.value||'').trim()||'⭐';
+  if(!name){toast('Введи название привычки');return;}
   const habits=getHabits();
-  habits.push({id:'h'+Date.now(),name:name.trim(),icon:icon.trim(),log:{}});
+  habits.push({id:'h'+Date.now(),name,icon,log:{}});
   saveHabits(habits);
-  toast('Привычка добавлена! 💪');
+  toast('Привычка добавлена 💪');
   renderHabits();
 }
 function deleteHabit(id){
@@ -1394,11 +1394,15 @@ function renderHabits(){
     </div>`;
   });
 
-  view.innerHTML=`
+   view.innerHTML=`
     <div style="padding:12px 16px">
-      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
-        <h2 style="margin:0;font-size:1.1rem">💪 Мои привычки</h2>
-        <button onclick="addHabit()" style="border:none;background:linear-gradient(135deg,var(--brand),var(--brand2));color:#fff;padding:8px 14px;border-radius:12px;font-weight:700;cursor:pointer">+ Привычка</button>
+      <div style="margin-bottom:12px">
+        <h2 style="margin:0 0 10px;font-size:1.1rem">💪 Мои привычки</h2>
+        <div class="sub-add">
+          <input id="habit-icon" placeholder="⭐" maxlength="4" style="max-width:56px;text-align:center">
+          <input id="habit-name" placeholder="Новая привычка..." onkeydown="if(event.key==='Enter')addHabit()">
+          <button onclick="addHabit()">+</button>
+        </div>
       </div>
       <div class="budget-card">
         <div style="display:flex;align-items:center;padding-bottom:8px;border-bottom:1px solid var(--line)">
@@ -2029,7 +2033,13 @@ function renderStreak(){
   if(s.last!==tk&&s.last!==yk)cnt=0;
   box.innerHTML=`🔥 Серия: ${cnt} ${cnt===1?'день':cnt>=2&&cnt<=4?'дня':'дней'}`;
 }
-
+function renderHeroDate(){
+  const el=document.getElementById('hero-date');
+  if(!el)return;
+  const s=new Date().toLocaleDateString('ru-RU',{weekday:'long',day:'numeric',month:'long'});
+  el.textContent=s.charAt(0).toUpperCase()+s.slice(1);
+}
+  
 /* ===== КОНФЕТТИ ===== */
 function confetti(){
   const colors=['#6c5ce7','#a29bfe','#00b894','#fdcb6e','#e17055','#0984e3','#e84393'];
@@ -2085,7 +2095,7 @@ function applyTheme(){
   let dark;
   if(m==='auto')dark=window.matchMedia&&window.matchMedia('(prefers-color-scheme:dark)').matches;
   else dark=(m==='dark');
-  document.documentElement.classList.toggle('light',!dark);
+  document.body.classList.toggle('dark',dark);
 }
 function toggleTheme(){
   const m=getThemeMode();
@@ -2814,6 +2824,7 @@ function initApp(){
   applyTheme();applyAccent();
   getCats();getExpCats();
   renderNav();renderStreak();
+  renderHeroDate();
   switchTab('all');
 
   // Service Worker
