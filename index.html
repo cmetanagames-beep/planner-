@@ -2795,8 +2795,9 @@ async function aiSend(){
     if(!r.ok){aiAddMsg('ai','😔 Ошибка сервера ИИ ('+r.status+').');return;}
     const d=await r.json();
     const answer=d.choices?.[0]?.message?.content||'Не смог ответить 😔';
-    aiHistory.push({role:'assistant',content:answer});
+        aiHistory.push({role:'assistant',content:answer});
     aiAddMsg('ai',esc(answer).replace(/\n/g,'<br>').replace(/\*\*(.+?)\*\*/g,'<b>$1</b>'));
+    if(_handsFree)speak(answer.slice(0,150));
   }catch(e){aiStopTyping();aiAddMsg('ai','😔 Нет связи с ИИ.');}
 }
 
@@ -3350,13 +3351,142 @@ function openHelp(){
   document.getElementById('modal-help').classList.add('on');
 }
 function closeHelp(){document.getElementById('modal-help').classList.remove('on');}
+/* ===== ГОЛОСОВОЙ РЕЖИМ (обычный + хендсфри) ===== */
+let _handsFree=false, _rec=null, _wakeLock=null, _listenMode='idle';
+const WAKE_WORDS=['планировщик','ассистент','помощник'];
+
+// Озвучка ответа
+function speak(text){
+  try{
+    const u=new SpeechSynthesisUtterance(text.replace(/[^\wа-яё0-9\s.,!?-]/gi,''));
+    u.lang='ru-RU';u.rate=1.05;
+    speechSynthesis.cancel();speechSynthesis.speak(u);
+  }catch(e){}
+}
+
+// Короткий обычный режим (одна фраза) — по клику
 function toggleMic(){
+  if(_handsFree){stopHandsFree();return;}
   const SR=window.SpeechRecognition||window.webkitSpeechRecognition;
   if(!SR){toast('🎤 Голос не поддерживается');return;}
   const rec=new SR();rec.lang='ru-RU';rec.interimResults=false;
   rec.onresult=e=>{document.getElementById('ai-input').value=e.results[0][0].transcript;aiSend();};
   rec.onerror=()=>toast('🎤 Ошибка распознавания');
   try{rec.start();toast('🎤 Говори...');}catch(e){}
+}
+
+// Долгий тап на 🎤 → включить хендсфри
+function initMicLongPress(){
+  const mic=document.getElementById('mic');
+  if(!mic)return;
+  let timer=null;
+  const start=()=>{timer=setTimeout(()=>{startHandsFree();},600);};
+  const cancel=()=>{clearTimeout(timer);};
+  mic.addEventListener('touchstart',start,{passive:true});
+  mic.addEventListener('touchend',cancel);
+  mic.addEventListener('touchmove',cancel);
+  mic.addEventListener('mousedown',start);
+  mic.addEventListener('mouseup',cancel);
+  mic.addEventListener('mouseleave',cancel);
+}
+
+async function startHandsFree(){
+  const SR=window.SpeechRecognition||window.webkitSpeechRecognition;
+  if(!SR){toast('🎤 Голос не поддерживается');return;}
+  _handsFree=true;_listenMode='wake';
+  const mic=document.getElementById('mic');
+  if(mic){mic.textContent='🔴';mic.style.background='var(--bad)';}
+  toast('🎙️ Хендсфри ВКЛ. Скажи «Планировщик»');
+  speak('Слушаю. Скажи планировщик');
+  vibrate([30,50,30]);
+  // держим экран включённым
+  try{if('wakeLock'in navigator)_wakeLock=await navigator.wakeLock.request('screen');}catch(e){}
+  runRecognizer();
+}
+
+function stopHandsFree(){
+  _handsFree=false;_listenMode='idle';
+  if(_rec){try{_rec.onend=null;_rec.stop();}catch(e){}_rec=null;}
+  if(_wakeLock){try{_wakeLock.release();}catch(e){}_wakeLock=null;}
+  const mic=document.getElementById('mic');
+  if(mic){mic.textContent='🎤';mic.style.background='';}
+  speechSynthesis.cancel();
+  toast('🎙️ Хендсфри выключен');
+  vibrate(20);
+}
+
+function runRecognizer(){
+  if(!_handsFree)return;
+  const SR=window.SpeechRecognition||window.webkitSpeechRecognition;
+  _rec=new SR();
+  _rec.lang='ru-RU';
+  _rec.interimResults=false;
+  _rec.continuous=false;
+
+  _rec.onresult=e=>{
+    const said=(e.results[e.results.length-1][0].transcript||'').toLowerCase().trim();
+    if(!said)return;
+
+    if(_listenMode==='wake'){
+      // ждём кодовое слово
+      const hit=WAKE_WORDS.find(w=>said.includes(w));
+      if(hit){
+        // может, команда сказана сразу после слова: "планировщик напомни завтра..."
+        const after=said.split(hit)[1]?.trim();
+        if(after&&after.length>3){
+          processVoiceCommand(after);
+        }else{
+          _listenMode='command';
+          vibrate([40,40,40]);
+          speak('Да, слушаю');
+          toast('🎙️ Говори команду...');
+        }
+      }
+    }else if(_listenMode==='command'){
+      processVoiceCommand(said);
+    }
+  };
+
+  _rec.onerror=ev=>{
+    // no-speech / aborted — норм, просто перезапустим
+    if(ev.error==='not-allowed'||ev.error==='service-not-allowed'){
+      stopHandsFree();toast('🎤 Нет доступа к микрофону');
+    }
+  };
+
+  _rec.onend=()=>{
+    // авто-перезапуск, пока хендсфри включён
+    if(_handsFree)setTimeout(runRecognizer,250);
+  };
+
+  try{_rec.start();}catch(e){}
+}
+
+function processVoiceCommand(text){
+  _listenMode='wait'; // пауза, пока обрабатываем
+  document.getElementById('ai-input').value=text;
+  vibrate(30);
+
+  // пробуем локально (быстро, без интернета для простых команд)
+  const local=tryLocalCommand(text);
+  if(local){
+    // показываем в чате
+    aiAddMsg('user',esc(text));
+    aiAddMsg('ai',local);
+    confetti();
+    if(currentTab==='finance')renderFinance();
+    else if(currentTab!=='ai')render();
+    // озвучиваем коротко
+    const plain=local.replace(/<[^>]+>/g,'').replace(/[📅🕐💰💵✅🤔]/g,'').trim();
+    speak('Готово. '+plain.slice(0,80));
+  }else{
+    // сложное → через обычный aiSend (он сам озвучит через хук ниже)
+    aiSend();
+  }
+  document.getElementById('ai-input').value='';
+
+  // вернуться к ожиданию кодового слова
+  setTimeout(()=>{if(_handsFree){_listenMode='wake';toast('🎙️ Скажи «Планировщик»');}},1200);
 }
 function clearAIChatHistory(){aiHistory=[];document.getElementById('ai-chat').innerHTML='';toast('История очищена 🗑');if(currentTab==='ai')aiHello();}
 function exportData(){
@@ -3416,6 +3546,7 @@ function initApp(){
   if(shopInp)shopInp.addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();addShopItem();}});
 
   // приветствие ключа при первом ИИ
+  initMicLongPress();
   checkAchievements();
     // Haptic-подобная вибрация на все интерактивные тапы
   document.addEventListener('pointerdown',e=>{
