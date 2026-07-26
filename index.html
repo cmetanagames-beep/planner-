@@ -1108,6 +1108,8 @@ body.dark #nav-pill{
   height:20px;
   stroke:var(--brand);
 }
+    /* SVG-иконки в плитках быстрых действий */
+.qa-ico svg{width:24px;height:24px;stroke:#fff}
 </style>
 </head>
 <body>
@@ -3491,10 +3493,10 @@ function renderMore(){
   // Служебное — всегда тут
   const service=`
     <div class="sub-h">Настройки</div>
-    <button class="assign-btn" onclick="openMenuEditor()">🧩 Настроить меню</button>
-    <button class="assign-btn" onclick="openCatModal()">🗂 Категории</button>
-    <button class="assign-btn" onclick="openSettings()">🎨 Настройки</button>
-    <button class="assign-btn" onclick="openHelp()">❓ Возможности</button>`;
+    <button class="assign-btn" onclick="openMenuEditor()">${ICONS.settings} Настроить меню</button>
+    <button class="assign-btn" onclick="openCatModal()">${ICONS.all} Категории</button>
+    <button class="assign-btn" onclick="openSettings()">${ICONS.settings} Настройки</button>
+    <button class="assign-btn" onclick="openHelp()">${ICONS.help} Возможности</button>`;
   view.innerHTML=`<div style="padding:14px 16px">
     ${hidden.length?'<div class="sub-h">Разделы</div>'+items:''}
     ${service}
