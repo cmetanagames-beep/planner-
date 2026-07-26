@@ -1155,7 +1155,7 @@ function setNavConfig(arr){const d=load();d.navConfig=arr.slice(0,5);save(d);}
 function sectionInfo(id){return NAV_SECTIONS.find(s=>s.id===id)||null;}
 
 let currentTab='all',currentPri='Y',editId=null,expType='exp',finDate=new Date(),calDate=new Date(),calSel=null;
-let expShared=false, finScope='personal';
+let expShared=false, finScope='personal', editFinId=null, editFinType=null;
 
 function esc(s){return String(s==null?'':s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]))}
 function todayKey(){const d=new Date();return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0')}
@@ -2058,13 +2058,12 @@ function renderFinance(){
   const incLog=(load().income||[]).filter(r=>r.date&&r.date.startsWith(ym)).slice().reverse();
   if(incLog.length){
     html+=`<div class="fin-log-h">💵 Доходы · ${incLog.length}</div><div class="list">`;
-    html+=incLog.map(t=>`<div class="task"><div class="bar" style="background:var(--ok)"></div><div class="t-body"><div class="t-title" style="color:var(--ok)">📈 +${fmtMoney(t.amount)}₽ · ${esc(t.source||'Доход')}</div><div class="t-meta"><span>📅 ${fmtDate(t.date)||t.date}</span></div>${t.desc?`<div class="t-desc">${esc(t.desc)}</div>`:''}</div><div class="t-acts"><button onclick="delIncome(${t.id})">🗑</button></div></div>`).join('')+'</div>';
-  }
+       html+=incLog.map(t=>`<div class="task"><div class="bar" style="background:var(--ok)"></div><div class="t-body"><div class="t-title" style="color:var(--ok)">📈 +${fmtMoney(t.amount)}₽ · ${esc(t.source||'Доход')}</div><div class="t-meta"><span>📅 ${fmtDate(t.date)||t.date}</span></div>${t.desc?`<div class="t-desc">${esc(t.desc)}</div>`:''}</div><div class="t-acts"><button onclick="editIncome(${t.id})">✏️</button><button onclick="delIncome(${t.id})">🗑</button></div></div>`).join('')+'</div>';
 
   const expLog=(load().finance||[]).filter(r=>r.date&&r.date.startsWith(ym)).slice().reverse();
   if(expLog.length){
     html+=`<div class="fin-log-h">📉 Расходы · ${expLog.length}</div><div class="list">`;
-    html+=expLog.map(t=>{const st=catStyleOf(t.category);const sh=t.shared?'<span class="assign-badge">👨‍👩‍👦 общая</span>':'';return `<div class="task"><div class="bar" style="background:${st.c}"></div><div class="t-body"><div class="t-title">${st.i} ${fmtMoney(t.amount)}₽ · ${esc(t.category||'Прочее')}</div><div class="t-meta"><span>📅 ${fmtDate(t.date)||t.date}</span>${sh}</div>${t.desc?`<div class="t-desc">${esc(t.desc)}</div>`:''}</div><div class="t-acts"><button onclick="delExpense(${t.id})">🗑</button></div></div>`;}).join('')+'</div>';
+       html+=expLog.map(t=>{const st=catStyleOf(t.category);const sh=t.shared?'<span class="assign-badge">👨‍👩‍👦 общая</span>':'';return `<div class="task"><div class="bar" style="background:${st.c}"></div><div class="t-body"><div class="t-title">${st.i} ${fmtMoney(t.amount)}₽ · ${esc(t.category||'Прочее')}</div><div class="t-meta"><span>📅 ${fmtDate(t.date)||t.date}</span>${sh}</div>${t.desc?`<div class="t-desc">${esc(t.desc)}</div>`:''}</div><div class="t-acts"><button onclick="editExpense(${t.id})">✏️</button><button onclick="delExpense(${t.id})">🗑</button></div></div>`;}).join('')+'</div>';
   }
 
   if(!incLog.length&&!expLog.length)html+=`<div class="empty"><div>💸</div>Нет записей за этот месяц</div>`;
@@ -2073,7 +2072,43 @@ function renderFinance(){
 function delExpense(id){if(!confirm('Удалить расход?'))return;const d=load();d.finance=(d.finance||[]).filter(x=>x.id!==id);save(d);renderFinance();toast('Удалено 🗑');}
 function delIncome(id){if(!confirm('Удалить доход?'))return;const d=load();d.income=(d.income||[]).filter(x=>x.id!==id);save(d);renderFinance();toast('Удалено 🗑');}
 
+  // Открыть модалку для РЕДАКТИРОВАНИЯ расхода
+function editExpense(id){
+  const rec=(load().finance||[]).find(x=>x.id===id);
+  if(!rec)return;
+  editFinId=id;editFinType='exp';
+  expType='exp';pickType('exp');
+  expShared=!!rec.shared;renderSharedBox();
+  document.getElementById('e-amount').value=rec.amount||'';
+  document.getElementById('e-desc').value=rec.desc||'';
+  document.getElementById('e-date').value=rec.date||todayKey();
+  document.getElementById('e-cat').innerHTML=getExpCats().map(c=>`<option value="${esc(c.name)}" ${c.name===rec.category?'selected':''}>${c.i} ${esc(c.name)}</option>`).join('');
+  const shTog=document.getElementById('e-shared-toggle');
+  if(shTog)shTog.style.display=getFamilyState()?'flex':'none';
+  document.querySelector('#modal-exp h3').textContent='✏️ Изменить расход';
+  document.getElementById('modal-exp').classList.add('on');
+}
+
+// Открыть модалку для РЕДАКТИРОВАНИЯ дохода
+function editIncome(id){
+  const rec=(load().income||[]).find(x=>x.id===id);
+  if(!rec)return;
+  editFinId=id;editFinType='inc';
+  expType='inc';pickType('inc');
+  document.getElementById('e-amount').value=rec.amount||'';
+  document.getElementById('e-desc').value=rec.desc||'';
+  document.getElementById('e-date').value=rec.date||todayKey();
+  // выставляем источник
+  const srcSel=document.getElementById('e-src');
+  let found=false;
+  Array.from(srcSel.options).forEach(o=>{if(o.value===rec.source){srcSel.value=rec.source;found=true;}});
+  if(!found&&rec.source){const o=document.createElement('option');o.value=rec.source;o.textContent=rec.source;srcSel.insertBefore(o,srcSel.firstChild);srcSel.value=rec.source;}
+  document.querySelector('#modal-exp h3').textContent='✏️ Изменить доход';
+  document.getElementById('modal-exp').classList.add('on');
+}
 function openExpModal(){
+  editFinId=null;editFinType=null;
+  document.querySelector('#modal-exp h3').textContent='💰 Добавить';
   expType='exp';pickType('exp');expShared=false;renderSharedBox();
   document.getElementById('e-amount').value='';document.getElementById('e-desc').value='';document.getElementById('e-date').value=todayKey();
   document.getElementById('e-cat').innerHTML=getExpCats().map(c=>`<option value="${esc(c.name)}">${c.i} ${esc(c.name)}</option>`).join('');
@@ -2082,7 +2117,7 @@ function openExpModal(){
   if(shTog)shTog.style.display=getFamilyState()?'flex':'none';
   document.getElementById('modal-exp').classList.add('on');
 }
-function closeExpModal(){document.getElementById('modal-exp').classList.remove('on');}
+function closeExpModal(){editFinId=null;editFinType=null;document.getElementById('modal-exp').classList.remove('on');}
 function pickType(t){
   expType=t;
   document.getElementById('type-exp').classList.toggle('on',t==='exp');
@@ -2099,6 +2134,25 @@ function saveExpModal(){
   const date=document.getElementById('e-date').value||todayKey();
   const desc=document.getElementById('e-desc').value.trim();
   const d=load();let cat=null;
+
+  // ===== РЕЖИМ РЕДАКТИРОВАНИЯ =====
+  if(editFinId){
+    if(editFinType==='exp'){
+      cat=document.getElementById('e-cat').value;
+      const rec=(d.finance||[]).find(x=>x.id===editFinId);
+      if(rec){rec.amount=amount;rec.date=date;rec.desc=desc;rec.category=cat;rec.shared=expShared;}
+      save(d);toast('Расход изменён ✅');if(cat)checkBudgetAlert(cat);
+    }else{
+      const rec=(d.income||[]).find(x=>x.id===editFinId);
+      if(rec){rec.amount=amount;rec.date=date;rec.desc=desc;rec.source=document.getElementById('e-src').value;}
+      save(d);toast('Доход изменён ✅');
+    }
+    editFinId=null;editFinType=null;
+    closeExpModal();vibrate(20);renderFinance();
+    return;
+  }
+
+  // ===== РЕЖИМ СОЗДАНИЯ (как было) =====
   if(expType==='exp'){cat=document.getElementById('e-cat').value;if(!d.finance)d.finance=[];d.finance.push({id:Date.now()+Math.floor(Math.random()*1000),date,desc,amount,category:cat,shared:expShared});save(d);toast(expShared?'Общая трата записана 👨‍👩‍👦':'Расход записан 💰');if(expShared)pushSharedExpense({date,desc,amount,category:cat});}
   else{if(!d.income)d.income=[];d.income.push({id:Date.now()+Math.floor(Math.random()*1000),date,desc,amount,source:document.getElementById('e-src').value});save(d);toast('Доход записан 💵');}
   closeExpModal();confetti();vibrate(30);
@@ -2536,8 +2590,11 @@ function tryLocalCommand(text){
   let results=[];let anyDone=false;
   parts.forEach(part=>{
     const low=part.toLowerCase();
-    if(/зарплат|аванс|преми|получил|пришл\w* деньг|доход/.test(low)){
-      const am=low.match(/(\d[\d\s]*)\s*(?:р|руб|₽|тыс)/);
+    if(/зарплат|аванс|преми|получил|пришл\w* деньг|доход|заработал/.test(low)){
+      // сначала пробуем "100000 руб", если нет — просто любое число в тексте
+      let am=low.match(/(\d[\d\s]*)\s*(?:р|руб|₽|тыс)/);
+      if(!am)am=low.match(/(\d[\d\s]{2,})/);        // 🔧 просто число (от 3 цифр)
+      if(!am)am=low.match(/(\d+)/);                  // 🔧 или любое число
       let amount=am?Number(am[1].replace(/\s/g,'')):0;
       if(/тыс/.test(low)&&amount<1000)amount*=1000;
       let src='Зарплата';
