@@ -2629,8 +2629,13 @@ async function aiSend(){
     if(w){aiAddMsg('ai','🌤️ '+w.replace(/\n/g,'<br>'));return;}
   }
 
-  // СНАЧАЛА пробуем локально (быстро, без ключа, работает всегда)
-  const localFirst=tryLocalCommand(text);
+  // Определяем сложность: много действий в одной фразе без запятых
+  const actionWords=(text.match(/зарплат|аванс|преми|получил|купил|потрат|заплат|отдал|ушло|встреч|напомн|сделать|пропуск|надо|нужно/gi)||[]).length;
+  const hasCommas=/[,;]/.test(text);
+  const isComplex=actionWords>=3 && !hasCommas; // 3+ действий слитно = сложно
+
+  // Сложную фразу сразу в ИИ (если есть ключ), простую — локально
+  const localFirst = isComplex ? null : tryLocalCommand(text);
   if(localFirst){
     aiAddMsg('ai',localFirst);
     confetti();
