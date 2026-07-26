@@ -1044,6 +1044,28 @@ body.dark #view::before{
   letter-spacing:1.2px!important;
   font-weight:700!important;
 }
+  /* ═══════ ВОЛНА ПОЯВЛЕНИЯ ═══════ */
+#view .tw-card,#view .qa-btn{
+  animation:cardWave .6s cubic-bezier(.34,1.4,.4,1) backwards;
+}
+#view .tw-grid .tw-card:nth-child(1){animation-delay:.05s}
+#view .tw-grid .tw-card:nth-child(2){animation-delay:.12s}
+#view .qa-grid .qa-btn:nth-child(1){animation-delay:.18s}
+#view .qa-grid .qa-btn:nth-child(2){animation-delay:.24s}
+#view .qa-grid .qa-btn:nth-child(3){animation-delay:.30s}
+#view .qa-grid .qa-btn:nth-child(4){animation-delay:.36s}
+@keyframes cardWave{
+  from{opacity:0;transform:translateY(30px) scale(.94)}
+  to{opacity:1;transform:translateY(0) scale(1)}
+}
+  /* ═══════ ДЫШАЩЕЕ МЕНЮ ═══════ */
+body.dark #nav-pill{
+  animation:pillBreath 3s ease-in-out infinite;
+}
+@keyframes pillBreath{
+  0%,100%{box-shadow:0 0 20px rgba(108,92,231,.5),inset 0 1px 0 rgba(255,255,255,.4)}
+  50%{box-shadow:0 0 32px rgba(108,92,231,.8),inset 0 1px 0 rgba(255,255,255,.4)}
+}
 </style>
 </head>
 <body>
