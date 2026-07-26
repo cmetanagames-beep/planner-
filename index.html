@@ -1144,6 +1144,11 @@ function esc(s){return String(s==null?'':s).replace(/[&<>"]/g,c=>({'&':'&amp;','
 function todayKey(){const d=new Date();return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0')}
 function fmtDate(k){if(!k)return'';const[y,m,d]=k.split('-').map(Number);if(!y)return k;return d+' '+monthNames[m-1]}
 function fmtMoney(n){return Number(n||0).toLocaleString('ru-RU')}
+  function normAmount(a){
+  if(typeof a==='string')a=a.replace(/\s/g,'').replace(',','.');
+  let n=Math.abs(Number(a));
+  return isNaN(n)?0:n;
+}
 function toast(t){const el=document.getElementById('toast');el.textContent=t;el.classList.add('on');setTimeout(()=>el.classList.remove('on'),1800)}
 
 /* ===== ПОГОДА (Open-Meteo, без ключа) ===== */
@@ -1951,7 +1956,7 @@ function finStats(y,m){
   const ym=y+'-'+String(m+1).padStart(2,'0');
   const exp=load().finance||[],inc=load().income||[];
   let total=0,income=0;const cats={};
-  exp.forEach(r=>{if(!r.amount||!r.date||!r.date.startsWith(ym))return;total+=r.amount;cats[r.category||'Прочее']=(cats[r.category||'Прочее']||0)+r.amount;});
+  exp.forEach(r=>{if(!r.amount||!r.date||!r.date.startsWith(ym))return;total+=Math.abs(r.amount);cats[r.category||'Прочее']=(cats[r.category||'Прочее']||0)+r.amount;});
   inc.forEach(r=>{if(!r.amount||!r.date||!r.date.startsWith(ym))return;income+=r.amount;});
   return{total,income,balance:income-total,byCat:Object.keys(cats).map(k=>({name:k,sum:cats[k]})).sort((a,b)=>b.sum-a.sum)};
 }
@@ -2624,11 +2629,21 @@ async function aiSend(){
     if(w){aiAddMsg('ai','🌤️ '+w.replace(/\n/g,'<br>'));return;}
   }
 
-  const key=ensureApiKey();
+  // СНАЧАЛА пробуем локально (быстро, без ключа, работает всегда)
+  const localFirst=tryLocalCommand(text);
+  if(localFirst){
+    aiAddMsg('ai',localFirst);
+    confetti();
+    if(currentTab==='finance')renderFinance();
+    else if(currentTab==='calendar')renderCalendar();
+    else if(currentTab!=='ai')render();
+    return;
+  }
+
+  // Локально не разобралось — пробуем ИИ (если есть ключ)
+  const key=getApiKey();
   if(!key){
-    const local=tryLocalCommand(text);
-    if(local){aiAddMsg('ai',local);confetti();return;}
-    aiAddMsg('ai','🔑 Нужен бесплатный ключ Groq. Нажми на меня ещё раз и вставь ключ с console.groq.com/keys');
+    aiAddMsg('ai','🤔 Не совсем понял. Попробуй проще: «зарплата 90000», «купил корм 3300», «завтра врач в 15:00».<br>Или добавь ключ Groq в настройках для сложных фраз.');
     return;
   }
 
@@ -2905,11 +2920,11 @@ function applyActionReturn(r){
       setExpCats(cats);
     }
        if(!cat)cat='Прочее';
-    d.finance.push({id,date:r.date||todayKey(),desc:r.desc||'',amount:Number(r.amount)||0,category:cat});
+    d.finance.push({id,date:r.date||todayKey(),desc:r.desc||'',amount:normAmount(r.amount),category:cat});
     save(d);checkBudgetAlert(cat);
   }else if(r.type==='income'){
     const d=load();if(!d.income)d.income=[];
-    d.income.push({id,date:r.date||todayKey(),desc:'',amount:Number(r.amount)||0,source:r.source||'Доход'});
+    d.income.push({id,date:r.date||todayKey(),desc:'',amount:normAmount(r.amount),source:r.source||'Доход'});
     save(d);
   }
   return id;
