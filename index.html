@@ -3357,7 +3357,6 @@ function applyActionReturn(r){
   t.push(task);
   setTasks(t);
   scheduleLocalTimeout(task);
-}
   }else if(r.type==='expense'){
     const d=load();if(!d.finance)d.finance=[];
     let cat=(r.category||'Прочее').trim();
