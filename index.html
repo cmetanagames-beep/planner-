@@ -474,7 +474,7 @@ body:not(.dark) .toast{background:rgba(255,255,255,.75)!important}
 
 /* Круглые кнопки сверху — чистое стекло с бликом */
 .hero-btns button{
-  background:rgba(255,255,255,.16)!important;
+  background:rgba(255,255,255,.28)!important;
   backdrop-filter:blur(12px) saturate(160%)!important;
   -webkit-backdrop-filter:blur(12px) saturate(160%)!important;
   border:1px solid rgba(255,255,255,.35)!important;
@@ -801,7 +801,7 @@ body.light-accent-body .fab{color:#1a1d2e!important}
 <div class="filters" id="filters"></div>
 
 <div class="search-wrap" id="search-wrap">
-  <input id="search" placeholder="🔍 Поиск..." oninput="render()">
+  <input id="search" placeholder="🔍 Поиск..." oninput="debouncedRender()">
 </div>
 
 <div id="view"></div>
@@ -1077,7 +1077,10 @@ function resetApiKey(){localStorage.removeItem(AI_KEY_STORE);toast('Ключ у�
 
 const KEY='planner_data_v2';
 function load(){try{return JSON.parse(localStorage.getItem(KEY))||{}}catch(e){return{}}}
-function save(d){localStorage.setItem(KEY,JSON.stringify(d))}
+function save(d){
+  try{localStorage.setItem(KEY,JSON.stringify(d));}
+  catch(e){toast('⚠️ Память заполнена! Сделай бэкап');}
+}
 function getTasks(){const d=load();return d.tasks||[]}
 function setTasks(t){const d=load();d.tasks=t;save(d);syncPushData();}
 function vibrate(ms){if(navigator.vibrate)try{navigator.vibrate(ms)}catch(e){}}
@@ -1250,11 +1253,14 @@ function roleInfo(id){return FAMILY_ROLES.find(r=>r.id===id)||FAMILY_ROLES[5];}
 function renderNav(){
   const nav=document.getElementById('nav');
   const cfg=getNavConfig();
+  const tk=todayKey();
+  const overdueCount=getTasks().filter(t=>isOverdue(t)&&t.date<tk).length;
   let html='';
   cfg.forEach(id=>{
     const s=sectionInfo(id);
     if(!s)return;
-    html+=`<button data-tab="${s.id}" class="${currentTab===s.id?'active':''}" onclick="switchTab('${s.id}')"><i>${s.icon}</i>${esc(s.name)}</button>`;
+    const badge=(s.id==='all'&&overdueCount)?`<span class="badge">${overdueCount}</span>`:'';
+    html+=`<button data-tab="${s.id}" class="${currentTab===s.id?'active':''}" onclick="switchTab('${s.id}')">${badge}<i>${s.icon}</i>${esc(s.name)}</button>`;
   });
   // "Ещё" — всегда последняя
   html+=`<button data-tab="more" class="${currentTab==='more'?'active':''}" onclick="switchTab('more')"><i>⚙️</i>Ещё</button>`;
@@ -1591,7 +1597,34 @@ function toggleTask(id){
   }
   if(currentTab==='calendar')renderCalendar();else render();
 }
-function delTask(id){if(!confirm('Удалить дело?'))return;setTasks(getTasks().filter(a=>a.id!==id));if(currentTab==='calendar')renderCalendar();else render();toast('Удалено 🗑');}
+let _lastDeleted=null,_undoTimer=null;
+function delTask(id){
+  const tasks=getTasks();
+  const victim=tasks.find(a=>a.id===id);
+  if(!victim)return;
+  _lastDeleted=JSON.parse(JSON.stringify(victim));
+  setTasks(tasks.filter(a=>a.id!==id));
+  if(currentTab==='calendar')renderCalendar();else render();
+  showUndoToast();
+}
+function showUndoToast(){
+  const el=document.getElementById('toast');
+  el.innerHTML='Удалено 🗑 <span onclick="undoDelete()" style="text-decoration:underline;cursor:pointer;margin-left:8px;font-weight:800">Отменить</span>';
+  el.classList.add('on');
+  el.style.pointerEvents='auto';
+  clearTimeout(_undoTimer);
+  _undoTimer=setTimeout(()=>{el.classList.remove('on');el.style.pointerEvents='none';_lastDeleted=null;},5000);
+}
+function undoDelete(){
+  if(!_lastDeleted)return;
+  const t=getTasks();t.push(_lastDeleted);setTasks(t);
+  _lastDeleted=null;clearTimeout(_undoTimer);
+  document.getElementById('toast').classList.remove('on');
+  document.getElementById('toast').style.pointerEvents='none';
+  vibrate(20);
+  if(currentTab==='calendar')renderCalendar();else render();
+  toast('Восстановлено ✅');
+}
 function editTask(id){
   const t=getTasks().find(a=>a.id===id);if(!t)return;
   editId=id;fillModuleSelect();fillAssignSelect();editSubs=(t.subs||[]).map(s=>({...s}));
@@ -2037,8 +2070,8 @@ function renderFinance(){
   let html=`<div class="fin-hero">
     <div class="fin-monthnav"><button onclick="finNav(-1)">‹</button><span>${monthLbl}</span><button onclick="finNav(1)">›</button></div>
     <div class="fin-balance">
-      <div class="fin-bal-item"><small>📈 Доход</small><b style="color:#a8ffcf">+${fmtMoney(s.income)}₽</b></div>
-      <div class="fin-bal-item"><small>📉 Расход</small><b style="color:#ffc7bd">-${fmtMoney(s.total)}₽</b></div>
+      <div class="fin-bal-item"><small>📈 Доход</small><b style="color:#a8ffcf">${s.income?'+':''}${fmtMoney(s.income)}₽</b></div>
+      <div class="fin-bal-item"><small>📉 Расход</small><b style="color:#ffc7bd">${s.total?'-':''}${fmtMoney(s.total)}₽</b></div>
       <div class="fin-bal-item"><small>💰 Баланс</small><b>${s.balance>=0?'+':''}${fmtMoney(s.balance)}₽</b></div>
     </div>
     <div class="fin-chart">${donutSVG(s.byCat,s.total)}<div class="center"><b>${fmtMoney(s.total)} ₽</b><small>Расходы</small></div></div>
@@ -2579,6 +2612,14 @@ function dateFromText(low){
   return todayKey();
 }
 function timeFromText(low){
+  // "через 5 минут", "через час"
+  let rel=low.match(/через\s+(\d{1,3})\s*(мин|час)/);
+  if(rel){
+    const n=+rel[1];const now=new Date();
+    if(/час/.test(rel[2]))now.setHours(now.getHours()+n);
+    else now.setMinutes(now.getMinutes()+n);
+    return String(now.getHours()).padStart(2,'0')+':'+String(now.getMinutes()).padStart(2,'0');
+  }
   const tm=low.match(/(\d{1,2})[:.\-](\d{2})|(?:в|к|на)\s*(\d{1,2})(?:\s|ч|$)/);
   if(tm){const hh=tm[1]||tm[3];const mm=tm[2]||'00';return String(hh).padStart(2,'0')+':'+mm;}
   return '';
@@ -3166,6 +3207,11 @@ function renderToday(){
 
   view.innerHTML=html;
   attachSwipes();
+}
+  let _searchTimer=null;
+function debouncedRender(){
+  clearTimeout(_searchTimer);
+  _searchTimer=setTimeout(render,180);
 }
 /* ===== МАТРИЦА ЭЙЗЕНХАУЭРА ===== */
 function matrixQuadrant(t){
