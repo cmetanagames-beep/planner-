@@ -332,7 +332,9 @@ body.dark{
 }
 .nav::-webkit-scrollbar{display:none}
 @media(max-width:520px){.nav{width:calc(100% - 20px)!important;left:50%!important}}
-.nav button{border-radius:22px!important;padding:9px 6px 10px!important;z-index:2;min-width:64px!important}
+.nav button{border-radius:18px!important;padding:8px 3px 9px!important;z-index:2;min-width:0!important;flex:1 1 0!important}
+.nav button i{font-size:1.25rem!important}
+.nav button{font-size:.62rem!important}
 .nav button.active{color:#fff!important}
 .nav button.active::before{display:none!important}
 
@@ -983,7 +985,7 @@ body.light-accent-body .fab{color:#1a1d2e!important}
   <div class="sheet">
     <h3>🧩 Настройка меню</h3>
     <p style="font-size:.82rem;color:var(--muted);margin-bottom:14px">
-      Выбери до 4 разделов для нижней панели. Остальные будут в «Ещё».
+      Выбери до 5 разделов для нижней панели. Остальные будут в «Ещё».
       «Ещё» всегда на месте.
     </p>
     <div class="sub-h">В нижней панели</div>
@@ -1091,7 +1093,7 @@ const DEFAULT_NAV=['today','all','finance','ai'];
 function getNavConfig(){
   const d=load();
   if(!Array.isArray(d.navConfig)||!d.navConfig.length)return DEFAULT_NAV.slice();
-  return d.navConfig.slice(0,4);
+  return d.navConfig.slice(0,5);
 }
 function setNavConfig(arr){const d=load();d.navConfig=arr.slice(0,4);save(d);}
 function sectionInfo(id){return NAV_SECTIONS.find(s=>s.id===id)||null;}
@@ -2899,7 +2901,7 @@ function renderMenuEditor(){
   // Скрытые — с кнопкой добавить
   let h='';
   hidden.forEach(s=>{
-    const full=active.length>=4;
+    const full=active.length>=5;const full=active.length>=4;
     h+=`<div class="cat-item">
       <span class="emo">${s.icon}</span>
       <span class="nm">${esc(s.name)}</span>
@@ -2911,7 +2913,7 @@ function renderMenuEditor(){
 }
 function menuAdd(id){
   const cfg=getNavConfig();
-  if(cfg.length>=4){toast('Максимум 4 раздела + «Ещё»');return;}
+  if(cfg.length>=4){toast('Максимум 5 раздела + «Ещё»');return;}
   if(cfg.includes(id))return;
   cfg.push(id);
   setNavConfig(cfg);
