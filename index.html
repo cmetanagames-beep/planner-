@@ -6,14 +6,15 @@
 <meta http-equiv="Expires" content="0">
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
-<title>Планировщик</title>
+<title>Lumo — освети свой день</title>
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-<meta name="apple-mobile-web-app-title" content="Дела">
+<meta name="apple-mobile-web-app-title" content="Lumo">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="theme-color" content="#6c5ce7" id="meta-theme">
 <link rel="manifest" href="manifest.json">
-<link rel="apple-touch-icon" href="icon.png">
+<link rel="apple-touch-icon" href="icon.svg">
+<link rel="icon" type="image/svg+xml" href="icon.svg">
 <style>
 *{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
 :root{--bg:#f4f6fb;--card:#fff;--text:#1a1d2e;--muted:#8b90a8;--line:#e8eaf2;--brand:#6c5ce7;--brand2:#a29bfe;--ok:#00b894;--bad:#e17055;--warn:#fdcb6e;--shadow:0 10px 34px rgba(80,80,150,.14);--glass:rgba(255,255,255,.72);--blur:16px}
@@ -798,7 +799,11 @@ body.light-accent-body .fab{color:#1a1d2e!important}
   box-shadow:0 0 40px rgba(108,92,231,.6)}
 @keyframes cinSpin{to{transform:rotate(360deg)}}
 @keyframes cinPulse{50%{box-shadow:0 0 70px rgba(162,155,254,.9)}}
-.cin-emoji{font-size:3rem;animation:cinFloat 2s ease-in-out infinite}
+.cin-emoji{font-size:3rem;animation:cinFloat 2s ease-in-out infinite
+          .cin-drop{animation:cinFloat 2s ease-in-out infinite;filter:drop-shadow(0 6px 24px rgba(162,155,254,.9))}
+.cin-title{letter-spacing:8px!important;font-size:1.8rem!important}
+.cin-tagline{color:#a29bfe;font-size:.8rem;letter-spacing:3px;margin-top:-16px;
+  opacity:0;animation:cinTitleIn .7s ease .8s both;text-transform:uppercase}
 @keyframes cinFloat{50%{transform:translateY(-6px)}}
 .cin-title{color:#fff;font-size:1.5rem;font-weight:800;letter-spacing:2px;
   opacity:0;animation:cinTitleIn .7s cubic-bezier(.2,.8,.3,1) .5s both;
@@ -906,18 +911,22 @@ body.light-accent-body .fab{color:#1a1d2e!important}
 </style>
 </head>
 <body>
-<!-- КИНЕМАТОГРАФИЧНЫЙ ВХОД -->
+<!-- КИНЕМАТОГРАФИЧНЫЙ ВХОД LUMO -->
 <div id="cinematic">
   <div class="cin-logo">
     <div class="cin-ring"></div>
-    <div class="cin-emoji">📋</div>
+    <svg class="cin-drop" width="70" height="70" viewBox="0 0 512 512">
+      <path d="M256 118 C 322 210, 352 262, 352 318 a96 96 0 0 1 -192 0 C 160 262, 190 210, 256 118 Z" fill="#fff"/>
+      <path d="M256 176 C 302 238, 324 274, 324 316 a68 68 0 0 1 -56 67 C 302 344, 286 252, 256 176 Z" fill="#a29bfe" opacity=".4"/>
+    </svg>
   </div>
-  <div class="cin-title">Планировщик</div>
+  <div class="cin-title">LUMO</div>
+  <div class="cin-tagline">освети свой день</div>
 </div>
 <div class="hero">
     <div class="hero-top">
     <div id="hero-textblock">
-      <h1 id="hero-title">Мои дела</h1>
+     <h1 id="hero-title">Lumo</h1>
       <div class="date" id="hero-date"></div>
       <div id="streakBox" class="streak-chip" style="display:none" onclick="openAchievements()"></div>
       <div class="quote-chip" id="quoteChip"></div>
