@@ -2948,6 +2948,7 @@ function renderToday(){
   const doneToday=tasks.filter(t=>t.date===tk&&t.done).length;
   const totalToday=todayTasks.length+doneToday;
   const pct=totalToday?Math.round(doneToday/totalToday*100):0;
+  const nothingPlanned=(totalToday===0); // на сегодня вообще ничего не было
 
   const name=getMyName();
   const h=new Date().getHours();
@@ -2963,7 +2964,7 @@ function renderToday(){
   let ringSub;
   if(overdue.length)ringSub=`⚠️ Просрочено: <b>${overdue.length}</b>`;
   else if(totalToday===0)ringSub='Дел на сегодня нет 🎉';
-  else if(pct===100)ringSub='Всё выполнено! 🔥';
+  else if(todayTasks.length===0&&doneToday>0)ringSub=`Всё выполнено! 🔥 (${doneToday})`;
   else ringSub=`Осталось <b>${todayTasks.length}</b> из ${totalToday}`;
 
   // кольцо (r=32, длина окружности ≈ 201)
@@ -2979,7 +2980,7 @@ function renderToday(){
         <div class="ring-txt"><b>${pct}%</b><small>сегодня</small></div>
       </div>
       <div class="ring-side">
-        <div class="rs-big">${doneToday}/${totalToday} дел</div>
+        <div class="rs-big">${nothingPlanned?'Нет дел':`${doneToday}/${totalToday} дел`}</div>
         <div class="rs-sub">${ringSub}</div>
       </div>
     </div>`;
