@@ -174,6 +174,31 @@ body.dark::before{opacity:.55}
 .today-mini-it{flex:1;background:rgba(255,255,255,.16);border:1px solid rgba(255,255,255,.22);border-radius:14px;padding:9px;text-align:center;backdrop-filter:blur(6px)}
 .today-mini-it b{font-size:1.3rem;display:block;font-weight:800}
 .today-mini-it small{font-size:.66rem;opacity:.9} 
+  /* Кольцо прогресса */
+.today-ring{display:flex;align-items:center;gap:16px;position:relative;margin-top:14px}
+.today-ring svg{flex:0 0 auto;transform:rotate(-90deg)}
+.today-ring .ring-bg{fill:none;stroke:rgba(255,255,255,.22);stroke-width:9}
+.today-ring .ring-fg{fill:none;stroke:#fff;stroke-width:9;stroke-linecap:round;transition:stroke-dashoffset 1s cubic-bezier(.3,1,.4,1)}
+.today-ring .ring-txt{position:absolute;left:33px;top:50%;transform:translateY(-50%);text-align:center;width:64px}
+.today-ring .ring-txt b{font-size:1.3rem;font-weight:800;display:block;line-height:1}
+.today-ring .ring-txt small{font-size:.58rem;opacity:.9}
+.today-ring .ring-side{flex:1}
+.today-ring .ring-side .rs-big{font-size:1.05rem;font-weight:800}
+.today-ring .ring-side .rs-sub{font-size:.8rem;opacity:.92;margin-top:3px}
+
+/* Мини-виджеты */
+.tw-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin:6px 0 4px}
+.tw-card{background:var(--glass);backdrop-filter:blur(var(--blur));border:1px solid var(--line);border-radius:18px;padding:14px;box-shadow:var(--shadow);cursor:pointer;position:relative;overflow:hidden}
+.tw-card .tw-ico{font-size:1.4rem}
+.tw-card .tw-lbl{font-size:.72rem;color:var(--muted);font-weight:700;margin-top:6px;text-transform:uppercase;letter-spacing:.4px}
+.tw-card .tw-val{font-size:1.15rem;font-weight:800;margin-top:2px}
+.tw-card .tw-sub{font-size:.72rem;color:var(--muted);margin-top:2px}
+
+/* Быстрые действия — плитки 2x2 */
+.qa-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:4px}
+.qa-btn{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;background:var(--glass);backdrop-filter:blur(var(--blur));border:1px solid var(--line);border-radius:18px;padding:16px 10px;cursor:pointer;box-shadow:var(--shadow);color:var(--text);font-weight:700;font-size:.8rem;transition:transform .15s}
+.qa-btn:active{transform:scale(.94)}
+.qa-btn .qa-ico{width:44px;height:44px;border-radius:14px;display:flex;align-items:center;justify-content:center;font-size:1.35rem;color:#fff}
 /* Категории */
 .cat-item{display:flex;align-items:center;gap:10px;background:var(--bg);border:1px solid var(--line);border-radius:13px;padding:11px 13px;margin-bottom:8px}
 .cat-item .emo{font-size:1.3rem}
@@ -2887,56 +2912,85 @@ function renderToday(){
     .sort((a,b)=>(a.time||'99:99')<(b.time||'99:99')?-1:1);
   const overdue=tasks.filter(t=>isOverdue(t)&&t.date<tk);
   const doneToday=tasks.filter(t=>t.date===tk&&t.done).length;
+  const totalToday=todayTasks.length+doneToday;
+  const pct=totalToday?Math.round(doneToday/totalToday*100):0;
 
   const name=getMyName();
   const h=new Date().getHours();
   const hi=h<6?'Доброй ночи':h<12?'Доброе утро':h<18?'Добрый день':'Добрый вечер';
   const greet=name?`${hi}, ${esc(name)}! 👋`:`${hi}! 👋`;
 
-  // погода
   const w=getWeatherCache();
   const weatherLine=(w&&w.temp!=null)
     ?`<div class="today-weather">${w.icon} ${w.temp}°C · ${esc(w.desc)}${w.rainToday>=50?' · ☔ возьми зонт':''}</div>`
     :'';
 
-  // сводка
-  let summary;
-  if(overdue.length)summary=`⚠️ Просрочено: <b>${overdue.length}</b>`;
-  else if(todayTasks.length)summary=`📌 На сегодня: <b>${todayTasks.length}</b> ${todayTasks.length===1?'дело':todayTasks.length<=4?'дела':'дел'}`;
-  else summary=`🎉 На сегодня всё сделано!`;
+  // текст рядом с кольцом
+  let ringSub;
+  if(overdue.length)ringSub=`⚠️ Просрочено: <b>${overdue.length}</b>`;
+  else if(totalToday===0)ringSub='Дел на сегодня нет 🎉';
+  else if(pct===100)ringSub='Всё выполнено! 🔥';
+  else ringSub=`Осталось <b>${todayTasks.length}</b> из ${totalToday}`;
+
+  // кольцо (r=32, длина окружности ≈ 201)
+  const R=32, C=2*Math.PI*R, off=C-(pct/100)*C;
 
   let html=`<div style="padding:14px 16px">
     <div class="today-card">
       <div class="today-greet">${greet}</div>
-      <div class="today-summary">${summary}</div>
       ${weatherLine}
-      <div class="today-mini">
-        <div class="today-mini-it"><b>${todayTasks.length}</b><small>осталось</small></div>
-        <div class="today-mini-it"><b>${doneToday}</b><small>готово</small></div>
-        <div class="today-mini-it"><b>${overdue.length}</b><small>просрочено</small></div>
+      <div class="today-ring">
+        <svg width="80" height="80" viewBox="0 0 80 80">
+          <circle class="ring-bg" cx="40" cy="40" r="${R}"></circle>
+          <circle class="ring-fg" cx="40" cy="40" r="${R}" stroke-dasharray="${C}" stroke-dashoffset="${off}"></circle>
+        </svg>
+        <div class="ring-txt"><b>${pct}%</b><small>сегодня</small></div>
+        <div class="ring-side">
+          <div class="rs-big">${doneToday}/${totalToday} дел</div>
+          <div class="rs-sub">${ringSub}</div>
+        </div>
       </div>
     </div>`;
 
-  // просроченные
+  // мини-виджеты
+  const fs=getExpenseStats();
+  const habits=getHabits();
+  const habitsDone=habits.filter(hb=>hb.log&&hb.log[tk]).length;
+  html+=`<div class="tw-grid">
+    <div class="tw-card" onclick="switchTab('finance')">
+      <div class="tw-ico">💰</div>
+      <div class="tw-lbl">Расходы за месяц</div>
+      <div class="tw-val">${fmtMoney(fs.total)} ₽</div>
+      <div class="tw-sub">Баланс: ${fs.balance>=0?'+':''}${fmtMoney(fs.balance)} ₽</div>
+    </div>
+    <div class="tw-card" onclick="switchTab('habits')">
+      <div class="tw-ico">💪</div>
+      <div class="tw-lbl">Привычки</div>
+      <div class="tw-val">${habitsDone}/${habits.length}</div>
+      <div class="tw-sub">${habitsDone===habits.length&&habits.length?'Все готовы! 🔥':'выполнено сегодня'}</div>
+    </div>
+  </div>`;
+
   if(overdue.length){
-    html+=`<div class="reschedule-bar" style="margin:0 0 10px"><span>⚠️ Просрочено: ${overdue.length}</span><button onclick="rescheduleOverdue()">➡️ На сегодня</button></div>`;
+    html+=`<div class="reschedule-bar" style="margin:6px 0 10px"><span>⚠️ Просрочено: ${overdue.length}</span><button onclick="rescheduleOverdue()">➡️ На сегодня</button></div>`;
   }
 
-  // список дел на сегодня
   html+=`<div class="sub-h">📅 Дела на сегодня</div>`;
   if(todayTasks.length){
     html+='<div class="list" style="padding:0">';
     todayTasks.forEach(t=>html+=taskCardHTML(t));
     html+='</div>';
   }else{
-    html+=`<div class="empty" style="padding:30px 20px"><div>☀️</div>Свободный день — отдыхай!</div>`;
+    html+=`<div class="empty" style="padding:22px 20px"><div>☀️</div>Свободный день — отдыхай!</div>`;
   }
 
-  // быстрые действия
   html+=`<div class="sub-h">Быстрые действия</div>
-    <button class="assign-btn" onclick="openModal()">➕ Добавить дело</button>
-    <button class="assign-btn" onclick="switchTab('calendar')">📅 Открыть календарь</button>
-    <button class="assign-btn" onclick="openShopping()">🛒 Список покупок</button>
+    <div class="qa-grid">
+      <div class="qa-btn" onclick="openModal()"><div class="qa-ico" style="background:linear-gradient(135deg,var(--brand),var(--brand2))">➕</div>Добавить дело</div>
+      <div class="qa-btn" onclick="switchTab('calendar')"><div class="qa-ico" style="background:linear-gradient(135deg,#0984e3,#74b9ff)">📅</div>Календарь</div>
+      <div class="qa-btn" onclick="openShopping()"><div class="qa-ico" style="background:linear-gradient(135deg,#00b894,#55efc4)">🛒</div>Покупки</div>
+      <div class="qa-btn" onclick="switchTab('ai')"><div class="qa-ico" style="background:linear-gradient(135deg,#e84393,#fd79a8)">🤖</div>Ассистент</div>
+    </div>
   </div>`;
 
   view.innerHTML=html;
