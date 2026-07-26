@@ -164,6 +164,16 @@ body.dark::before{opacity:.55}
 .sub-h{font-size:.8rem;color:var(--muted);font-weight:800;margin:16px 0 8px;text-transform:uppercase;letter-spacing:.5px}
 .ai-hint{text-align:center;color:var(--muted);font-size:.85rem;padding:20px 16px}
 
+ /* Экран "Сегодня" */
+.today-card{background:linear-gradient(135deg,var(--brand),var(--brand2));color:#fff;border-radius:22px;padding:18px;box-shadow:var(--shadow);position:relative;overflow:hidden;margin-bottom:6px}
+.today-card::before{content:'';position:absolute;inset:0;background:linear-gradient(180deg,rgba(255,255,255,.25),transparent 50%);pointer-events:none}
+.today-greet{font-size:1.15rem;font-weight:800;position:relative}
+.today-summary{font-size:.9rem;margin-top:6px;opacity:.95;position:relative}
+.today-weather{font-size:.82rem;margin-top:6px;opacity:.9;position:relative}
+.today-mini{display:flex;gap:8px;margin-top:14px;position:relative}
+.today-mini-it{flex:1;background:rgba(255,255,255,.16);border:1px solid rgba(255,255,255,.22);border-radius:14px;padding:9px;text-align:center;backdrop-filter:blur(6px)}
+.today-mini-it b{font-size:1.3rem;display:block;font-weight:800}
+.today-mini-it small{font-size:.66rem;opacity:.9} 
 /* Категории */
 .cat-item{display:flex;align-items:center;gap:10px;background:var(--bg);border:1px solid var(--line);border-radius:13px;padding:11px 13px;margin-bottom:8px}
 .cat-item .emo{font-size:1.3rem}
@@ -1095,7 +1105,7 @@ function getNavConfig(){
   if(!Array.isArray(d.navConfig)||!d.navConfig.length)return DEFAULT_NAV.slice();
   return d.navConfig.slice(0,5);
 }
-function setNavConfig(arr){const d=load();d.navConfig=arr.slice(0,4);save(d);}
+function setNavConfig(arr){const d=load();d.navConfig=arr.slice(0,5);save(d);}
 function sectionInfo(id){return NAV_SECTIONS.find(s=>s.id===id)||null;}
 
 let currentTab='all',currentPri='Y',editId=null,expType='exp',finDate=new Date(),calDate=new Date(),calSel=null;
@@ -2865,12 +2875,67 @@ function renderMore(){
 
 /* ===== ВРЕМЕННАЯ ЗАГЛУШКА "СЕГОДНЯ" (сделаем красиво в след. шаге) ===== */
 function renderToday(){
-  currentTab='all';               // временно показываем обычный список
-  document.getElementById('hero-title').textContent='🏠 Сегодня';
-  filterState='today';
-  document.getElementById('filters').style.display='none';
-  document.querySelector('.hero-stats').style.display='flex';
-  render();
+  const view=document.getElementById('view');
+  const tk=todayKey();
+  const tasks=getTasks();
+  const todayTasks=tasks.filter(t=>t.date===tk&&!t.done)
+    .sort((a,b)=>(a.time||'99:99')<(b.time||'99:99')?-1:1);
+  const overdue=tasks.filter(t=>isOverdue(t)&&t.date<tk);
+  const doneToday=tasks.filter(t=>t.date===tk&&t.done).length;
+
+  const name=getMyName();
+  const h=new Date().getHours();
+  const hi=h<6?'Доброй ночи':h<12?'Доброе утро':h<18?'Добрый день':'Добрый вечер';
+  const greet=name?`${hi}, ${esc(name)}! 👋`:`${hi}! 👋`;
+
+  // погода
+  const w=getWeatherCache();
+  const weatherLine=(w&&w.temp!=null)
+    ?`<div class="today-weather">${w.icon} ${w.temp}°C · ${esc(w.desc)}${w.rainToday>=50?' · ☔ возьми зонт':''}</div>`
+    :'';
+
+  // сводка
+  let summary;
+  if(overdue.length)summary=`⚠️ Просрочено: <b>${overdue.length}</b>`;
+  else if(todayTasks.length)summary=`📌 На сегодня: <b>${todayTasks.length}</b> ${todayTasks.length===1?'дело':todayTasks.length<=4?'дела':'дел'}`;
+  else summary=`🎉 На сегодня всё сделано!`;
+
+  let html=`<div style="padding:14px 16px">
+    <div class="today-card">
+      <div class="today-greet">${greet}</div>
+      <div class="today-summary">${summary}</div>
+      ${weatherLine}
+      <div class="today-mini">
+        <div class="today-mini-it"><b>${todayTasks.length}</b><small>осталось</small></div>
+        <div class="today-mini-it"><b>${doneToday}</b><small>готово</small></div>
+        <div class="today-mini-it"><b>${overdue.length}</b><small>просрочено</small></div>
+      </div>
+    </div>`;
+
+  // просроченные
+  if(overdue.length){
+    html+=`<div class="reschedule-bar" style="margin:0 0 10px"><span>⚠️ Просрочено: ${overdue.length}</span><button onclick="rescheduleOverdue()">➡️ На сегодня</button></div>`;
+  }
+
+  // список дел на сегодня
+  html+=`<div class="sub-h">📅 Дела на сегодня</div>`;
+  if(todayTasks.length){
+    html+='<div class="list" style="padding:0">';
+    todayTasks.forEach(t=>html+=taskCardHTML(t));
+    html+='</div>';
+  }else{
+    html+=`<div class="empty" style="padding:30px 20px"><div>☀️</div>Свободный день — отдыхай!</div>`;
+  }
+
+  // быстрые действия
+  html+=`<div class="sub-h">Быстрые действия</div>
+    <button class="assign-btn" onclick="openModal()">➕ Добавить дело</button>
+    <button class="assign-btn" onclick="switchTab('calendar')">📅 Открыть календарь</button>
+    <button class="assign-btn" onclick="openShopping()">🛒 Список покупок</button>
+  </div>`;
+
+  view.innerHTML=html;
+  attachSwipes();
 }
 function openMenuEditor(){
   renderMenuEditor();
@@ -2901,7 +2966,7 @@ function renderMenuEditor(){
   // Скрытые — с кнопкой добавить
   let h='';
   hidden.forEach(s=>{
-    const full=active.length>=5;const full=active.length>=4;
+    const full=active.length>=5;
     h+=`<div class="cat-item">
       <span class="emo">${s.icon}</span>
       <span class="nm">${esc(s.name)}</span>
@@ -2913,7 +2978,7 @@ function renderMenuEditor(){
 }
 function menuAdd(id){
   const cfg=getNavConfig();
-  if(cfg.length>=4){toast('Максимум 5 раздела + «Ещё»');return;}
+  if(cfg.length>=5){toast('Максимум 5 разделов + «Ещё»');return;}
   if(cfg.includes(id))return;
   cfg.push(id);
   setNavConfig(cfg);
