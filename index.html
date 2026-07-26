@@ -175,19 +175,16 @@ body.dark::before{opacity:.55}
 .today-mini-it b{font-size:1.3rem;display:block;font-weight:800}
 .today-mini-it small{font-size:.66rem;opacity:.9} 
 /* Кольцо прогресса */
-.today-ring{display:flex;align-items:center;gap:16px;margin-top:14px}
 .ring-wrap{position:relative;width:84px;height:84px;flex:0 0 84px}
-.ring-wrap svg{position:absolute;inset:0;transform:rotate(-90deg)}
+.ring-wrap svg{position:absolute;top:0;left:0;width:84px;height:84px}
 .ring-bg{fill:none;stroke:var(--line);stroke-width:8}
 .ring-fg{fill:none;stroke:var(--brand);stroke-width:8;stroke-linecap:round;transition:stroke-dashoffset 1s cubic-bezier(.3,1,.4,1)}
-.ring-txt b{color:var(--text)}
-.ring-txt small{color:var(--muted)}
-.ring-txt{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;z-index:2}
-.ring-txt b{font-size:1.15rem;font-weight:800;line-height:1}
-.ring-txt small{font-size:.55rem;opacity:.9;margin-top:1px}
+.ring-txt{position:absolute;top:0;left:0;right:0;bottom:0;display:flex;flex-direction:column;align-items:center;justify-content:center;line-height:1}
+.ring-txt b{font-size:1.05rem;font-weight:800;color:var(--text);line-height:1}
+.ring-txt small{font-size:.5rem;color:var(--muted);margin-top:2px}
 .ring-side{flex:1;min-width:0}
 .ring-side .rs-big{font-size:1.05rem;font-weight:800}
-.ring-side .rs-sub{font-size:.8rem;opacity:.92;margin-top:3px}
+.ring-side .rs-sub{font-size:.8rem;color:var(--muted);margin-top:3px}
 
 /* Мини-виджеты */
 .tw-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin:6px 0 4px}
@@ -1309,7 +1306,24 @@ function fabRipple(e){
   else if(tab==='more')title='⚙️ Ещё';
   else if(tab==='today')title='🏠 Сегодня';
   else title=catLabel(tab);
+
+  // Приветствие по времени суток — только на "Сегодня"
+  if(tab==='today'){
+    const nm=getMyName();
+    const hh=new Date().getHours();
+    const hi=hh<6?'Доброй ночи':hh<12?'Доброе утро':hh<18?'Добрый день':'Добрый вечер';
+    title=nm?`${hi}, ${esc(nm)}! 👋`:`${hi}! 👋`;
+  }
   document.getElementById('hero-title').textContent=title;
+
+  // Если имени нет — предложим задать (кнопка под датой на "Сегодня")
+  const dateEl=document.getElementById('hero-date');
+  if(tab==='today'&&!getMyName()){
+    dateEl.innerHTML=new Date().toLocaleDateString('ru-RU',{weekday:'long',day:'numeric',month:'long'}).replace(/^./,c=>c.toUpperCase())+
+      ` · <span onclick="askMyName()" style="text-decoration:underline;cursor:pointer;opacity:.95">✏️ указать имя</span>`;
+  }else{
+    renderHeroDate();
+  }
   document.getElementById('streakBox').style.display=hideList?'none':'inline-flex';
   if(isAI){document.getElementById('fab').style.display='none';if(!document.getElementById('ai-chat').children.length)aiHello();}
   else if(isFin)renderFinance();
@@ -2127,7 +2141,21 @@ function renderHeroDate(){
   const s=new Date().toLocaleDateString('ru-RU',{weekday:'long',day:'numeric',month:'long'});
   el.textContent=s.charAt(0).toUpperCase()+s.slice(1);
 }
-  
+function askMyName(){
+  const cur=getMyName();
+  const nm=prompt('Как тебя зовут? 😊',cur||'');
+  if(nm===null)return;
+  const clean=nm.trim();
+  const d=load();
+  d.myName=clean;
+  save(d);
+  if(clean){
+    toast('Приятно познакомиться, '+clean+'! 👋');
+    confetti();
+  }
+  syncPushData();
+  switchTab('today'); // перерисуем шапку с приветствием
+}
 /* ===== КОНФЕТТИ ===== */
 function confetti(){
   const colors=['#6c5ce7','#a29bfe','#00b894','#fdcb6e','#e17055','#0984e3','#e84393'];
