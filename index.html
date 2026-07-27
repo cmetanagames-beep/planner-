@@ -120,8 +120,14 @@ body.dark::before{
   margin-top:10px;box-shadow:var(--shadow);
   transition:transform .35s cubic-bezier(.34,1.6,.5,1);
 }
+  .hero-chips .streak-chip,
+.hero-chips .weather-chip{
+  margin-top:0;
+}  
 .streak-chip:active,.weather-chip:active{transform:scale(.94)}
-.quote-chip{font-size:.8rem;color:var(--muted);margin-top:8px}
+.quote-chip{font-size:.75rem;color:var(--muted);margin-top:5px;line-height:1.3;
+  transition:opacity .2s}
+    .today-weather{font-size:.8rem;color:var(--muted);margin-bottom:10px;line-height:1.4}
 
 /* Статистика в шапке */
 .hero-stats{display:flex;gap:10px;margin-top:14px}
@@ -598,7 +604,7 @@ body.dark .fab{box-shadow:0 0 26px color-mix(in srgb,var(--brand) 55%,transparen
 
 /* ---------- ТОСТ — плавающий стеклянный ---------- */
 .toast{
-  position:fixed;bottom:calc(90px + env(safe-area-inset-bottom));left:50%;transform:translateX(-50%) translateY(30px);
+  position:fixed;bottom:calc(160px + env(safe-area-inset-bottom));left:50%;transform:translateX(-50%) translateY(30px);
   z-index:200;opacity:0;pointer-events:none;
   padding:13px 24px;border-radius:30px;font-size:.85rem;font-weight:700;color:var(--text);
   background:var(--glass);border:1px solid var(--glass-brd);
@@ -617,35 +623,97 @@ body.dark .fab{box-shadow:0 0 26px color-mix(in srgb,var(--brand) 55%,transparen
    ЗАСТАВКА LUMO (кино-вход) — под новую палитру
    ═══════════════════════════════════════════════════════════ */
 #cinematic{
-  position:fixed;inset:0;z-index:99999;gap:22px;
-  display:flex;flex-direction:column;align-items:center;justify-content:center;
-  background:radial-gradient(circle at 50% 42%,#241E5C,#0E0D18 78%);
-  transition:opacity .7s ease;
+  position:fixed;inset:0;z-index:99999;
+  display:flex;flex-direction:column;align-items:center;justify-content:center;gap:0;
+  background:linear-gradient(160deg,#4B35C8 0%,#7B5CFF 45%,#9D8DFF 100%);
+  transition:opacity .6s ease;overflow:hidden;
 }
 #cinematic.hide{opacity:0;pointer-events:none}
 
+/* Фоновый узор как у Пятёрочки */
+#cinematic::before{
+  content:'';position:absolute;inset:0;
+  background-image:
+    repeating-linear-gradient(45deg,rgba(255,255,255,.04) 0,rgba(255,255,255,.04) 1px,transparent 0,transparent 50%),
+    repeating-linear-gradient(-45deg,rgba(255,255,255,.04) 0,rgba(255,255,255,.04) 1px,transparent 0,transparent 50%);
+  background-size:40px 40px;
+  pointer-events:none;
+}
+
+/* Свечение снизу */
+#cinematic::after{
+  content:'';position:absolute;bottom:-20%;left:50%;transform:translateX(-50%);
+  width:70%;height:40%;border-radius:50%;
+  background:radial-gradient(ellipse,rgba(255,255,255,.18),transparent 70%);
+  pointer-events:none;
+}
+
+/* Круглый логотип */
 .cin-logo{
-  position:relative;width:104px;height:104px;border-radius:50%;
+  width:140px;height:140px;border-radius:50%;
   display:flex;align-items:center;justify-content:center;
-  background:radial-gradient(circle at 50% 40%,#2C2860,#181534);
-  box-shadow:0 0 60px color-mix(in srgb,var(--brand) 35%,transparent),
-             inset 0 1px 0 color-mix(in srgb,var(--brand2) 30%,transparent);
-  opacity:0;transform:scale(.9);
-  animation:cinLogoIn 1s cubic-bezier(.22,.8,.3,1) .1s forwards;
+  background:rgba(255,255,255,.18);
+  border:3px solid rgba(255,255,255,.35);
+  box-shadow:
+    0 0 0 12px rgba(255,255,255,.07),
+    0 20px 60px rgba(0,0,0,.25),
+    inset 0 2px 0 rgba(255,255,255,.3);
+  opacity:0;transform:scale(.6);
+  animation:cinLogoIn .9s cubic-bezier(.34,1.5,.5,1) .1s forwards;
+  position:relative;z-index:1;
 }
 @keyframes cinLogoIn{to{opacity:1;transform:scale(1)}}
 
-.cin-drop{opacity:0;filter:drop-shadow(0 4px 20px color-mix(in srgb,var(--brand2) 55%,transparent));
-  animation:cinDropIn 1s ease .25s forwards}
-@keyframes cinDropIn{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:translateY(0)}}
+.cin-drop{
+  opacity:0;
+  filter:drop-shadow(0 4px 16px rgba(255,255,255,.4));
+  animation:cinDropIn .8s ease .3s forwards;
+}
+@keyframes cinDropIn{from{opacity:0;transform:translateY(8px) scale(.9)}to{opacity:1;transform:none}}
 
-.cin-title{color:#fff;font-size:1.6rem;font-weight:700;letter-spacing:6px;
-  opacity:0;transform:translateY(8px);
-  text-shadow:0 2px 24px color-mix(in srgb,var(--brand) 50%,transparent);
-  animation:cinTextIn .8s ease .5s forwards}
-.cin-tagline{color:var(--brand2);font-size:.72rem;letter-spacing:2.5px;text-transform:uppercase;
-  margin-top:-14px;opacity:0;animation:cinTextIn .8s ease .7s forwards}
+/* Название */
+.cin-title{
+  color:#fff;
+  font-size:2.6rem;
+  font-weight:900;
+  letter-spacing:10px;
+  margin-top:32px;
+  opacity:0;transform:translateY(12px);
+  text-shadow:0 4px 30px rgba(0,0,0,.2);
+  animation:cinTextIn .7s ease .55s forwards;
+  position:relative;z-index:1;
+}
+
+/* Слоган */
+.cin-tagline{
+  color:rgba(255,255,255,.8);
+  font-size:.85rem;
+  letter-spacing:3px;
+  text-transform:uppercase;
+  margin-top:10px;
+  opacity:0;
+  animation:cinTextIn .7s ease .75s forwards;
+  position:relative;z-index:1;
+}
 @keyframes cinTextIn{to{opacity:1;transform:translateY(0)}}
+
+/* Точки загрузки */
+.cin-dots{
+  display:flex;gap:8px;margin-top:52px;
+  opacity:0;animation:cinTextIn .5s ease 1s forwards;
+  position:relative;z-index:1;
+}
+.cin-dots span{
+  width:7px;height:7px;border-radius:50%;
+  background:rgba(255,255,255,.5);
+  animation:cinDot 1.2s ease-in-out infinite;
+}
+.cin-dots span:nth-child(2){animation-delay:.2s}
+.cin-dots span:nth-child(3){animation-delay:.4s}
+@keyframes cinDot{
+  0%,80%,100%{transform:scale(.7);opacity:.4}
+  40%{transform:scale(1.1);opacity:1}
+}
 
 /* SVG в SVG-defs (градиент кольца прогресса) — прячем контейнер */
 svg[width="0"]{position:absolute;width:0;height:0}
@@ -686,6 +754,7 @@ input,textarea{-webkit-user-select:text;user-select:text}
 }
 .hero-btns button:active{background:var(--line);color:var(--text)}
 .hero-btns button svg{width:22px;height:22px}
+    #hero-title:empty{display:none}
 </style>
 </head>
 <body>
@@ -695,27 +764,31 @@ input,textarea{-webkit-user-select:text;user-select:text}
 </linearGradient></defs></svg>
 <!-- КИНЕМАТОГРАФИЧНЫЙ ВХОД LUMO -->
 <div id="cinematic">
+  <div class="cin-glow"></div>
   <div class="cin-logo">
-    <svg class="cin-drop" width="58" height="58" viewBox="0 0 512 512">
+    <svg class="cin-drop" width="72" height="72" viewBox="0 0 512 512">
       <path d="M256 118 C 322 210, 352 262, 352 318 a96 96 0 0 1 -192 0 C 160 262, 190 210, 256 118 Z" fill="#fff"/>
-      <path d="M256 176 C 302 238, 324 274, 324 316 a68 68 0 0 1 -56 67 C 302 344, 286 252, 256 176 Z" fill="#a29bfe" opacity=".4"/>
+      <path d="M256 176 C 302 238, 324 274, 324 316 a68 68 0 0 1 -56 67 C 302 344, 286 252, 256 176 Z" fill="#a29bfe" opacity=".5"/>
     </svg>
   </div>
   <div class="cin-title">LUMO</div>
   <div class="cin-tagline">освети свой день</div>
+  <div class="cin-dots">
+    <span></span><span></span><span></span>
+  </div>
 </div>
 <div class="hero">
     <div class="hero-top">
     <div id="hero-textblock">
      <h1 id="hero-title">Lumo</h1>
       <div class="date" id="hero-date"></div>
-      <div id="streakBox" class="streak-chip" style="display:none" onclick="openAchievements()"></div>
-      <div class="quote-chip" id="quoteChip"></div>
-      <div id="weatherChip" class="weather-chip" style="display:none" onclick="refreshWeather(true)"></div>
+<div id="hero-chips-row" style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-top:8px">
+  <div id="streakBox" class="streak-chip" style="display:none;margin-top:0" onclick="openAchievements()"></div>
+  <div id="weatherChip" class="weather-chip" style="display:none;margin-top:0" onclick="refreshWeather(true)"></div>
+</div>
+<div class="quote-chip" id="quoteChip"></div>
     </div>
     <div class="hero-btns">
-  <button onclick="openFamily()" title="Семья"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="8" r="3"/><path d="M3 20c0-3.3 2.7-6 6-6s6 2.7 6 6"/><circle cx="17" cy="9" r="2.2"/><path d="M15.5 20c0-2.5 1.4-4.6 3.5-5.4"/></svg></button>
-  <button onclick="openShopping()" title="Покупки"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="20" r="1.4"/><circle cx="18" cy="20" r="1.4"/><path d="M2 3h3l2.4 12.4a2 2 0 002 1.6h8.5a2 2 0 002-1.6L22 7H6"/></svg></button>
   <button onclick="openHelp()" title="Возможности"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M9.5 9a2.5 2.5 0 015 .2c0 1.7-2.5 2-2.5 3.8"/><circle cx="12" cy="17" r=".6" fill="currentColor"/></svg></button>
   <button onclick="openSettings()" title="Настройки"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.6 1.6 0 00.3 1.8 2 2 0 11-2.8 2.8 1.6 1.6 0 00-2.7.7 1.6 1.6 0 01-3.2 0 1.6 1.6 0 00-2.7-.7 2 2 0 11-2.8-2.8 1.6 1.6 0 000-2.7 1.6 1.6 0 01.9-2.9 1.6 1.6 0 00.9-2.7 2 2 0 112.8-2.8 1.6 1.6 0 002.7-.7 1.6 1.6 0 013.2 0 1.6 1.6 0 002.7.7 2 2 0 112.8 2.8 1.6 1.6 0 000 2.7z"/></svg></button>
   <button onclick="toggleTheme()" title="Тема"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.8A8 8 0 1111.2 3 6.5 6.5 0 0021 12.8z"/></svg></button>
@@ -1285,22 +1358,18 @@ else if(tab==='matrix')title='Матрица Эйзенхауэра';
 
   // Приветствие по времени суток — только на "Сегодня"
   if(tab==='today'){
-    const nm=getMyName();
-    const hh=new Date().getHours();
-    const hi=hh<6?'Доброй ночи':hh<12?'Доброе утро':hh<18?'Добрый день':'Добрый вечер';
-    title=nm?`${hi}, ${esc(nm)}! 👋`:`${hi}! 👋`;
+     title=''; 
   }
   document.getElementById('hero-title').textContent=title;
-
-  // Если имени нет — предложим задать (кнопка под датой на "Сегодня")
-  const dateEl=document.getElementById('hero-date');
-  if(tab==='today'&&!getMyName()){
-    dateEl.innerHTML=new Date().toLocaleDateString('ru-RU',{weekday:'long',day:'numeric',month:'long'}).replace(/^./,c=>c.toUpperCase())+
-      ` · <span onclick="askMyName()" style="text-decoration:underline;cursor:pointer;opacity:.95">✏️ указать имя</span>`;
-  }else{
-    renderHeroDate();
-  }
-  document.getElementById('streakBox').style.display=hideList?'none':'inline-flex';
+ document.getElementById('streakBox').style.display=(hideList||isToday)?'none':'inline-flex';
+  // Скрываем всю строку чипов + дату на "Сегодня"
+const chipsRow=document.getElementById('hero-chips-row');
+if(chipsRow)chipsRow.style.display=(isToday||hideList)?'none':'flex';
+document.getElementById('hero-date').style.display=isToday?'none':'';
+if(!isToday)renderHeroDate();
+  const qc=document.getElementById('quoteChip');
+if(qc)qc.style.display=(isToday||hideList)?'none':'';
+document.getElementById('weatherChip').style.display=(hideList||isToday)?'none':'';
   if(isAI){document.getElementById('fab').style.display='none';if(!document.getElementById('ai-chat').children.length)aiHello();}
   else if(isFin)renderFinance();
   else if(isCal)renderCalendar();
@@ -3119,7 +3188,9 @@ function renderToday(){
   // кольцо (r=32, длина окружности ≈ 201)
    const R=34, C=2*Math.PI*R, off=C-(pct/100)*C;
 
-    let html=`<div style="padding:14px 16px">
+  let html=`<div style="padding:14px 16px">
+    <div style="font-size:1.2rem;font-weight:800;margin-bottom:${weatherLine?'4px':'10px'}">${greet}</div>
+    ${weatherLine}
     <div class="tw-card" style="display:flex;align-items:center;gap:16px;margin-bottom:12px">
       <div class="ring-wrap" style="--rc:var(--brand)">
         <svg width="84" height="84" viewBox="0 0 84 84">
