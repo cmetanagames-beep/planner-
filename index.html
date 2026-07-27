@@ -1365,6 +1365,47 @@ body:not(.dark) .qa-btn,body:not(.dark) .fin-hero{
 
 /* 8. Секции-заголовки — тоньше и с буквенным трекингом */
 .sub-h{font-size:.68rem!important;letter-spacing:1.5px!important;font-weight:700!important}
+    /* ═══════ СВЕТЛАЯ ТЕМА v4 — догоняем тёмную ═══════ */
+body:not(.dark){
+  --bg:#f7f8fa!important;      /* чистый, не сиреневый */
+  --card:#ffffff!important;
+  --line:#eceef2!important;
+  --text:#1c1d22!important;
+  --muted:#9296a3!important;
+}
+/* Фон — почти без цвета, лёгкий намёк сверху */
+body:not(.dark)::before{
+  background:radial-gradient(circle at 50% -10%,rgba(108,92,231,.07),transparent 40%)!important;
+}
+/* Карточки — глубина через тень, не через цвет */
+body:not(.dark) .task,body:not(.dark) .tw-card,body:not(.dark) .qa-btn,
+body:not(.dark) .fin-hero,body:not(.dark) .budget-card,body:not(.dark) .goal-card,
+body:not(.dark) .fin-insight,body:not(.dark) .ai-msg.ai .bubble,
+body:not(.dark) .cal-cell{
+  background:#fff!important;
+  border:1px solid #eef0f4!important;
+  box-shadow:0 1px 3px rgba(20,20,50,.04),0 6px 16px rgba(20,20,50,.05)!important;
+}
+/* Кольцо-карточка "Нет дел" — чуть выделяем */
+body:not(.dark) .tw-card:first-child{
+  box-shadow:0 2px 6px rgba(108,92,231,.06),0 8px 24px rgba(108,92,231,.07)!important;
+}
+/* Кнопки шапки — светлее и мягче */
+body:not(.dark) .hero-btns button{
+  background:#fff!important;border:1px solid #eef0f4!important;
+  color:#6b7080!important;box-shadow:0 1px 3px rgba(20,20,50,.05)!important;
+}
+/* Чипы серии/погоды */
+body:not(.dark) .streak-chip,body:not(.dark) .weather-chip{
+  background:#fff!important;border:1px solid #eef0f4!important;
+  color:#1c1d22!important;box-shadow:0 1px 3px rgba(20,20,50,.05)!important;
+}
+/* Нижнее меню светлой темы */
+body:not(.dark) .nav{
+  background:rgba(255,255,255,.9)!important;
+  border:1px solid #eef0f4!important;
+  box-shadow:0 4px 24px rgba(20,20,50,.08)!important;
+}
 </style>
 </head>
 <body>
