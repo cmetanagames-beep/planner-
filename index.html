@@ -8,10 +8,10 @@
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
 <title>Lumo — освети свой день</title>
 <meta name="apple-mobile-web-app-capable" content="yes">
-<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="theme-color" content="#F6F6FA" id="meta-theme">
 <meta name="apple-mobile-web-app-title" content="Lumo">
 <meta name="mobile-web-app-capable" content="yes">
-<meta name="theme-color" content="#6c5ce7" id="meta-theme">
 <link rel="manifest" href="manifest.json">
 <link rel="apple-touch-icon" href="icon.svg">
 <link rel="icon" type="image/svg+xml" href="icon.svg">
@@ -109,7 +109,10 @@ body.dark::before{
   backdrop-filter:blur(24px) saturate(180%);
   -webkit-backdrop-filter:blur(24px) saturate(180%);
   border-bottom:1px solid var(--line);
-  padding:calc(env(safe-area-inset-top) + 8px) 16px 12px;
+  padding-top:calc(env(safe-area-inset-top) + 8px);
+padding-right:16px;
+padding-bottom:12px;
+padding-left:16px;
 }
 
 /* Чипы серии/погоды/подсказки */
@@ -623,7 +626,10 @@ body.dark .fab{box-shadow:0 0 26px color-mix(in srgb,var(--brand) 55%,transparen
    ЗАСТАВКА LUMO (кино-вход) — под новую палитру
    ═══════════════════════════════════════════════════════════ */
 #cinematic{
-  position:fixed;inset:0;z-index:99999;
+  position:fixed;
+  top:0;left:0;right:0;bottom:0;
+  background-attachment:fixed;z-index:99999;
+  padding-top:env(safe-area-inset-top);
   display:flex;flex-direction:column;align-items:center;justify-content:center;gap:0;
   background:linear-gradient(160deg,#4B35C8 0%,#7B5CFF 45%,#9D8DFF 100%);
   transition:opacity .6s ease;overflow:hidden;
@@ -2349,6 +2355,9 @@ function applyTheme(){
   if(m==='auto')dark=window.matchMedia&&window.matchMedia('(prefers-color-scheme:dark)').matches;
   else dark=(m==='dark');
   document.body.classList.toggle('dark',dark);
+  
+  const mt=document.getElementById('meta-theme');
+  if(mt)mt.content=dark?'#0E0D18':'#F6F6FA';
 }
 function toggleTheme(){
   const m=getThemeMode();
