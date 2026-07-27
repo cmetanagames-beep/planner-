@@ -1305,9 +1305,73 @@ body.dark .ring-wrap::before{opacity:.4!important}
 .list{padding:8px 16px 4px!important}
 .task{margin-bottom:10px!important;padding:16px!important}
 .sub-h{margin:22px 4px 10px!important;opacity:.6!important}
+    /* ═══════ LUMO CLEAN v3 — фикс FAB + оживление ═══════ */
+
+/* 1. ФИКС: FAB больше НЕ наезжает на плитки.
+   Сдвигаем его выше и добавляем плиткам отступ снизу */
+.fab{bottom:120px!important}
+#view{padding-bottom:70px!important}
+.qa-grid{margin-bottom:20px!important}
+
+/* 2. Плитки быстрых действий — компактнее и живее */
+.qa-btn{
+  flex-direction:row!important;
+  justify-content:flex-start!important;
+  gap:12px!important;
+  padding:14px 16px!important;
+  font-size:.88rem!important;
+}
+.qa-btn .qa-ico{
+  width:40px!important;height:40px!important;
+  border-radius:12px!important;font-size:1.2rem!important;
+  flex:0 0 auto!important;
+}
+
+/* 3. ЦВЕТНЫЕ ИКОНКИ и в светлой теме (было только в тёмной) */
+.qa-btn:nth-child(1) .qa-ico{background:linear-gradient(135deg,#6c5ce7,#a29bfe)!important}
+.qa-btn:nth-child(2) .qa-ico{background:linear-gradient(135deg,#0984e3,#74b9ff)!important}
+.qa-btn:nth-child(3) .qa-ico{background:linear-gradient(135deg,#00b894,#55efc4)!important}
+.qa-btn:nth-child(4) .qa-ico{background:linear-gradient(135deg,#b95ce7,#e07bd8)!important}
+
+/* 4. ВКУСНАЯ ДЕТАЛЬ: цветное кольцо прогресса со свечением */
+.ring-fg{
+  stroke:url(#ringGrad)!important;
+  filter:drop-shadow(0 0 6px color-mix(in srgb,var(--brand) 60%,transparent))!important;
+}
+.ring-wrap{position:relative}
+.ring-wrap::after{
+  content:'';position:absolute;inset:-6px;border-radius:50%;z-index:-1;
+  background:radial-gradient(circle,color-mix(in srgb,var(--brand) 25%,transparent),transparent 70%);
+  filter:blur(8px);
+}
+
+/* 5. Мини-виджеты (Расходы/Привычки) — иконка в цветном кружке */
+.tw-card .tw-ico{
+  width:38px;height:38px;border-radius:11px;
+  display:flex;align-items:center;justify-content:center;
+  font-size:1.1rem;margin-bottom:2px;
+  background:color-mix(in srgb,var(--brand) 12%,transparent);
+}
+
+/* 6. Чуть теплее фон светлой темы — не бледный серый, а мягкий */
+body:not(.dark){--bg:#f2f1f9;--card:#ffffff}
+body:not(.dark) .task,body:not(.dark) .tw-card,
+body:not(.dark) .qa-btn,body:not(.dark) .fin-hero{
+  box-shadow:0 4px 16px rgba(90,80,160,.07)!important;
+}
+
+/* 7. Заголовок "Доброе утро" — чуть характернее */
+.hero h1{font-weight:800!important;letter-spacing:-.3px!important}
+
+/* 8. Секции-заголовки — тоньше и с буквенным трекингом */
+.sub-h{font-size:.68rem!important;letter-spacing:1.5px!important;font-weight:700!important}
 </style>
 </head>
 <body>
+  <svg width="0" height="0" style="position:absolute"><defs>
+<linearGradient id="ringGrad" x1="0" y1="0" x2="1" y2="1">
+<stop offset="0" stop-color="#6c5ce7"/><stop offset="1" stop-color="#a29bfe"/>
+</linearGradient></defs></svg>
 <!-- КИНЕМАТОГРАФИЧНЫЙ ВХОД LUMO -->
 <div id="cinematic">
   <div class="cin-logo">
