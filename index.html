@@ -1110,6 +1110,201 @@ body.dark #nav-pill{
 }
     /* SVG-иконки в плитках быстрых действий */
 .qa-ico svg{width:24px;height:24px;stroke:#fff}
+    /* ═══════════════════ LUMO CLEAN v2 — премиум-редизайн ═══════════════════ */
+
+/* 1. УБИРАЕМ радужный shimmer — это главный источник "грязи" */
+.task::after,.budget-card::after,.goal-card::after,
+.fin-insight::after,.shop-item::after,.ai-msg .bubble::after{
+  display:none!important;
+}
+
+/* 2. ЧИСТЫЙ ГРАФИТОВЫЙ ФОН вместо фиолетовой каши (тёмная тема) */
+body.dark{--bg:#0e0e14;--card:#17171f;--line:#26262f;--muted:#7b7b8c;--text:#f0f0f5}
+body.dark::before{
+  background:
+    radial-gradient(circle at 50% -5%,rgba(108,92,231,.18),transparent 45%),
+    radial-gradient(circle at 90% 100%,rgba(108,92,231,.1),transparent 45%)!important;
+  opacity:1!important;
+}
+body:not(.dark){--bg:#f5f5f8;--line:#e9e9f0}
+body:not(.dark)::before{
+  background:
+    radial-gradient(circle at 50% -5%,rgba(108,92,231,.12),transparent 45%)!important;
+}
+
+/* 3. ШАПКА без резкого обрыва — плавный переход в фон */
+.hero{
+  background:transparent!important;
+  box-shadow:none!important;
+  border-radius:0!important;
+  padding-bottom:8px!important;
+}
+.hero::before,.hero::after{display:none!important}
+.hero h1{color:var(--text)!important;font-size:1.7rem!important;text-shadow:none!important}
+.hero .date{color:var(--muted)!important;opacity:1!important}
+
+/* Плитки статистики в шапке — нейтральные, не белое-на-фиолетовом */
+.hero-stats{margin-top:14px!important}
+.hstat{
+  background:var(--card)!important;
+  border:1px solid var(--line)!important;
+  backdrop-filter:none!important;-webkit-backdrop-filter:none!important;
+  box-shadow:none!important;border-radius:16px!important;
+  color:var(--text)!important;
+}
+.hstat::before{display:none!important}
+.hstat b{color:var(--text)!important;text-shadow:none!important}
+.hstat small{color:var(--muted)!important;opacity:1!important}
+
+/* Кнопки шапки — нейтральное стекло, не пёстрое */
+.hero-btns button{
+  background:var(--card)!important;
+  border:1px solid var(--line)!important;
+  color:var(--muted)!important;
+  backdrop-filter:none!important;-webkit-backdrop-filter:none!important;
+  box-shadow:none!important;
+}
+.hero-btns button:active{background:var(--line)!important}
+
+/* Чипы серии/погоды — нейтральные */
+.streak-chip,.weather-chip{
+  background:var(--card)!important;
+  border:1px solid var(--line)!important;
+  color:var(--text)!important;
+  backdrop-filter:none!important;box-shadow:none!important;
+}
+.quote-chip{color:var(--muted)!important;opacity:1!important}
+
+/* 4. ЕДИНАЯ СИСТЕМА КАРТОЧЕК — один фон, одна тень, один радиус */
+.task,.tw-card,.qa-btn,.budget-card,.goal-card,.fin-insight,
+.shop-item,.cal-cell,.ai-msg.ai .bubble{
+  background:var(--card)!important;
+  border:1px solid var(--line)!important;
+  border-radius:18px!important;
+  backdrop-filter:none!important;-webkit-backdrop-filter:none!important;
+  box-shadow:0 2px 8px rgba(0,0,0,.04)!important;
+}
+body.dark .task,body.dark .tw-card,body.dark .qa-btn,
+body.dark .budget-card,body.dark .goal-card,body.dark .fin-insight,
+body.dark .shop-item,body.dark .ai-msg.ai .bubble{
+  box-shadow:0 2px 12px rgba(0,0,0,.25)!important;
+}
+.task::before,.shop-item::before,.budget-card::before,
+.goal-card::before,.fin-insight::before,.tw-card::before{display:none!important}
+
+/* 5. АКЦЕНТ ТОЛЬКО ГДЕ НУЖНО. Финансовая шапка — не заливаем целиком */
+.fin-hero{
+  background:var(--card)!important;
+  border:1px solid var(--line)!important;
+  color:var(--text)!important;
+  box-shadow:0 2px 12px rgba(0,0,0,.06)!important;
+}
+body.dark .fin-hero{box-shadow:0 2px 16px rgba(0,0,0,.3)!important}
+.fin-hero::after{display:none!important}
+.fin-monthnav{color:var(--text)!important}
+.fin-monthnav button{
+  background:var(--bg)!important;border:1px solid var(--line)!important;
+  color:var(--text)!important;backdrop-filter:none!important;box-shadow:none!important;
+}
+.fin-bal-item{
+  background:var(--bg)!important;
+  border:1px solid var(--line)!important;
+  backdrop-filter:none!important;box-shadow:none!important;
+}
+.fin-bal-item::before{display:none!important}
+.fin-bal-item small{color:var(--muted)!important;opacity:1!important}
+.fin-bal-item b{color:var(--text)!important}
+/* доход зелёным, расход красным — акцент в цифрах */
+.fin-bal-item b[style*="a8ffcf"]{color:var(--ok)!important}
+.fin-bal-item b[style*="ffc7bd"]{color:var(--bad)!important}
+.fin-chart .center b{color:var(--text)!important;text-shadow:none!important}
+.fin-chart .center small{color:var(--muted)!important;opacity:1!important}
+.fin-chart svg{filter:none!important}
+
+/* Карточка "Сегодня" (кольцо) — не заливаем фиолетом */
+.today-card{
+  background:var(--card)!important;color:var(--text)!important;
+  border:1px solid var(--line)!important;box-shadow:none!important;
+}
+.today-card::before{display:none!important}
+.ring-txt b{color:var(--text)!important}
+
+/* 6. НИЖНЕЕ МЕНЮ — чистое, акцент только на активной */
+.nav{
+  background:var(--card)!important;
+  border:1px solid var(--line)!important;
+  backdrop-filter:blur(20px)!important;-webkit-backdrop-filter:blur(20px)!important;
+  box-shadow:0 4px 20px rgba(0,0,0,.1)!important;
+}
+body:not(.dark) .nav{background:rgba(255,255,255,.85)!important}
+body.dark .nav{background:rgba(23,23,31,.9)!important}
+.nav button{color:var(--muted)!important}
+.nav button.active{color:#fff!important}
+#nav-pill{
+  animation:none!important;
+  box-shadow:0 4px 14px color-mix(in srgb,var(--brand) 45%,transparent)!important;
+}
+
+/* 7. FAB и кнопки — чистый акцент */
+.fab{box-shadow:0 6px 20px color-mix(in srgb,var(--brand) 45%,transparent)!important}
+.fab::after{display:none!important}  /* убираем пульсацию — она отвлекает */
+
+/* 8. ФИЛЬТРЫ и поиск — нейтральные */
+.filters button{
+  background:var(--card)!important;border:1px solid var(--line)!important;
+  backdrop-filter:none!important;box-shadow:none!important;color:var(--muted)!important;
+}
+.filters button.active{background:linear-gradient(135deg,var(--brand),var(--brand2))!important;color:#fff!important}
+#search{
+  background:var(--card)!important;border:1px solid var(--line)!important;
+  backdrop-filter:none!important;box-shadow:none!important;
+}
+
+/* 9. ЧАТ ИИ — чисто */
+.ai-msg.ai .bubble::before{display:none!important}
+.ai-msg.user .bubble{
+  background:linear-gradient(135deg,var(--brand),var(--brand2))!important;
+  box-shadow:none!important;
+}
+.ai-msg.user .bubble::before,.ai-msg.user .bubble::after{display:none!important}
+.ai-input-bar{
+  background:var(--card)!important;border:1px solid var(--line)!important;
+  backdrop-filter:blur(20px)!important;
+}
+body.dark .ai-input-bar{background:rgba(23,23,31,.92)!important}
+.ai-input-bar input,.mic-btn{
+  background:var(--bg)!important;border:1px solid var(--line)!important;
+  backdrop-filter:none!important;box-shadow:none!important;
+}
+
+/* 10. МОДАЛКИ — чистые */
+.sheet{
+  background:var(--card)!important;
+  backdrop-filter:blur(24px)!important;-webkit-backdrop-filter:blur(24px)!important;
+  border:1px solid var(--line)!important;box-shadow:0 -8px 40px rgba(0,0,0,.3)!important;
+}
+body:not(.dark) .sheet{background:rgba(255,255,255,.98)!important}
+body.dark .sheet{background:rgba(23,23,31,.98)!important}
+
+/* 11. КАЛЕНДАРЬ — нейтральные ячейки */
+.cal-cell{backdrop-filter:none!important;box-shadow:none!important}
+.cal-cell.today{box-shadow:0 2px 10px color-mix(in srgb,var(--brand) 40%,transparent)!important}
+
+/* 12. ТОСТ */
+.toast{
+  background:var(--card)!important;border:1px solid var(--line)!important;
+  backdrop-filter:blur(20px)!important;
+}
+body.dark .toast{background:rgba(23,23,31,.95)!important}
+
+/* 13. ГАСИМ лишние живые свечения фона — они мутят картинку */
+body.dark #view::before{display:none!important}
+body.dark .ring-wrap::before{opacity:.4!important}
+
+/* 14. Больше воздуха — премиум держится на пустоте */
+.list{padding:8px 16px 4px!important}
+.task{margin-bottom:10px!important;padding:16px!important}
+.sub-h{margin:22px 4px 10px!important;opacity:.6!important}
 </style>
 </head>
 <body>
