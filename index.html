@@ -73,8 +73,12 @@ body{
   color:var(--text);background:var(--bg);
   min-height:100vh;width:100%;max-width:100vw;overflow-x:hidden;
   display:flex;flex-direction:column;align-items:center;
-  padding-bottom:96px;position:relative;
+  padding-bottom:calc(90px + env(safe-area-inset-bottom));
+  position:relative;
   transition:background .4s,color .4s;
+  overscroll-behavior:none;
+  -webkit-user-select:none;
+  user-select:none;
 }
 /* Мягкое свечение сверху под заставку Lumo */
 body::before{
@@ -92,24 +96,21 @@ body.dark::before{
   width:100%;max-width:480px;margin:0 auto;overflow-x:hidden;
 }
 
-/* ---------- ШАПКА (плавно перетекает в фон, без заливки) ---------- */
+/* ---------- ШАПКА ---------- */
 .hero{
-  background:transparent;color:var(--text);position:relative;
-  padding:max(20px,env(safe-area-inset-top)) 16px 6px;
+  background:color-mix(in srgb,var(--bg) 85%,transparent);
+  color:var(--text);
+  position:sticky;
+  top:0;
+  z-index:20;
+  width:100%;
+  max-width:480px;
+  margin:0 auto;
+  backdrop-filter:blur(24px) saturate(180%);
+  -webkit-backdrop-filter:blur(24px) saturate(180%);
+  border-bottom:1px solid var(--line);
+  padding:calc(env(safe-area-inset-top) + 8px) 16px 12px;
 }
-.hero-top{display:flex;justify-content:space-between;align-items:flex-start;gap:12px;margin-bottom:6px}
-.hero h1{font-size:1.7rem;font-weight:800;letter-spacing:-.4px;line-height:1.15}
-.hero .date{color:var(--muted);font-size:.85rem;margin-top:4px}
-
-.hero-btns{display:flex;gap:7px;flex-wrap:nowrap}
-.hero-btns button{
-  width:38px;height:38px;border-radius:12px;flex:0 0 auto;
-  display:flex;align-items:center;justify-content:center;cursor:pointer;
-  background:var(--card);border:1px solid var(--line);color:var(--muted);
-  box-shadow:var(--shadow);transition:transform .35s cubic-bezier(.34,1.6,.5,1),background .2s;
-}
-.hero-btns button:active{transform:scale(.85);background:var(--card2)}
-.hero-btns button svg{width:19px;height:19px}
 
 /* Чипы серии/погоды/подсказки */
 .streak-chip,.weather-chip{
@@ -467,7 +468,7 @@ body.dark .fin-hero::after{background:radial-gradient(circle,color-mix(in srgb,v
 
 /* Панель ввода ИИ — плавающая стеклянная */
 .ai-input-bar{
-  position:fixed;bottom:96px;left:50%;transform:translateX(-50%);
+  position:fixed;bottom:calc(70px + env(safe-area-inset-bottom));left:50%;transform:translateX(-50%);
   width:calc(100% - 24px);max-width:456px;z-index:35;
   display:flex;gap:8px;padding:8px 10px;border-radius:26px;
   background:var(--glass);border:1px solid var(--glass-brd);
@@ -484,7 +485,7 @@ body.dark .fin-hero::after{background:radial-gradient(circle,color-mix(in srgb,v
 
 /* ---------- FAB ---------- */
 .fab{
-  position:fixed;bottom:96px;z-index:40;overflow:visible;
+  position:fixed;bottom:calc(70px + env(safe-area-inset-bottom));z-index:40;overflow:visible;
   right:calc(50% - 226px);
   width:58px;height:58px;border-radius:50%;padding:0;cursor:pointer;
   display:flex;align-items:center;justify-content:center;
@@ -506,9 +507,10 @@ body.dark .fab{box-shadow:0 0 26px color-mix(in srgb,var(--brand) 55%,transparen
 
 /* ---------- НИЖНЕЕ МЕНЮ — плавающая стеклянная пилюля ---------- */
 .nav{
-  position:fixed;bottom:14px;left:50%;transform:translateX(-50%);z-index:30;
-  width:calc(100% - 28px);max-width:452px;
-  display:flex;padding:6px 8px;border-radius:30px;
+  position:fixed;bottom:0;left:50%;transform:translateX(-50%);z-index:30;
+  width:100%;max-width:480px;
+  display:flex;padding:10px 8px calc(10px + env(safe-area-inset-bottom));
+  border-radius:24px 24px 0 0;
   background:var(--glass);border:1px solid var(--glass-brd);
   backdrop-filter:blur(var(--blur)) saturate(180%);-webkit-backdrop-filter:blur(var(--blur)) saturate(180%);
   box-shadow:var(--shadow-lg);
@@ -524,7 +526,7 @@ body.dark .fab{box-shadow:0 0 26px color-mix(in srgb,var(--brand) 55%,transparen
 }
 .nav button.active{color:#fff}
 .nav button i{font-size:1.25rem;font-style:normal;display:flex;align-items:center;justify-content:center;transition:transform .2s}
-.nav button i svg{width:23px;height:23px}
+.nav button i svg{width:26px;height:26px}
 .nav button.active i{animation:navBounce .5s cubic-bezier(.34,1.7,.4,1)}
 @keyframes navBounce{0%{transform:scale(1)}40%{transform:scale(1.3) translateY(-2px)}100%{transform:scale(1.12)}}
 .nav button .badge{position:absolute;top:2px;right:calc(50% - 18px);background:var(--bad);color:#fff;
@@ -537,7 +539,7 @@ body.dark .fab{box-shadow:0 0 26px color-mix(in srgb,var(--brand) 55%,transparen
   box-shadow:0 6px 16px color-mix(in srgb,var(--brand) 45%,transparent);
   transition:left .38s cubic-bezier(.34,1.4,.5,1),width .38s cubic-bezier(.34,1.4,.5,1),opacity .2s;
 }
-@media(max-width:520px){.nav{width:calc(100% - 20px)}}
+@media(max-width:520px){.nav{width:100%;border-radius:20px 20px 0 0}}
 
 /* ---------- МОДАЛКИ / ШТОРКИ ---------- */
 .modal{position:fixed;inset:0;z-index:100;display:none;align-items:flex-end;justify-content:center;
@@ -596,7 +598,7 @@ body.dark .fab{box-shadow:0 0 26px color-mix(in srgb,var(--brand) 55%,transparen
 
 /* ---------- ТОСТ — плавающий стеклянный ---------- */
 .toast{
-  position:fixed;bottom:112px;left:50%;transform:translateX(-50%) translateY(30px);
+  position:fixed;bottom:calc(90px + env(safe-area-inset-bottom));left:50%;transform:translateX(-50%) translateY(30px);
   z-index:200;opacity:0;pointer-events:none;
   padding:13px 24px;border-radius:30px;font-size:.85rem;font-weight:700;color:var(--text);
   background:var(--glass);border:1px solid var(--glass-brd);
@@ -647,6 +649,43 @@ body.dark .fab{box-shadow:0 0 26px color-mix(in srgb,var(--brand) 55%,transparen
 
 /* SVG в SVG-defs (градиент кольца прогресса) — прячем контейнер */
 svg[width="0"]{position:absolute;width:0;height:0}
+    /* Анимация смены вкладок */
+@keyframes pageIn{
+  from{opacity:0;transform:translateY(8px)}
+  to{opacity:1;transform:none}
+}
+#view.page-in{animation:pageIn .28s cubic-bezier(.34,1.2,.4,1)}
+
+/* Разрешить выделение в полях ввода */
+input,textarea{-webkit-user-select:text;user-select:text}
+
+/* Нативный вид кнопок шапки */
+.hstat{box-shadow:none}
+    /* ---------- ШАПКА: строка заголовок + кнопки ---------- */
+.hero-top{
+  display:flex;
+  align-items:flex-start;
+  justify-content:space-between;
+  gap:10px;
+}
+#hero-textblock{flex:1;min-width:0}
+#hero-title{font-size:1.35rem;font-weight:800;line-height:1.2}
+#hero-date{font-size:.8rem;color:var(--muted);margin-top:3px}
+.hero-btns{
+  display:flex;
+  gap:2px;
+  flex:0 0 auto;
+  align-items:center;
+  margin-top:2px;
+}
+.hero-btns button{
+  background:none;border:none;cursor:pointer;
+  color:var(--muted);padding:7px;border-radius:12px;
+  display:flex;align-items:center;justify-content:center;
+  transition:color .2s,background .2s;
+}
+.hero-btns button:active{background:var(--line);color:var(--text)}
+.hero-btns button svg{width:22px;height:22px}
 </style>
 </head>
 <body>
@@ -1215,7 +1254,9 @@ function fabRipple(e){
   vibrate(15);
 }
   
-  function switchTab(tab){
+function switchTab(tab){
+  const _vv=document.getElementById('view');
+  if(_vv){_vv.classList.remove('page-in');void _vv.offsetWidth;_vv.classList.add('page-in');}
   const heroText=document.getElementById('hero-textblock');
   if(heroText)heroText.style.display='';
   const heroBtns=document.querySelector('.hero-btns');
