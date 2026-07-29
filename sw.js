@@ -2,6 +2,11 @@ const CACHE = 'planner-v8'; // ← подняли версию
 
 const ASSETS = ['./', './index.html', './manifest.json'];
 
+self.addEventListener('message', e => {
+  if(e.data && e.data.type === 'SKIP_WAITING'){
+    self.skipWaiting();
+  }
+});
 // ===== УСТАНОВКА =====
 self.addEventListener('install', e => {
   e.waitUntil(caches.open(CACHE).then(c => c.addAll(ASSETS)));
