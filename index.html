@@ -549,7 +549,9 @@ body.dark .fab{box-shadow:0 0 26px color-mix(in srgb,var(--brand) 55%,transparen
   position:absolute;top:6px;bottom:6px;border-radius:22px;z-index:1;pointer-events:none;opacity:0;
   background:linear-gradient(135deg,var(--brand),var(--brand2));
   box-shadow:0 6px 16px color-mix(in srgb,var(--brand) 45%,transparent);
-  transition:left .38s cubic-bezier(.34,1.4,.5,1),width .38s cubic-bezier(.34,1.4,.5,1),opacity .2s;
+  transition:left .38s cubic-bezier(.34,1.4,.5,1),width .38s cubic-bezier(.34,1.4,.5,1),opacity .3s;
+  /* скрыта до первой отрисовки */
+  left:-999px;
 }
 @media(max-width:520px){.nav{width:100%;border-radius:20px 20px 0 0}}
 
@@ -1302,8 +1304,9 @@ function renderNav(){
   // "Ещё" — всегда последняя
  html+=`<button data-tab="more" class="${currentTab==='more'?'active':''}" onclick="switchTab('more')"><i>${ICONS.more}</i>Ещё</button>`;
   nav.innerHTML='<span id="nav-pill"></span>'+html;
-  requestAnimationFrame(moveNavPill);
-}
+    requestAnimationFrame(()=>{
+    requestAnimationFrame(moveNavPill);
+});
 
 let _lastPillLeft=null;
 function moveNavPill(){
