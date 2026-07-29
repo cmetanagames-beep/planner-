@@ -388,6 +388,9 @@ body.dark .fin-hero::after{background:radial-gradient(circle,color-mix(in srgb,v
 .cal-cell.sel{outline:3px solid var(--brand);outline-offset:-1px}
 .cal-cell .dot{position:absolute;bottom:5px;width:6px;height:6px;border-radius:50%;background:var(--ok)}
 .cal-cell .dot.over{background:var(--bad)}
+.cal-cell .dot.note{background:var(--warn)}
+.cal-cell .dots-wrap{position:absolute;bottom:5px;display:flex;gap:2px}
+.cal-cell .dots-wrap .dot{position:static}
 .cal-cell.today .dot{background:#fff}
 .cal-cell.weekend{color:#e5484d}
 .cal-cell.today.weekend{color:#fff}
@@ -824,7 +827,16 @@ input,textarea{-webkit-user-select:text;user-select:text}
 <button class="fab" id="fab" onclick="fabRipple(event);fabAction()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg></button>
 
 <div class="nav" id="nav"></div>
-
+<div class="modal" id="modal-note">
+  <div class="sheet">
+    <h3>📝 Новая заметка</h3>
+    <div class="field"><label>Заголовок</label><input id="note-title" placeholder="Например: Идея для сада"></div>
+    <div class="field"><label>Текст</label><textarea id="note-text" placeholder="Пиши что угодно..." style="min-height:100px"></textarea></div>
+    <div class="field"><label>📅 Дата (для календаря)</label><input id="note-date" type="date"></div>
+    <button class="btn" onclick="saveNote()">Сохранить</button>
+    <button class="btn ghost" onclick="closeNoteModal()">Отмена</button>
+  </div>
+</div>
 <div class="modal" id="modal">
   <div class="sheet">
     <h3 id="modal-title">Новое дело</h3>
@@ -1068,6 +1080,7 @@ const ICONS = {
   more: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="5" cy="12" r="1.6"/><circle cx="12" cy="12" r="1.6"/><circle cx="19" cy="12" r="1.6"/></svg>',
   settings: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.6 1.6 0 00.3 1.8l.1.1a2 2 0 11-2.8 2.8l-.1-.1a1.6 1.6 0 00-2.7.7 1.6 1.6 0 01-3.2 0 1.6 1.6 0 00-2.7-.7l-.1.1a2 2 0 11-2.8-2.8l.1-.1A1.6 1.6 0 004.6 15a1.6 1.6 0 01-.9-2.9 1.6 1.6 0 00.9-2.7 2 2 0 112.8-2.8 1.6 1.6 0 002.7-.7 1.6 1.6 0 013.2 0 1.6 1.6 0 002.7.7 2 2 0 112.8 2.8 1.6 1.6 0 000 2.7z"/></svg>',
   help: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M9.5 9a2.5 2.5 0 015 .2c0 1.7-2.5 2-2.5 3.8"/><circle cx="12" cy="17" r=".6" fill="currentColor"/></svg>',
+    notes: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M14 3v4a1 1 0 001 1h4"/><path d="M17 21H7a2 2 0 01-2-2V5a2 2 0 012-2h7l5 5v11a2 2 0 01-2 2z"/><path d="M9 13h6M9 17h4"/></svg>',
   moon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.8A8 8 0 1111.2 3 6.5 6.5 0 0021 12.8z"/></svg>',
   plus: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>'
 };
@@ -1164,6 +1177,7 @@ const NAV_SECTIONS=[
   {id:'finance',  icon:ICONS.finance,  name:'Финансы'},
   {id:'ai',       icon:ICONS.ai,       name:'ИИ'},
   {id:'calendar', icon:ICONS.calendar, name:'Календарь'},
+  {id:'notes',    icon:ICONS.notes,    name:'Заметки'}, 
   {id:'habits',   icon:ICONS.habits,   name:'Привычки'},
   {id:'shopping', icon:ICONS.shopping, name:'Покупки'},
   {id:'family',   icon:ICONS.family,   name:'Семья'},
@@ -1181,7 +1195,7 @@ function setNavConfig(arr){const d=load();d.navConfig=arr.slice(0,5);save(d);}
 function sectionInfo(id){return NAV_SECTIONS.find(s=>s.id===id)||null;}
 
 let currentTab='all',currentPri='Y',editId=null,expType='exp',finDate=new Date(),calDate=new Date(),calSel=null;
-let expShared=false, finScope='personal', editFinId=null, editFinType=null;
+let expShared=false, editFinId=null, editFinType=null;
 
 function esc(s){return String(s==null?'':s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]))}
 function todayKey(){const d=new Date();return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0')}
@@ -1342,15 +1356,15 @@ function switchTab(tab){
   if(heroBtns)heroBtns.style.display='flex';
   currentTab=tab;
   const isAI=tab==='ai',isFin=tab==='finance',isCal=tab==='calendar',isHabits=tab==='habits';
-  const isMore=tab==='more',isToday=tab==='today',isMatrix=tab==='matrix';
+  const isMore=tab==='more',isToday=tab==='today',isMatrix=tab==='matrix',isNotes=tab==='notes';
   const hideList=isAI||isFin;
   document.getElementById('ai-view').style.display=isAI?'block':'none';
   document.getElementById('ai-bar').style.display=isAI?'flex':'none';
   document.getElementById('view').style.display=isAI?'none':'block';
-  document.getElementById('fab').style.display=(isAI||isMore)?'none':'flex';
-  document.getElementById('filters').style.display=(hideList||isCal||isHabits||isMore||isToday||isMatrix)?'none':'flex';
-  document.getElementById('search-wrap').style.display=(hideList||isCal||isHabits||isMore||isToday||isMatrix)?'none':'block';
-  document.querySelector('.hero-stats').style.display=(hideList||isCal||isHabits||isMore||isToday||isMatrix)?'none':'flex';
+  document.getElementById('fab').style.display=(isAI||isMore||isNotes)?'none':'flex';
+  document.getElementById('filters').style.display=(hideList||isCal||isHabits||isMore||isToday||isMatrix||isNotes)?'none':'flex';
+  document.getElementById('search-wrap').style.display=(hideList||isCal||isHabits||isMore||isToday||isMatrix||isNotes)?'none':'block';
+  document.querySelector('.hero-stats').style.display=(hideList||isCal||isHabits||isMore||isToday||isMatrix||isNotes)?'none':'flex';
   let title='Мои дела';
   if(tab==='all')title='Мои дела';
 else if(tab==='finance')title='Финансы';
@@ -1360,6 +1374,7 @@ else if(tab==='habits')title='Привычки';
 else if(tab==='more')title='Ещё';
 else if(tab==='today')title='Сегодня';
 else if(tab==='matrix')title='Матрица Эйзенхауэра';
+  else if(tab==='notes')title='Заметки';
   else title=catLabel(tab);
 
   // Приветствие по времени суток — только на "Сегодня"
@@ -1382,6 +1397,7 @@ document.getElementById('weatherChip').style.display=(hideList||isToday)?'none':
   else if(isHabits)renderHabits();
   else if(tab==='more')renderMore();
   else if(tab==='today')renderToday();
+  else if(tab==='notes')renderNotes();
   else if(tab==='matrix')renderMatrix();
   else render();
   renderNav();
@@ -1402,8 +1418,10 @@ function isOverdue(t){
   if(t.time){const now=new Date();const hm=String(now.getHours()).padStart(2,'0')+':'+String(now.getMinutes()).padStart(2,'0');return t.time<hm;}
   return false;
 }
-function taskCardHTML(t){
-  const subs=t.subs||[];const sdone=subs.filter(s=>s.done).length;
+function taskCardHTML(t, isFam){
+  if(isFam===undefined)isFam=!!getFamilyState();
+  const subs=t.subs||[];
+  const sdone=subs.filter(s=>s.done).length;
   const over=isOverdue(t);
   const fromBadge=t.fromName?`<span class="assign-badge">📥 от ${esc(t.fromName)}</span>`:'';
   return `<div class="task ${t.done?'done':''} ${over?'overdue':''}" data-id="${t.id}">
@@ -1415,13 +1433,14 @@ function taskCardHTML(t){
       ${t.desc?`<div class="t-desc">${esc(t.desc)}</div>`:''}
       ${subs.length?`<div class="subtasks">${subs.map((s,i)=>`<div class="subtask ${s.done?'done':''}"><div class="sc ${s.done?'on':''}" onclick="toggleSubtask(${t.id},${i})">${s.done?'✓':''}</div><span>${esc(s.t)}</span></div>`).join('')}</div>`:''}
     </div>
-        <div class="t-acts">${getFamilyState()?`<button onclick="openAssign(${t.id})" title="Поручить">📤</button>`:''}<button onclick="editTask(${t.id})">✏️</button><button onclick="delTask(${t.id})">🗑</button></div>
+        ${isFam?`<button onclick="openAssign(${t.id})" title="Поручить">📤</button>`:''}<button onclick="editTask(${t.id})">✏️</button><button onclick="delTask(${t.id})">🗑</button></div>
   </div>`;
 }
 
 function render(){
   renderFilters();
   const view=document.getElementById('view');
+  const _isFamilyMember=getFamilyState(); // вычисляем один раз
   let tasks=getTasks().slice();
   if(currentTab!=='all')tasks=tasks.filter(t=>t.module===currentTab);
   const q=(document.getElementById('search')?.value||'').toLowerCase().trim();
@@ -1447,7 +1466,8 @@ function render(){
     if(k===tk)lbl='📅 Сегодня';
     else if(k<tk&&k!=='Без даты')lbl='⚠️ '+fmtDate(k);
     html+=`<div class="day-sep">${lbl}</div>`;
-    groups[k].forEach(t=>{html+=taskCardHTML(t);});
+    const _fam=!!getFamilyState();
+groups[k].forEach(t=>{html+=taskCardHTML(t,_fam);});
   });
   html+='</div>';
   view.innerHTML=html;
@@ -1464,11 +1484,14 @@ function rescheduleOverdue(){
   /* ===== ПРИВЫЧКИ ===== */
 function getHabits(){
   const d=load();
-  if(!d.habits)d.habits=[
-    {id:'h1',name:'Пить воду',icon:'💧',log:{}},
-    {id:'h2',name:'Зарядка',icon:'🏃',log:{}},
-    {id:'h3',name:'Чтение',icon:'📖',log:{}}
-  ];
+  if(!d.habits){
+    d.habits=[
+      {id:'h1',name:'Пить воду',icon:'💧',log:{}},
+      {id:'h2',name:'Зарядка',icon:'🏃',log:{}},
+      {id:'h3',name:'Чтение',icon:'📖',log:{}}
+    ];
+    save(d); // ← вот это было пропущено
+  }
   return d.habits;
 }
 function saveHabits(h){const d=load();d.habits=h;save(d);}
@@ -1781,7 +1804,84 @@ function attachSwipes(){
     });
   });
 }
-
+/* ===== ЗАМЕТКИ ===== */
+function getNotes(){const d=load();return d.notes||[];}
+function setNotes(n){const d=load();d.notes=n;save(d);}
+let editNoteId=null;
+function openNoteModal(id){
+  editNoteId=id||null;
+  if(id){
+    const n=getNotes().find(x=>x.id===id);
+    if(!n)return;
+    document.getElementById('note-title').value=n.title||'';
+    document.getElementById('note-text').value=n.text||'';
+    document.getElementById('note-date').value=n.date||'';
+    document.querySelector('#modal-note h3').textContent='✏️ Изменить заметку';
+  }else{
+    document.getElementById('note-title').value='';
+    document.getElementById('note-text').value='';
+    document.getElementById('note-date').value=(currentTab==='calendar'&&calSel)?calSel:todayKey();
+    document.querySelector('#modal-note h3').textContent='📝 Новая заметка';
+  }
+  document.getElementById('modal-note').classList.add('on');
+}
+function closeNoteModal(){document.getElementById('modal-note').classList.remove('on');}
+function saveNote(){
+  const title=document.getElementById('note-title').value.trim();
+  const text=document.getElementById('note-text').value.trim();
+  const date=document.getElementById('note-date').value||todayKey();
+  if(!title&&!text){toast('Введи текст заметки');return;}
+  const notes=getNotes();
+  if(editNoteId){
+    const n=notes.find(x=>x.id===editNoteId);
+    if(n){n.title=title;n.text=text;n.date=date;}
+  }else{
+    notes.push({id:Date.now()+Math.floor(Math.random()*1000),title,text,date});
+  }
+  setNotes(notes);
+  closeNoteModal();vibrate(20);confetti();toast('Заметка сохранена 📝');
+  if(currentTab==='calendar')renderCalendar();
+  else if(currentTab==='notes')renderNotes();
+}
+function delNote(id){
+  if(!confirm('Удалить заметку?'))return;
+  setNotes(getNotes().filter(n=>n.id!==id));
+  toast('Удалено 🗑');
+  if(currentTab==='calendar')renderCalendar();
+  else if(currentTab==='notes')renderNotes();
+}
+function noteCardHTML(n){
+  return `<div class="task" data-note-id="${n.id}">
+    <div class="bar" style="background:var(--warn)"></div>
+    <div class="t-body">
+      ${n.title?`<div class="t-title">📝 ${esc(n.title)}</div>`:''}
+      ${n.date?`<div class="t-meta"><span>📅 ${fmtDate(n.date)}</span></div>`:''}
+      ${n.text?`<div class="t-desc">${esc(n.text).replace(/\n/g,'<br>')}</div>`:''}
+    </div>
+    <div class="t-acts"><button onclick="openNoteModal(${n.id})">✏️</button><button onclick="delNote(${n.id})">🗑</button></div>
+  </div>`;
+}
+function renderNotes(){
+  const view=document.getElementById('view');
+  const notes=getNotes().slice().sort((a,b)=>{
+    const da=a.date||'';
+    const db=b.date||'';
+    if(db>da)return 1;
+    if(db<da)return -1;
+    return 0;
+  });
+  let html=`<div style="padding:14px 16px">
+    <button class="btn" onclick="openNoteModal()" style="margin-bottom:14px">➕ Новая заметка</button>`;
+  if(!notes.length){
+    html+=`<div class="empty"><div>📝</div>Заметок пока нет</div>`;
+  }else{
+    html+='<div class="list" style="padding:0">';
+    notes.forEach(n=>html+=noteCardHTML(n));
+    html+='</div>';
+  }
+  html+='</div>';
+  view.innerHTML=html;
+}
 /* ===== КАЛЕНДАРЬ ===== */
 function calNav(dir){calDate.setMonth(calDate.getMonth()+dir);calSel=null;renderCalendar();}
 function calPick(k){calSel=(calSel===k)?null:k;renderCalendar();}
@@ -1793,8 +1893,12 @@ function renderCalendar(){
   let startDow=first.getDay();startDow=startDow===0?6:startDow-1;
   const daysInMonth=new Date(y,m+1,0).getDate();
   const tasks=getTasks();
+  const notes=getNotes();                         /* ← ДОБАВЛЕНО */
+  const monthPrefix=y+'-'+String(m+1).padStart(2,'0');
   const byDay={};
-  tasks.forEach(t=>{if(t.date&&t.date.startsWith(y+'-'+String(m+1).padStart(2,'0'))){(byDay[t.date]=byDay[t.date]||[]).push(t);}});
+  tasks.forEach(t=>{if(t.date&&t.date.startsWith(monthPrefix)){(byDay[t.date]=byDay[t.date]||[]).push(t);}});
+  const notesByDay={};                            /* ← ДОБАВЛЕНО */
+  notes.forEach(n=>{if(n.date&&n.date.startsWith(monthPrefix)){(notesByDay[n.date]=notesByDay[n.date]||[]).push(n);}});
   const dow=['Пн','Вт','Ср','Чт','Пт','Сб','Вс'];
   let html=`<div class="calendar">
     <div class="cal-head"><button onclick="calNav(-1)">‹</button><span>${monthFull[m]} ${y}</span><button onclick="calNav(1)">›</button></div>
@@ -1804,23 +1908,38 @@ function renderCalendar(){
     for(let d=1;d<=daysInMonth;d++){
     const k=y+'-'+String(m+1).padStart(2,'0')+'-'+String(d).padStart(2,'0');
     const list=byDay[k]||[];
+    const noteList=notesByDay[k]||[];             /* ← ДОБАВЛЕНО */
     const hasOver=list.some(t=>!t.done&&k<tk);
     const hasTask=list.some(t=>!t.done);
+    const hasNote=noteList.length>0;              /* ← ДОБАВЛЕНО */
     const cellDow=(startDow+d-1)%7;
     const isWeekend=cellDow===5||cellDow===6;
     let cls='cal-cell';
     if(isWeekend)cls+=' weekend';
     if(k===tk)cls+=' today';
     if(k===calSel)cls+=' sel';
-    html+=`<div class="${cls}" onclick="calPick('${k}')">${d}${hasTask?`<span class="dot ${hasOver?'over':''}"></span>`:''}</div>`;
+    /* точки: задача (зел/красн) + заметка (жёлтая) */
+    let dots='';
+    if(hasTask)dots+=`<span class="dot ${hasOver?'over':''}"></span>`;
+    if(hasNote)dots+=`<span class="dot note"></span>`;
+    html+=`<div class="${cls}" onclick="calPick('${k}')">${d}${dots?`<span class="dots-wrap">${dots}</span>`:''}</div>`;
   }
   html+='</div></div>';
 
   if(calSel){
     const list=(byDay[calSel]||[]).slice().sort((a,b)=>(a.time||'99')<(b.time||'99')?-1:1);
+    const noteList=(notesByDay[calSel]||[]);      /* ← ДОБАВЛЕНО */
     html+=`<div class="day-sep" style="margin-left:20px">📌 ${fmtDate(calSel)}</div>`;
-    if(list.length){html+='<div class="list">';list.forEach(t=>html+=taskCardHTML(t));html+='</div>';}
-    else html+=`<div class="empty"><div>🗓</div>Нет дел на этот день</div>`;
+    if(list.length||noteList.length){
+      html+='<div class="list">';
+      list.forEach(t=>html+=taskCardHTML(t));
+      noteList.forEach(n=>html+=noteCardHTML(n)); /* ← ДОБАВЛЕНО */
+      html+='</div>';
+    }else{
+      html+=`<div class="empty"><div>🗓</div>Нет дел на этот день</div>`;
+    }
+    /* быстрая кнопка добавить заметку на выбранный день */
+    html+=`<div style="text-align:center;margin:4px 16px 14px"><button class="btn ghost" onclick="openNoteModal()">📝 Заметка на ${fmtDate(calSel)}</button></div>`;
   }else{
     html+=`<div class="ai-hint">Нажми на день, чтобы посмотреть дела 👆</div>`;
   }
@@ -2739,8 +2858,13 @@ function buildContext(){
 }
 
 async function aiSend(){
+  if(Date.now() < _cooldownUntil){
+    const sec=Math.ceil((_cooldownUntil-Date.now())/1000);
+    toast(`⏳ Подожди ${sec} сек перед следующим запросом`);
+    return;
+  }
   const inp=document.getElementById('ai-input');
-    const text=inp.value.trim();if(!text)return;
+  const text=inp.value.trim();if(!text)return;
   window._lastUserText=text;
   inp.value='';aiAddMsg('user',esc(text));
 
@@ -2986,8 +3110,6 @@ function delFromResult(type,id){
   else if(currentTab!=='ai')render();
 }
 
-let pendingAI=null;
-let aiQueue=[];
 
 // Рекурсивно достаём все действия из любой структуры ответа ИИ
 function collectActions(r){
@@ -3144,7 +3266,8 @@ function renderMore(){
     shopping:"openShopping()",
     family:"openFamily()",
     ach:"openAchievements()",
-    matrix:"switchTab('matrix')"
+    matrix:"switchTab('matrix')",
+    notes:"switchTab('notes')"
   };
   let items='';
   hidden.forEach(s=>{
