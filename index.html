@@ -3702,6 +3702,7 @@ function initApp(){
   // синхронизация с сервером
   syncPushData();
   pullAssignedTasks();
+  scheduleMorningPush()
 
   // периодические проверки
   setInterval(pullAssignedTasks,60000);
@@ -3769,6 +3770,82 @@ function playCinematicIntro(){
     setTimeout(()=>cin.remove(),700);
   },2000);
   }
+
+  // ═══════════════════════════════════════════
+// УМНЫЙ УТРЕННИЙ ПУШ В 8:00
+// ═══════════════════════════════════════════
+
+function getTasksForToday(){
+  const tk=todayKey();
+  return getTasks().filter(t=>t.date===tk&&!t.done)
+    .sort((a,b)=>(a.time||'99:99')<(b.time||'99:99')?-1:1);
+}
+
+function getMonthBalanceText(){
+  const s=getExpenseStats();
+  const sign=s.balance>=0?'+':'-';
+  return sign+fmtMoney(Math.abs(s.balance))+'₽';
+}
+
+function getStreakCount(){
+  const s=getStreak();
+  const tk=todayKey();
+  const y=new Date();y.setDate(y.getDate()-1);
+  const yk=y.getFullYear()+'-'+String(y.getMonth()+1).padStart(2,'0')+'-'+String(y.getDate()).padStart(2,'0');
+  let cnt=s.count||0;
+  if(s.last!==tk&&s.last!==yk)cnt=0;
+  return cnt;
+}
+
+async function scheduleMorningPush(){
+  try{
+    // Нет подписки — выходим
+    const reg=await navigator.serviceWorker.ready;
+    const sub=await reg.pushManager.getSubscription();
+    if(!sub)return;
+
+    // Собираем данные
+    const tasks=getTasksForToday();
+    const balance=getMonthBalanceText();
+    const streak=getStreakCount();
+    const name=getMyName();
+
+    // Формируем текст
+    const taskLines=tasks.length>0
+      ? tasks.slice(0,3).map(t=>`• ${t.title}${t.time?' в '+t.time:''}`).join('\n')
+      : '• Дел на сегодня нет 🎉';
+
+    const greeting=name?`Доброе утро, ${name}!`:'Доброе утро!';
+
+    const body=[
+      '📋 '+taskLines,
+      `💰 Баланс: ${balance}`,
+      streak>0?`🔥 Серия: ${streak} дней`:null
+    ].filter(Boolean).join('\n');
+
+    // Отправляем на сервер
+    const resp=await fetch(FAMILY_SERVER+'/schedule-morning',{
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({
+        userId:PUSH_USER_ID,
+        subscription:sub,
+        type:'morning',
+        title:'☀️ '+greeting,
+        body:body,
+        hour:8,
+        minute:0
+      })
+    });
+
+    const d=await resp.json();
+    if(d.ok){
+      console.log('✅ Утренний пуш запланирован на 8:00');
+    }
+  }catch(e){
+    console.log('scheduleMorningPush: нет связи или нет подписки');
+  }
+}
 </script>
 </body>
 </html>
