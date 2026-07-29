@@ -1,4 +1,4 @@
-const CACHE = 'planner-v7'; // ← подняли версию
+const CACHE = 'planner-v8'; // ← подняли версию
 
 const ASSETS = ['./', './index.html', './manifest.json'];
 
