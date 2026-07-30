@@ -1,6 +1,12 @@
-const CACHE = 'planner-v14'; // ← подняли версию
+const CACHE = 'planner-v26';
 
-const ASSETS = ['./', './index.html', './manifest.json'];
+const ASSETS = [
+  './',
+  './index.html',
+  './manifest.json',
+  './icon.svg',
+  './icon.png'
+];
 
 self.addEventListener('message', e => {
   if(e.data && e.data.type === 'SKIP_WAITING'){
@@ -23,16 +29,19 @@ self.addEventListener('activate', e => {
 
 // ===== КЭШ (офлайн) =====
 self.addEventListener('fetch', e => {
-  if(e.request.url.includes('groq.com')){ return; }
+  if(e.request.method !== 'GET' || e.request.url.includes('groq.com')){ return; }
   e.respondWith(
     caches.match(e.request).then(r => r || fetch(e.request).then(resp => {
-      if(e.request.method === 'GET' && resp.status === 200 &&
+      if(resp.status === 200 &&
          e.request.url.startsWith(self.location.origin)){
         const clone = resp.clone();
         caches.open(CACHE).then(c => c.put(e.request, clone));
       }
       return resp;
-    }).catch(() => caches.match('./index.html')))
+    }).catch(() => {
+      if(e.request.mode === 'navigate') return caches.match('./index.html');
+      return Response.error();
+    }))
   );
 });
 
@@ -40,6 +49,9 @@ self.addEventListener('fetch', e => {
 self.addEventListener('push', e => {
   let d = {};
   try { d = e.data ? e.data.json() : {}; } catch(_) {}
+  if(self.registration.setAppBadge){
+    self.registration.setAppBadge(d.badgeCount||undefined).catch(()=>{});
+  }
 
   // ── Утренний брифинг ──
   if(d.type === 'morning'){
@@ -114,17 +126,12 @@ self.addEventListener('notificationclick', e => {
 
   if(action === 'snooze'){
     e.waitUntil(
-      new Promise(resolve => {
-        setTimeout(async () => {
-          await self.registration.showNotification(
-            '⏰ ' + e.notification.title, {
-            body: 'Отложенное напоминание',
-            icon: './icon.png',
-            tag: taskId || 'snooze',
-            vibrate: [80, 50, 80]
-          });
-          resolve();
-        }, 3600000);
+      clients.matchAll({ type: 'window', includeUncontrolled: true }).then(cl => {
+        for(const c of cl){
+          c.postMessage({type:'SNOOZE_TASK',taskId});
+          if('focus' in c)return c.focus();
+        }
+        return clients.openWindow('./?snoozeTask='+encodeURIComponent(taskId||''));
       })
     );
     return;
