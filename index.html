@@ -1634,9 +1634,24 @@ function renderNav(){
     void pill.offsetWidth;
     requestAnimationFrame(()=>{if(pill.isConnected)pill.style.transition='';});
   }
+  alignFloatingControls();
+  requestAnimationFrame(alignFloatingControls);
   }
 
 let _lastPillLeft=null;
+function alignFloatingControls(){
+  const nav=document.getElementById('nav');if(!nav)return;
+  const navTop=nav.getBoundingClientRect().top;
+  if(!Number.isFinite(navTop)||navTop<=0)return;
+  [document.getElementById('ai-bar'),document.getElementById('fab')].forEach(el=>{
+    if(!el||getComputedStyle(el).display==='none')return;
+    const rect=el.getBoundingClientRect();
+    const gap=navTop-rect.bottom;
+    if(!Number.isFinite(gap)||Math.abs(gap-8)<.5)return;
+    const bottom=parseFloat(getComputedStyle(el).bottom)||91;
+    el.style.bottom=Math.max(4,bottom-(gap-8))+'px';
+  });
+}
 function moveNavPill(){
   const nav=document.getElementById('nav');
   const pill=document.getElementById('nav-pill');
@@ -1670,6 +1685,8 @@ function moveNavPill(){
   }
 }
 window.addEventListener('resize',()=>setTimeout(moveNavPill,50));
+window.addEventListener('resize',()=>setTimeout(alignFloatingControls,60));
+if(window.visualViewport)window.visualViewport.addEventListener('resize',()=>setTimeout(alignFloatingControls,60));
 function fabRipple(e){
   const fab=document.getElementById('fab');
   if(!fab)return;
