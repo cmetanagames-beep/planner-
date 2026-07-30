@@ -488,6 +488,50 @@ body.dark .fin-hero::after{background:radial-gradient(circle,color-mix(in srgb,v
 .habit-empty{text-align:center;padding:36px 20px;color:var(--muted);background:var(--card);border:1px solid var(--line);border-radius:21px}
 .habit-empty div{font-size:2rem;margin-bottom:8px}
 
+/* ---------- ОБУЧЕНИЕ / СПРАВКА ---------- */
+.guide-progress{display:flex;gap:6px;margin:4px 0 18px}
+.guide-progress i{height:5px;flex:1;border-radius:5px;background:var(--line);transition:background .25s}
+.guide-progress i.on{background:linear-gradient(90deg,var(--brand),var(--brand2))}
+.guide-hero{text-align:center;padding:5px 8px 16px}
+.guide-icon{width:68px;height:68px;margin:0 auto 13px;border-radius:22px;display:grid;place-items:center;
+  color:#fff;background:linear-gradient(135deg,var(--brand),var(--brand2));
+  box-shadow:0 10px 24px color-mix(in srgb,var(--brand) 30%,transparent)}
+.guide-icon svg{width:34px;height:34px;stroke:currentColor}
+.guide-hero h4{font-size:1.12rem;margin-bottom:7px}
+.guide-hero p{font-size:.8rem;line-height:1.5;color:var(--muted)}
+.guide-list{display:grid;gap:9px}
+.guide-item{display:grid;grid-template-columns:38px 1fr;gap:10px;align-items:center;padding:10px;
+  border-radius:15px;background:var(--card2);border:1px solid var(--line)}
+.guide-item .gi{width:38px;height:38px;border-radius:12px;display:grid;place-items:center;font-size:1.15rem;
+  color:var(--brand);background:color-mix(in srgb,var(--brand) 10%,var(--card))}
+.guide-item .gi svg{width:21px;height:21px;stroke:currentColor}
+.guide-item b{display:block;font-size:.82rem;margin-bottom:2px}
+.guide-item span{display:block;color:var(--muted);font-size:.7rem;line-height:1.35}
+.guide-example{margin-top:11px;padding:11px 13px;border-radius:14px;font-size:.75rem;line-height:1.45;
+  background:color-mix(in srgb,var(--brand) 8%,var(--card));border:1px solid color-mix(in srgb,var(--brand) 22%,var(--line))}
+.guide-actions{display:grid;grid-template-columns:1fr 1.45fr;gap:8px;margin-top:16px}
+.guide-actions.single{grid-template-columns:1fr}
+.guide-actions .btn{margin:0}
+.guide-skip{display:block;margin:11px auto 0;border:0;background:none;color:var(--muted);font-size:.75rem;padding:5px}
+.tour-shade{position:fixed;inset:0;z-index:79;background:rgba(10,10,25,.38);pointer-events:none;
+  backdrop-filter:blur(1.5px);-webkit-backdrop-filter:blur(1.5px)}
+.tour-coach{position:fixed;z-index:150;left:12px;right:12px;bottom:100px;margin:auto;max-width:456px;
+  padding:15px;border-radius:20px;background:var(--card);border:1px solid var(--line);box-shadow:var(--shadow-lg);
+  animation:sheetUp .25s ease}
+.tour-coach.top-step,.tour-coach.ai-step{top:112px;bottom:auto}
+.tour-count{font-size:.64rem;color:var(--brand);font-weight:850;letter-spacing:.08em;text-transform:uppercase;margin-bottom:6px}
+.tour-coach h4{font-size:.96rem;margin-bottom:5px}
+.tour-coach p{font-size:.75rem;line-height:1.45;color:var(--muted)}
+.tour-coach .tour-example{margin-top:9px;padding:9px 11px;border-radius:12px;background:var(--card2);
+  border:1px solid var(--line);font-size:.72rem;line-height:1.4;color:var(--text)}
+.tour-buttons{display:grid;grid-template-columns:auto 1fr;gap:8px;margin-top:12px}
+.tour-buttons button{border:0;border-radius:12px;padding:10px 12px;font-weight:800}
+.tour-buttons .secondary{background:var(--card2);color:var(--muted);border:1px solid var(--line)}
+.tour-buttons .primary{background:linear-gradient(135deg,var(--brand),var(--brand2));color:#fff}
+.tour-focus{z-index:90!important;box-shadow:0 0 0 4px rgba(255,255,255,.88),0 0 0 9px color-mix(in srgb,var(--brand) 70%,transparent),var(--shadow-lg)!important}
+.today-card.tour-focus,.habit-summary.tour-focus,.fin-hero.tour-focus{position:relative}
+body.dark .tour-focus{box-shadow:0 0 0 4px #171525,0 0 0 9px color-mix(in srgb,var(--brand) 75%,transparent),var(--shadow-lg)!important}
+
 /* ---------- КАТЕГОРИИ / ПИКЕРЫ ---------- */
 .cat-item{display:flex;align-items:center;gap:10px;background:var(--card2);border:1px solid var(--line);
   border-radius:var(--radius-sm);padding:11px 13px;margin-bottom:8px}
@@ -627,10 +671,10 @@ body.dark .fab{box-shadow:0 0 26px color-mix(in srgb,var(--brand) 55%,transparen
 
 /* ---------- НИЖНЕЕ МЕНЮ — плавающая стеклянная пилюля ---------- */
 .nav{
-  position:fixed;bottom:0;left:0;right:0;margin:0 auto;transform:none;z-index:30;
-  width:100%;max-width:480px;
-  display:flex;padding:10px 8px calc(10px + env(safe-area-inset-bottom));
-  border-radius:24px 24px 0 0;
+  position:fixed;bottom:8px;left:0;right:0;margin:0 auto;transform:none;z-index:30;
+  width:calc(100% - 16px);max-width:464px;
+  display:flex;padding:8px;
+  border-radius:24px;
   background:var(--glass);border:1px solid var(--glass-brd);
   backdrop-filter:blur(var(--blur)) saturate(180%);-webkit-backdrop-filter:blur(var(--blur)) saturate(180%);
   box-shadow:var(--shadow-lg);
@@ -660,7 +704,7 @@ body.dark .fab{box-shadow:0 0 26px color-mix(in srgb,var(--brand) 55%,transparen
   transition:left .38s cubic-bezier(.34,1.4,.5,1),width .38s cubic-bezier(.34,1.4,.5,1),opacity .3s;
   /* скрыта до первой отрисовки */
 }
-@media(max-width:520px){.nav{width:100%;border-radius:20px 20px 0 0}}
+@media(max-width:520px){.nav{width:calc(100% - 16px);border-radius:22px}}
 
 /* ---------- МОДАЛКИ / ШТОРКИ ---------- */
 .modal{position:fixed;inset:0;min-height:100dvh;z-index:100;display:none;align-items:flex-end;justify-content:center;
@@ -1271,11 +1315,17 @@ input,textarea{-webkit-user-select:text;user-select:text}
 </div>
 <div class="modal" id="modal-help">
   <div class="sheet">
-    <h3>✨ Что умеет приложение</h3>
+    <h3 id="help-title">Знакомство с Lumo</h3>
+    <div class="guide-progress" id="help-progress"></div>
     <div id="help-body"></div>
-    <button class="btn ghost" onclick="closeHelp()">Понятно 👍</button>
+    <div class="guide-actions">
+      <button class="btn ghost" id="help-back" onclick="helpBack()">Назад</button>
+      <button class="btn" id="help-next" onclick="helpNext()">Далее</button>
+    </div>
+    <button class="guide-skip" id="help-skip" onclick="skipOnboarding()">Пропустить обучение</button>
   </div>
 </div>
+<div id="tour-layer" style="display:none"></div>
 
 <div class="toast" id="toast"></div>
 
@@ -4203,19 +4253,245 @@ function menuMove(i,dir){
   renderMenuEditor();renderNav();
 }
 /* ===== ИНИЦИАЛИЗАЦИЯ ===== */
-function openHelp(){
-  document.getElementById('help-body').innerHTML=`
-    <div class="ai-hint" style="line-height:1.7">
-    📋 <b>Дела</b> — категории, приоритеты, подзадачи, повторы, свайпы<br>
-    📅 <b>Календарь</b> — точки на днях с делами<br>
-    💰 <b>Финансы</b> — доходы/расходы, бюджеты, цели-копилки<br>
-    👨‍👩‍👦 <b>Семья</b> — код, поручения, рейтинг, общие траты<br>
-    🛒 <b>Покупки</b> — общий список<br>
-    🤖 <b>ИИ</b> — «напомни завтра...», «потратил 500...», погода<br>
-    ⬅️ Свайп задачи влево — удалить, вправо — выполнить</div>`;
+const ONBOARDING_KEY='lumo_onboarding_v1';
+let helpStep=0,helpIsOnboarding=false;
+function guideItem(icon,title,text){
+  return `<div class="guide-item"><div class="gi">${icon}</div><div><b>${title}</b><span>${text}</span></div></div>`;
+}
+function getHelpSlides(){
+  return [
+    {
+      title:'Добро пожаловать в Lumo',
+      icon:ICONS.sun,
+      intro:'Все важные части дня собраны в одном приложении. За минуту покажем основное.',
+      items:[
+        ['✓','Дела','Планируй задачи, даты, приоритеты, повторы и подзадачи.'],
+        [ICONS.habits,'Привычки','Создавай ритм и отмечай выполнение одним касанием.'],
+        [ICONS.finance,'Финансы','Следи за расходами, доходами, бюджетами и целями.']
+      ]
+    },
+    {
+      title:'Дела и календарь',
+      icon:ICONS.all,
+      intro:'Добавляй дело кнопкой «+» и сразу указывай всё необходимое.',
+      items:[
+        [ICONS.calendar,'Дата и время','Задача появится в нужном дне и напомнит о себе.'],
+        [ICONS.postpone,'Быстро отложить','Перенеси дело на час, вечер, завтра или понедельник.'],
+        ['↔','Жесты','Свайп вправо выполняет задачу, влево — удаляет.']
+      ]
+    },
+    {
+      title:'Твой ежедневный ритм',
+      icon:ICONS.habits,
+      intro:'Экран «Сегодня» показывает главное, а привычки помогают сохранять темп.',
+      items:[
+        ['◉','Прогресс дня','Видно, сколько дел и привычек уже выполнено.'],
+        [ICONS.habits,'Недельная цепочка','Отмечай дни и следи за текущей серией.'],
+        [ICONS.shopping,'Покупки','Веди общий список и отмечай купленное в магазине.']
+      ]
+    },
+    {
+      title:'Деньги и семья',
+      icon:ICONS.finance,
+      intro:'Lumo помогает вести бытовые финансы и совместные дела.',
+      items:[
+        ['₽','Доходы и расходы','Категории, месячный баланс, бюджеты и регулярные платежи.'],
+        ['◎','Цели и долги','Копилки показывают прогресс, а долги — сроки возврата.'],
+        [ICONS.family,'Семейный режим','Общие покупки, поручения, траты и рейтинг выполнения.']
+      ]
+    },
+    {
+      title:'Локальный помощник',
+      icon:ICONS.ai,
+      intro:'Напиши или надиктуй несколько действий одной фразой — даже без запятых.',
+      items:[
+        ['🎙️','Диктуй естественно','Помощник разделит речь на дела, покупки, расходы и привычки.'],
+        ['👀','Сначала проверка','Перед сохранением появятся карточки — лишнее можно удалить.'],
+        ['⌁','Работает локально','Основные команды обрабатываются на устройстве. Groq — только необязательный резерв.']
+      ],
+      example:'Пример: «завтра встреча в 15 в понедельник сделать отчёт пришла зарплата 90000».'
+    }
+  ];
+}
+function renderHelpStep(){
+  const slides=getHelpSlides(),s=slides[helpStep];
+  document.getElementById('help-title').textContent=s.title;
+  document.getElementById('help-progress').innerHTML=slides.map((_,i)=>`<i class="${i<=helpStep?'on':''}"></i>`).join('');
+  document.getElementById('help-body').innerHTML=`<div class="guide-hero"><div class="guide-icon">${s.icon}</div><p>${s.intro}</p></div>
+    <div class="guide-list">${s.items.map(x=>guideItem(x[0],x[1],x[2])).join('')}</div>
+    ${s.example?`<div class="guide-example">${s.example}</div>`:''}`;
+  const back=document.getElementById('help-back'),next=document.getElementById('help-next'),skip=document.getElementById('help-skip');
+  const actions=document.querySelector('#modal-help .guide-actions');
+  back.style.display=helpStep===0?'none':'block';
+  actions.classList.toggle('single',helpStep===0);
+  next.textContent=helpStep===0?'Начать живой тур':helpStep===slides.length-1?'Начать пользоваться':'Далее';
+  skip.textContent=helpIsOnboarding?'Пропустить обучение':'Закрыть справку';
+}
+function openHelp(fromOnboarding=false){
+  helpIsOnboarding=!!fromOnboarding;helpStep=0;
+  renderHelpStep();
   document.getElementById('modal-help').classList.add('on');
 }
-function closeHelp(){document.getElementById('modal-help').classList.remove('on');}
+function helpBack(){if(helpStep>0){helpStep--;renderHelpStep();}}
+function helpNext(){
+  if(helpStep===0){startAppTour();return;}
+  const last=getHelpSlides().length-1;
+  if(helpStep<last){helpStep++;renderHelpStep();vibrate(10);return;}
+  closeHelp(true);
+}
+function skipOnboarding(){closeHelp(true);}
+function closeHelp(markDone=false){
+  document.getElementById('modal-help').classList.remove('on');
+  if(markDone||helpIsOnboarding)localStorage.setItem(ONBOARDING_KEY,'1');
+  helpIsOnboarding=false;
+}
+function scheduleOnboarding(delay){
+  if(localStorage.getItem(ONBOARDING_KEY))return;
+  setTimeout(()=>{
+    if(!localStorage.getItem(ONBOARDING_KEY)&&!document.querySelector('.modal.on'))openHelp(true);
+  },delay);
+}
+
+let tourStep=-1,tourDemoDone=false,tourTypingTimer=null,tourOwnPlan=false;
+const TOUR_TOTAL=15,TOUR_AI_STEP=13;
+function clearTourFocus(){document.querySelectorAll('.tour-focus').forEach(x=>x.classList.remove('tour-focus'));}
+function closeTourModals(){
+  document.querySelectorAll('.modal.on').forEach(x=>x.classList.remove('on'));
+  editId=null;editFinId=null;editFinType=null;
+}
+function focusTourElement(selector){
+  clearTourFocus();
+  const el=document.querySelector(selector);
+  if(el)el.classList.add('tour-focus');
+  return el;
+}
+function renderTourCoach({title,text,example='',primary='Далее',top=false}){
+  const layer=document.getElementById('tour-layer');layer.style.display='block';
+  layer.innerHTML=`<div class="tour-shade"></div><div class="tour-coach ${top?'top-step':''}">
+    <div class="tour-count">Шаг ${tourStep+1} из ${TOUR_TOTAL}</div>
+    <h4>${title}</h4><p>${text}</p>${example?`<div class="tour-example">${example}</div>`:''}
+    <div class="tour-buttons"><button class="secondary" onclick="finishAppTour()">Пропустить</button>
+      <button class="primary" onclick="tourNext()">${primary}</button></div></div>`;
+}
+function startAppTour(){
+  closeHelp(false);tourStep=0;tourDemoDone=false;tourOwnPlan=false;
+  showTourStep();
+}
+function showTourStep(){
+  clearInterval(tourTypingTimer);clearTourFocus();closeTourModals();
+  if(tourStep===0){
+    switchTab('today');setTimeout(()=>focusTourElement('.today-card'),100);
+    renderTourCoach({title:'Экран «Сегодня»',text:'Это главный экран дня: прогресс, ближайшие дела, привычки и быстрые действия. Нажатие на прогресс переносит к сегодняшним задачам.',example:'Начинай день отсюда — Lumo покажет только актуальное.'});return;
+  }
+  if(tourStep===1){
+    switchTab('all');
+    setTimeout(()=>{
+      openModal();
+      document.getElementById('f-title').value='Подготовить презентацию';
+      document.getElementById('f-module').value='work';
+      document.getElementById('f-date').value=dateFromText('завтра');
+      document.getElementById('f-time').value='11:30';
+    },80);
+    renderTourCoach({title:'Как создать дело',text:'Так выглядит настоящая форма. Укажи название, категорию, дату, время, повтор, приоритет, подзадачи или фотографии.',example:'Это демонстрация: «Подготовить презентацию» не будет сохранено.',top:true});return;
+  }
+  if(tourStep===2){
+    switchTab('more');setTimeout(()=>openCatModal(),80);
+    renderTourCoach({title:'Категории дел и расходов',text:'В разделе «Ещё → Категории» можно добавлять свои разделы, менять иконки и редактировать категории расходов.',example:'Например: «Работа», «Дом», «Авто» или «Учёба». Удалённые дела безопасно переносятся в «Личное».',top:true});return;
+  }
+  if(tourStep===3){
+    switchTab('calendar');setTimeout(()=>focusTourElement('.calendar'),100);
+    renderTourCoach({title:'Календарь',text:'Точки отмечают дни с делами. Нажми на дату, чтобы увидеть её задачи или добавить новое дело сразу на выбранный день.',example:'Стрелками сверху переключаются месяцы.'});return;
+  }
+  if(tourStep===4){
+    switchTab('habits');setTimeout(()=>focusTourElement('.habit-summary'),100);
+    renderTourCoach({title:'Привычки и серии',text:'Кольцо показывает прогресс дня. Круглая кнопка выполняет привычку, недельные точки сохраняют историю, а огонёк показывает серию.',example:'Кнопка «Новая» добавляет привычку, например «Читать 10 минут».'});return;
+  }
+  if(tourStep===5){
+    switchTab('more');setTimeout(()=>{renderShopping();document.getElementById('modal-shopping').classList.add('on');},80);
+    renderTourCoach({title:'Список покупок',text:'Добавляй продукты одной строкой и отмечай купленное прямо в магазине. В семейном режиме список становится общим.',example:'Помощник тоже умеет добавлять покупки голосом.',top:true});return;
+  }
+  if(tourStep===6){
+    switchTab('finance');setTimeout(()=>focusTourElement('.fin-hero'),100);
+    renderTourCoach({title:'Обзор финансов',text:'Верхняя карточка показывает доходы, расходы, баланс и диаграмму выбранного месяца. Стрелки переключают месяцы.',example:'Ниже находятся аналитика по дням и история операций.'});return;
+  }
+  if(tourStep===7){
+    switchTab('finance');
+    setTimeout(()=>{
+      openExpModal();document.getElementById('e-amount').value='850';document.getElementById('e-desc').value='Продукты на неделю';
+      const sel=document.getElementById('e-cat');if([...sel.options].some(x=>x.value==='Продукты'))sel.value='Продукты';
+    },80);
+    renderTourCoach({title:'Как записать расход или доход',text:'На экране финансов кнопка «+» открывает эту форму. Выбери тип операции, сумму, категорию, дату и комментарий.',example:'Пример 850 ₽ показан только для обучения и не сохранится.',top:true});return;
+  }
+  if(tourStep===8){
+    switchTab('finance');setTimeout(()=>focusTourElement('.goal-card, .budget-card, button[onclick=\"openGoal()\"]'),120);
+    renderTourCoach({title:'Планирование денег',text:'Бюджеты ограничивают расходы по категориям, цели-копилки показывают накопления, регулярные платежи создают операции по расписанию.',example:'Здесь же можно учитывать долги и сроки возврата.'});return;
+  }
+  if(tourStep===9){
+    switchTab('more');setTimeout(()=>openFamily(),80);
+    renderTourCoach({title:'Семейный режим',text:'Создай семью или войди по коду. Участникам доступны общие покупки, поручения, совместные расходы и рейтинг выполнения.',example:'Без семейного кода личные данные продолжают храниться отдельно.',top:true});return;
+  }
+  if(tourStep===10){
+    switchTab('more');setTimeout(()=>focusTourElement('#view .assign-btn'),100);
+    renderTourCoach({title:'Остальные разделы',text:'В «Ещё» находятся заметки, матрица приоритетов, покупки, семья, награды и разделы, которые не помещаются снизу.',example:'Состав этого экрана зависит от выбранного нижнего меню.'});return;
+  }
+  if(tourStep===11){
+    switchTab('more');setTimeout(()=>openMenuEditor(),80);
+    renderTourCoach({title:'Настрой нижнее меню',text:'Можно выбрать пять самых нужных разделов и поменять их порядок. Всё остальное автоматически останется в «Ещё».',example:'Кнопка «Ещё» всегда остаётся последней.',top:true});return;
+  }
+  if(tourStep===12){
+    switchTab('more');setTimeout(()=>openSettings(),80);
+    renderTourCoach({title:'Настройки и сохранность данных',text:'Здесь меняются тема, цвет, тихие часы и уведомления. В разделе «Данные» скачивается и восстанавливается резервная JSON-копия.',example:'Регулярно делай копию: удаление PWA может удалить локальные данные.',top:true});return;
+  }
+  if(tourStep===TOUR_AI_STEP){
+    switchTab('ai');
+    setTimeout(()=>{
+      focusTourElement('#ai-bar');
+      const phrase='Завтра совещание с коллегами в 15:00 в понедельник сделать отчёт для сотрудников';
+      const input=document.getElementById('ai-input');input.value='';let i=0;
+      tourTypingTimer=setInterval(()=>{input.value=phrase.slice(0,++i);if(i>=phrase.length)clearInterval(tourTypingTimer);},20);
+      renderTourCoach({title:'Локальный помощник',text:'Lumo печатает длинный запрос без запятых. Нажми кнопку ниже — помощник разделит его на отдельные действия, но ничего не сохранит.',example:'Основной разбор работает локально, Groq нужен только как необязательный резерв.',primary:'Разобрать пример',top:true});
+    },80);return;
+  }
+  switchTab('today');setTimeout(()=>focusTourElement('.today-card'),100);
+  renderTourCoach({title:'Готово — теперь можно начинать',text:'Ты увидел все основные возможности Lumo на настоящих экранах. Обучение всегда можно повторить кнопкой «?».',primary:'Завершить'});
+}
+function tourNext(){
+  if(tourStep===TOUR_AI_STEP&&!tourDemoDone){runTourAssistantDemo();return;}
+  if(tourStep>=TOUR_TOTAL-1){finishAppTour();return;}
+  if(tourStep===TOUR_AI_STEP&&tourOwnPlan){
+    pendingLocalPlan=null;tourOwnPlan=false;
+    document.querySelector('.local-plan')?.closest('.ai-msg')?.remove();
+  }
+  tourStep++;showTourStep();vibrate(10);
+}
+function runTourAssistantDemo(){
+  clearInterval(tourTypingTimer);
+  const input=document.getElementById('ai-input');
+  input.value='Завтра совещание с коллегами в 15:00 в понедельник сделать отчёт для сотрудников';
+  if(pendingLocalPlan&&!tourOwnPlan){
+    renderTourCoach({title:'Есть незавершённый разбор',text:'Сначала сохрани или отмени карточки, которые уже находятся в помощнике.',primary:'Продолжить',top:true});
+    tourDemoDone=true;return;
+  }
+  aiSend();tourDemoDone=true;tourOwnPlan=true;
+  setTimeout(()=>{
+    focusTourElement('.local-plan');
+    renderTourCoach({
+      title:'Вот результат разбора',
+      text:'Помощник разделил одну фразу на карточки. Перед сохранением их можно проверить и удалить лишнее.',
+      example:'Во время обучения ничего сохранять не нужно — нажми «Далее».',
+      primary:'Далее'
+    });
+  },120);
+}
+function finishAppTour(){
+  clearInterval(tourTypingTimer);clearTourFocus();closeTourModals();
+  if(tourOwnPlan){pendingLocalPlan=null;document.querySelector('.local-plan')?.closest('.ai-msg')?.remove();}
+  tourOwnPlan=false;tourStep=-1;
+  document.getElementById('tour-layer').style.display='none';
+  document.getElementById('tour-layer').innerHTML='';
+  localStorage.setItem(ONBOARDING_KEY,'1');
+  switchTab('today');toast('Обучение можно повторить через кнопку ?');
+}
 /* ===== ГОЛОСОВОЙ РЕЖИМ (обычный + хендсфри) ===== */
 let _handsFree=false, _rec=null, _wakeLock=null, _listenMode='idle';
 const WAKE_WORDS=['планировщик','ассистент','помощник'];
@@ -4388,7 +4664,9 @@ function initApp(){
   renderNav();renderStreak();
   renderHeroDate();
   switchTab('all');
-    playCinematicIntro();
+  const introWasShown=!!sessionStorage.getItem('introShown');
+  playCinematicIntro();
+  scheduleOnboarding(introWasShown?450:2900);
   processAutoPays();
 scheduleAutoPayReminders();
 scheduleDebtReminders();
