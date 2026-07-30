@@ -617,14 +617,17 @@ body.dark .tour-focus{box-shadow:0 0 0 4px #171525,0 0 0 9px color-mix(in srgb,v
 .local-plan{width:100%;display:grid;gap:9px}
 .local-plan-head{font-weight:800;margin-bottom:2px}
 .local-plan-sub{color:var(--muted);font-size:.76rem;line-height:1.35}
-.local-plan-item{display:grid;grid-template-columns:32px 1fr 28px;gap:9px;align-items:center;
+.local-plan-item{display:grid;grid-template-columns:32px 1fr 28px 28px;gap:7px;align-items:center;
   background:color-mix(in srgb,var(--brand) 7%,var(--card));border:1px solid var(--line);
   border-radius:14px;padding:9px}
 .local-plan-icon{width:32px;height:32px;border-radius:10px;display:grid;place-items:center;
   background:color-mix(in srgb,var(--brand) 15%,transparent)}
 .local-plan-title{font-weight:750;font-size:.84rem;line-height:1.25}
 .local-plan-meta{color:var(--muted);font-size:.7rem;margin-top:3px}
-.local-plan-del{border:0;background:transparent;color:var(--muted);font-size:1.05rem;padding:4px}
+.local-plan-del,.local-plan-edit{border:0;background:transparent;color:var(--muted);font-size:1.05rem;padding:4px}
+.local-plan-edit svg{width:17px;height:17px;stroke:currentColor}
+.local-edit-note{padding:9px 11px;border-radius:12px;background:color-mix(in srgb,var(--brand) 8%,var(--card2));
+  color:var(--muted);font-size:.72rem;line-height:1.4;margin-bottom:10px}
 .local-plan-actions{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:3px}
 .local-plan-actions button{border:0;border-radius:12px;padding:10px;font-weight:750}
 .local-plan-save{background:linear-gradient(135deg,var(--brand),var(--brand2));color:#fff}
@@ -1242,6 +1245,9 @@ input,textarea{-webkit-user-select:text;user-select:text}
     <div class="ai-hint" style="padding:0 0 10px;text-align:left">Работает без ключа и интернета. Groq используется только как необязательный резерв для свободного общения и нераспознанных фраз.</div>
     <button class="btn ghost" onclick="setupApiKey()">🔑 Настроить резервный Groq</button>
     <button class="btn ghost" onclick="resetApiKey()">🗑 Отключить Groq</button>
+    <div class="sub-h">Память помощника</div>
+    <div class="ai-hint" id="local-memory-info" style="padding:0 0 8px;text-align:left"></div>
+    <button class="btn ghost" onclick="clearLocalAssistantMemory()">Очистить изученные правила</button>
 
     <div class="sub-h">📲 Пуши и напоминания</div>
     <button class="btn ghost" onclick="subscribePush()">📲 Включить фоновые пуши</button>
@@ -1323,6 +1329,15 @@ input,textarea{-webkit-user-select:text;user-select:text}
       <button class="btn" id="help-next" onclick="helpNext()">Далее</button>
     </div>
     <button class="guide-skip" id="help-skip" onclick="skipOnboarding()">Пропустить обучение</button>
+  </div>
+</div>
+<div class="modal" id="modal-local-edit">
+  <div class="sheet">
+    <h3>Исправить распознавание</h3>
+    <div class="local-edit-note">После общего сохранения Lumo запомнит исправленную категорию и применит её к похожим фразам.</div>
+    <div id="local-edit-body"></div>
+    <button class="btn" onclick="saveLocalPlanEdit()">Применить исправление</button>
+    <button class="btn ghost" onclick="closeLocalPlanEdit()">Отмена</button>
   </div>
 </div>
 <div id="tour-layer" style="display:none"></div>
@@ -2972,7 +2987,7 @@ function toggleTheme(){
   setThemeMode(m==='dark'?'light':'dark');
   toast(getThemeMode()==='dark'?'🌙 Тёмная тема':'☀️ Светлая тема');
 }
-function openSettings(){renderColorPick();updateThemeButtons();loadNotifyHour();loadQuietHours();document.getElementById('modal-settings').classList.add('on');}
+function openSettings(){renderColorPick();updateThemeButtons();loadNotifyHour();loadQuietHours();renderLocalMemoryInfo();document.getElementById('modal-settings').classList.add('on');}
 function closeSettings(){document.getElementById('modal-settings').classList.remove('on');}
 
 /* НАПОМИНАНИЯ / ТИХИЕ ЧАСЫ */
@@ -3348,6 +3363,35 @@ function timeFromText(low){
 function findOrNull(name){return getExpCats().some(c=>c.name===name)?name:null;}
 let pendingCat=null;
 let pendingLocalPlan=null;
+const LOCAL_MEMORY_KEY='lumo_local_memory_v1';
+function getLocalMemory(){
+  try{
+    const m=JSON.parse(localStorage.getItem(LOCAL_MEMORY_KEY)||'{}');
+    return {taskModules:m.taskModules||{},expenseCategories:m.expenseCategories||{}};
+  }catch(e){return {taskModules:{},expenseCategories:{}};}
+}
+function memoryTokens(text){
+  const stop=new Set(['завтра','сегодня','послезавтра','сделать','нужно','надо','оплатить','купить','добавить','создать','рублей','тысяч','тыщи','через','каждый','каждую','каждое','понедельник','вторник','среду','четверг','пятницу','субботу','воскресенье','меня','мне','него','них','этого','того','просто','уже']);
+  return [...new Set(String(text||'').toLowerCase().replace(/ё/g,'е').match(/[а-яa-z]{4,}/g)||[])].filter(x=>!stop.has(x)).slice(0,8);
+}
+function learnLocalAction(a){
+  if(!a)return;
+  const m=getLocalMemory(),tokens=memoryTokens((a._source||'')+' '+(a.title||'')+' '+(a.desc||''));
+  if(a._learnModule&&a.module)tokens.forEach(t=>m.taskModules[t]=a.module);
+  if(a._learnExpenseCategory&&a.category)tokens.forEach(t=>m.expenseCategories[t]=a.category);
+  localStorage.setItem(LOCAL_MEMORY_KEY,JSON.stringify(m));
+}
+function localMemoryCount(){
+  const m=getLocalMemory();return Object.keys(m.taskModules).length+Object.keys(m.expenseCategories).length;
+}
+function renderLocalMemoryInfo(){
+  const el=document.getElementById('local-memory-info');if(!el)return;
+  const n=localMemoryCount();el.textContent=n?`Изучено правил: ${n}. Они хранятся только на этом устройстве.`:'Пока нет изученных правил. Исправь категорию в карточке помощника — Lumo её запомнит.';
+}
+function clearLocalAssistantMemory(){
+  if(!confirm('Удалить все изученные помощником правила?'))return;
+  localStorage.removeItem(LOCAL_MEMORY_KEY);renderLocalMemoryInfo();toast('Память помощника очищена');
+}
 
 function localDateKey(d){return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');}
 function localRepeat(text){
@@ -3401,6 +3445,9 @@ function splitLocalSpeech(text){
 }
 function expenseCategory(text){
   const low=text.toLowerCase();
+  const learned=getLocalMemory().expenseCategories;
+  const learnedToken=memoryTokens(low).find(t=>learned[t]&&getExpCats().some(c=>c.name===learned[t]));
+  if(learnedToken)return learned[learnedToken];
   if(/продукт|еда|магаз|хлеб|молок|сыр|овощ|фрукт/.test(low))return 'Продукты';
   if(/бензин|топлив|заправ/.test(low))return findOrNull('Топливо')||'Топливо';
   if(/кафе|ресторан|кофе|обед/.test(low))return findOrNull('Кафе')||'Кафе';
@@ -3412,6 +3459,9 @@ function expenseCategory(text){
 }
 function inferTaskModule(text){
   const low=text.toLowerCase();
+  const learned=getLocalMemory().taskModules;
+  const learnedToken=memoryTokens(low).find(t=>learned[t]&&getCats().some(c=>c.id===learned[t]));
+  if(learnedToken)return learned[learnedToken];
   const preferred=
     /сотрудник|коллег|начальник|клиент|заказчик|офис|работ|совещан|отч[её]т|договор|пропуск|смен[аыу]|зарплат/.test(low)?'work':
     /машин|авто|гараж|шиномонтаж|техосмотр|масло|заправ/.test(low)?'car':
@@ -3434,27 +3484,27 @@ function parseLocalPlan(text){
     if(amountMatch&&/тыс|тыщ/.test(amountMatch[2])&&amount<1000)amount*=1000;
     if(/зарплат|аванс|преми|получил|получила|доход|заработал/.test(low)){
       if(!amount){const m=low.match(/\b(\d[\d\s]{2,})\b/);amount=m?Number(m[1].replace(/\s/g,'')):0;}
-      actions.push({type:'income',amount,source:/аванс/.test(low)?'Аванс':/преми/.test(low)?'Премия':'Зарплата',date:hasDate?date:todayKey(),desc:chunk});return;
+      actions.push({type:'income',amount,source:/аванс/.test(low)?'Аванс':/преми/.test(low)?'Премия':'Зарплата',date:hasDate?date:todayKey(),desc:chunk,_source:chunk});return;
     }
     if(amount&&/(потрат|купил|купила|заплат|оплатить|оплатил|оплатила|отдал|ушло)/.test(low)){
-      actions.push({type:'expense',amount,category:expenseCategory(low),desc:cleanLocalTitle(chunk),date:hasDate?date:todayKey()});return;
+      actions.push({type:'expense',amount,category:expenseCategory(low),desc:cleanLocalTitle(chunk),date:hasDate?date:todayKey(),_source:chunk});return;
     }
     if(/(?:^|\s)(?:купить|докупить|заказать)(?=\s|$)/.test(low)&&!amount){
       let list=cleanLocalTitle(chunk).replace(/^(?:купить|докупить|заказать)\s+/i,'');
       const known=['молоко','хлеб','сыр','яйца','масло','кефир','творог','сметана','мясо','курица','рыба','рис','гречка','макароны','картошка','лук','морковь','помидоры','огурцы','яблоки','бананы','вода','кофе','чай'];
       const found=known.filter(x=>new RegExp(`(?:^|\\s)${x}(?:\\s|$)`,'i').test(list));
       const goods=found.length>1?found:list.split(/\s+и\s+|,\s*/).map(x=>x.trim()).filter(Boolean);
-      if(goods.length)actions.push({type:'shopping',items:goods,title:goods.join(', '),date});else unknown.push(chunk);
+      if(goods.length)actions.push({type:'shopping',items:goods,title:goods.join(', '),date,_source:chunk});else unknown.push(chunk);
       return;
     }
     const repeat=localRepeat(low);
     if(repeat&&/(трениров|зарядк|читать|прогул|заниматься|пить|учить|бег)/.test(low)){
-      let name=cleanLocalTitle(chunk);if(name)actions.push({type:'habit',title:name,date,time,repeat});else unknown.push(chunk);return;
+      let name=cleanLocalTitle(chunk);if(name)actions.push({type:'habit',title:name,date,time,repeat,_source:chunk});else unknown.push(chunk);return;
     }
     let title=cleanLocalTitle(chunk);
     if(title&&(/напомн|создай|добавь|запиши|заплан|нужно|надо|не забыть|позвон|написать|отправить|забрать|отвезти|сходить|съездить|встреч|оплатить|трениров/.test(low)||date!==todayKey()||time)){
       title=title.charAt(0).toUpperCase()+title.slice(1);
-      actions.push({type:'task',title,date,time,module:inferTaskModule(low),pri:/срочно|важно/.test(low)?'R':'Y',repeat});return;
+      actions.push({type:'task',title,date,time,module:inferTaskModule(low),pri:/срочно|важно/.test(low)?'R':'Y',repeat,_source:chunk});return;
     }
     unknown.push(chunk);
   });
@@ -3489,24 +3539,93 @@ function tryLocalAnswer(text){
   }
   return null;
 }
-function showLocalPlan(plan){
-  pendingLocalPlan=plan;
+function localPlanHTML(plan){
   const icons={task:'✓',expense:'−₽',income:'+₽',shopping:'🛒',habit:'↻'};
   let html='<div class="local-plan"><div class="local-plan-head">Я разобрал фразу</div><div class="local-plan-sub">Проверь и только потом сохрани. Всё обработано на устройстве.</div>';
-  plan.actions.forEach((a,i)=>{html+=`<div class="local-plan-item" id="local-plan-${i}"><div class="local-plan-icon">${icons[a.type]||'✓'}</div><div><div class="local-plan-title">${esc(a.title||a.desc||a.source||'Действие')}</div><div class="local-plan-meta">${esc(localPlanMeta(a))}</div></div><button class="local-plan-del" onclick="removeLocalPlanItem(${i})">×</button></div>`;});
+  plan.actions.forEach((a,i)=>{html+=`<div class="local-plan-item" id="local-plan-${i}" style="${a._removed?'display:none':''}"><div class="local-plan-icon">${icons[a.type]||'✓'}</div><div><div class="local-plan-title">${esc(a.title||a.desc||a.source||'Действие')}</div><div class="local-plan-meta">${esc(localPlanMeta(a))}${a._edited?' · исправлено':''}</div></div><button class="local-plan-edit" onclick="editLocalPlanItem(${i})" aria-label="Исправить">${ICONS.edit}</button><button class="local-plan-del" onclick="removeLocalPlanItem(${i})" aria-label="Убрать">×</button></div>`;});
   if(plan.unknown.length)html+=`<div class="local-plan-sub">Не уверен: «${esc(plan.unknown.join(' · '))}» — этот фрагмент не сохраню.</div>`;
   html+='<div class="local-plan-actions"><button class="local-plan-cancel" onclick="cancelLocalPlan()">Отмена</button><button class="local-plan-save" onclick="confirmLocalPlan()">Сохранить всё</button></div></div>';
-  aiAddMsg('ai',html);
+  return html;
+}
+function showLocalPlan(plan){
+  pendingLocalPlan=plan;
+  aiAddMsg('ai',localPlanHTML(plan));
+}
+function refreshLocalPlanPreview(){
+  const box=document.querySelector('.local-plan');
+  if(box&&pendingLocalPlan)box.outerHTML=localPlanHTML(pendingLocalPlan);
 }
 function removeLocalPlanItem(i){
   if(!pendingLocalPlan||!pendingLocalPlan.actions[i])return;
   pendingLocalPlan.actions[i]._removed=true;const el=document.getElementById('local-plan-'+i);if(el)el.style.display='none';
 }
 function cancelLocalPlan(){pendingLocalPlan=null;aiAddMsg('ai','Хорошо, ничего не сохраняю.');}
+let localEditIndex=-1;
+function editLocalPlanItem(i){
+  if(!pendingLocalPlan||!pendingLocalPlan.actions[i])return;
+  localEditIndex=i;
+  const a=pendingLocalPlan.actions[i];
+  document.getElementById('local-edit-body').innerHTML=`<div class="field"><label>Что распознано</label><select id="local-edit-type" onchange="renderLocalEditFields()">
+    <option value="task" ${a.type==='task'?'selected':''}>Дело</option><option value="shopping" ${a.type==='shopping'?'selected':''}>Покупки</option>
+    <option value="expense" ${a.type==='expense'?'selected':''}>Расход</option><option value="income" ${a.type==='income'?'selected':''}>Доход</option>
+    <option value="habit" ${a.type==='habit'?'selected':''}>Привычка</option></select></div><div id="local-edit-fields"></div>`;
+  renderLocalEditFields(a);
+  document.getElementById('modal-local-edit').classList.add('on');
+}
+function renderLocalEditFields(source){
+  const old=source||pendingLocalPlan?.actions[localEditIndex]||{};
+  const type=document.getElementById('local-edit-type')?.value||old.type||'task';
+  const body=document.getElementById('local-edit-fields');if(!body)return;
+  const date=old.date||todayKey(),time=old.time||'';
+  if(type==='task'){
+    body.innerHTML=`<div class="field"><label>Название</label><input id="le-title" value="${esc(old.title||old.desc||'')}"></div>
+      <div class="field"><label>Категория</label><select id="le-module">${getCats().map(c=>`<option value="${esc(c.id)}" ${c.id===(old.module||'personal')?'selected':''}>${c.emoji} ${esc(c.name)}</option>`).join('')}</select></div>
+      <div class="two-col"><div class="field"><label>Дата</label><input id="le-date" type="date" value="${esc(date)}"></div><div class="field"><label>Время</label><input id="le-time" type="time" value="${esc(time)}"></div></div>
+      <div class="field"><label>Повтор</label><select id="le-repeat"><option value="">Без повтора</option><option value="daily" ${old.repeat==='daily'?'selected':''}>Каждый день</option><option value="weekly" ${old.repeat==='weekly'?'selected':''}>Каждую неделю</option><option value="monthly" ${old.repeat==='monthly'?'selected':''}>Каждый месяц</option></select></div>`;
+  }else if(type==='expense'){
+    body.innerHTML=`<div class="field"><label>Сумма ₽</label><input id="le-amount" type="number" inputmode="decimal" value="${Number(old.amount||0)}"></div>
+      <div class="field"><label>Категория</label><select id="le-exp-cat">${getExpCats().map(c=>`<option value="${esc(c.name)}" ${c.name===(old.category||'Прочее')?'selected':''}>${c.i} ${esc(c.name)}</option>`).join('')}</select></div>
+      <div class="field"><label>Комментарий</label><input id="le-desc" value="${esc(old.desc||old.title||'')}"></div><div class="field"><label>Дата</label><input id="le-date" type="date" value="${esc(date)}"></div>`;
+  }else if(type==='income'){
+    body.innerHTML=`<div class="field"><label>Сумма ₽</label><input id="le-amount" type="number" inputmode="decimal" value="${Number(old.amount||0)}"></div>
+      <div class="field"><label>Источник</label><select id="le-source">${['Зарплата','Аванс','Премия','Подработка','Продажа','Прочее'].map(x=>`<option ${x===(old.source||'Зарплата')?'selected':''}>${x}</option>`).join('')}</select></div>
+      <div class="field"><label>Дата</label><input id="le-date" type="date" value="${esc(date)}"></div>`;
+  }else if(type==='shopping'){
+    body.innerHTML=`<div class="field"><label>Позиции через запятую</label><textarea id="le-items">${esc((old.items||[old.title||'']).join(', '))}</textarea></div>`;
+  }else{
+    body.innerHTML=`<div class="field"><label>Название привычки</label><input id="le-title" value="${esc(old.title||old.desc||'')}"></div>
+      <div class="two-col"><div class="field"><label>Первый день</label><input id="le-date" type="date" value="${esc(date)}"></div><div class="field"><label>Время</label><input id="le-time" type="time" value="${esc(time)}"></div></div>
+      <div class="field"><label>Ритм</label><select id="le-repeat"><option value="daily" ${old.repeat!=='weekly'&&old.repeat!=='monthly'?'selected':''}>Каждый день</option><option value="weekly" ${old.repeat==='weekly'?'selected':''}>Каждую неделю</option><option value="monthly" ${old.repeat==='monthly'?'selected':''}>Каждый месяц</option></select></div>`;
+  }
+}
+function saveLocalPlanEdit(){
+  if(localEditIndex<0||!pendingLocalPlan?.actions[localEditIndex])return;
+  const old=pendingLocalPlan.actions[localEditIndex],type=document.getElementById('local-edit-type').value;
+  let a={type,_source:old._source||'',_edited:true};
+  if(type==='task'){
+    a.title=document.getElementById('le-title').value.trim()||'Дело';a.module=document.getElementById('le-module').value;
+    a.date=document.getElementById('le-date').value||todayKey();a.time=document.getElementById('le-time').value;
+    a.repeat=document.getElementById('le-repeat').value;a.pri=old.pri||'Y';a._learnModule=old.type!=='task'||old.module!==a.module;
+  }else if(type==='expense'){
+    a.amount=Number(document.getElementById('le-amount').value)||0;a.category=document.getElementById('le-exp-cat').value;
+    a.desc=document.getElementById('le-desc').value.trim();a.date=document.getElementById('le-date').value||todayKey();
+    a._learnExpenseCategory=old.type!=='expense'||old.category!==a.category;
+  }else if(type==='income'){
+    a.amount=Number(document.getElementById('le-amount').value)||0;a.source=document.getElementById('le-source').value;a.date=document.getElementById('le-date').value||todayKey();
+  }else if(type==='shopping'){
+    a.items=document.getElementById('le-items').value.split(/[,\n]+/).map(x=>x.trim()).filter(Boolean);a.title=a.items.join(', ');
+  }else{
+    a.title=document.getElementById('le-title').value.trim()||'Привычка';a.date=document.getElementById('le-date').value||todayKey();
+    a.time=document.getElementById('le-time').value;a.repeat=document.getElementById('le-repeat').value;
+  }
+  pendingLocalPlan.actions[localEditIndex]=a;closeLocalPlanEdit();refreshLocalPlanPreview();toast('Исправление применено');
+}
+function closeLocalPlanEdit(){localEditIndex=-1;document.getElementById('modal-local-edit').classList.remove('on');}
 function confirmLocalPlan(){
   if(!pendingLocalPlan)return;
   const created=[];
   pendingLocalPlan.actions.filter(a=>!a._removed).forEach(a=>{
+    learnLocalAction(a);
     if(a.type==='shopping'){
       const s=getShopping();a.items.forEach(x=>s.push({id:Date.now()+Math.floor(Math.random()*9999),t:x,done:false,by:getMyName()||''}));setShopping(s);created.push({type:'shopping',data:a});return;
     }

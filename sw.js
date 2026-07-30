@@ -1,4 +1,4 @@
-const CACHE = 'planner-v33';
+const CACHE = 'planner-v34';
 
 const ASSETS = [
   './',
