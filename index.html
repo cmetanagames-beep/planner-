@@ -632,6 +632,25 @@ body.dark .tour-focus{box-shadow:0 0 0 4px #171525,0 0 0 9px color-mix(in srgb,v
 .local-plan-actions button{border:0;border-radius:12px;padding:10px;font-weight:750}
 .local-plan-save{background:linear-gradient(135deg,var(--brand),var(--brand2));color:#fff}
 .local-plan-cancel{background:var(--bg);color:var(--muted);border:1px solid var(--line)!important}
+.local-ops{width:100%;display:grid;gap:9px}
+.local-op{padding:11px;border-radius:15px;background:var(--card2);border:1px solid var(--line)}
+.local-op-title{font-weight:800;font-size:.82rem;margin-bottom:8px}
+.local-op-diff{display:grid;grid-template-columns:1fr auto 1fr;gap:7px;align-items:center}
+.local-op-side{padding:8px;border-radius:11px;background:var(--card);border:1px solid var(--line);font-size:.7rem;line-height:1.4}
+.local-op-side small{display:block;color:var(--muted);font-size:.61rem;margin-bottom:2px}
+.local-op-arrow{color:var(--brand);font-weight:900}
+.local-op-warn{font-size:.68rem;color:var(--muted);line-height:1.4}
+.global-results{padding:8px 16px 120px;display:grid;gap:9px}
+.global-group{font-size:.7rem;color:var(--muted);font-weight:850;letter-spacing:.08em;text-transform:uppercase;margin:10px 2px 0}
+.global-result{display:grid;grid-template-columns:38px 1fr auto;gap:10px;align-items:center;padding:11px;
+  border:1px solid var(--line);border-radius:16px;background:var(--card);box-shadow:var(--shadow);cursor:pointer}
+.global-result .gr-icon{width:38px;height:38px;border-radius:12px;display:grid;place-items:center;background:var(--card2)}
+.global-result b{font-size:.82rem}.global-result small{display:block;color:var(--muted);font-size:.67rem;margin-top:3px}
+.receipt-drop{border:1.5px dashed color-mix(in srgb,var(--brand) 45%,var(--line));border-radius:18px;padding:16px;text-align:center;background:var(--card2)}
+.receipt-drop img{display:none;width:100%;max-height:220px;object-fit:contain;border-radius:12px;margin-bottom:10px}
+.receipt-progress{height:7px;border-radius:7px;background:var(--line);overflow:hidden;margin:10px 0}
+.receipt-progress i{display:block;height:100%;width:0;background:linear-gradient(90deg,var(--brand),var(--brand2));transition:width .25s}
+.receipt-status{font-size:.72rem;color:var(--muted);text-align:center;margin-bottom:8px}
 
 /* Панель ввода ИИ — плавающая стеклянная */
 .ai-input-bar{
@@ -642,10 +661,12 @@ body.dark .tour-focus{box-shadow:0 0 0 4px #171525,0 0 0 9px color-mix(in srgb,v
   backdrop-filter:blur(var(--blur)) saturate(180%);-webkit-backdrop-filter:blur(var(--blur)) saturate(180%);
   box-shadow:var(--shadow-lg);
 }
-.ai-input-bar input{flex:1;border:1px solid var(--line);border-radius:22px;padding:12px 16px;
+.ai-input-bar input{flex:1;min-width:0;border:1px solid var(--line);border-radius:22px;padding:12px 16px;
   background:var(--card);color:var(--text);font-size:.9rem;outline:none}
-.mic-btn,.send-btn{border:none;width:44px;height:44px;border-radius:50%;font-size:1.1rem;cursor:pointer;flex:0 0 auto}
+.mic-btn,.receipt-ai-btn,.send-btn{border:none;width:44px;height:44px;border-radius:50%;font-size:1.1rem;cursor:pointer;flex:0 0 auto}
 .mic-btn{background:var(--card);border:1px solid var(--line);color:var(--text)}
+.receipt-ai-btn{background:var(--card);border:1px solid var(--line);color:var(--brand);display:grid;place-items:center}
+.receipt-ai-btn svg{width:21px;height:21px}
 .send-btn{background:linear-gradient(135deg,var(--brand),var(--brand2));color:#fff;
   box-shadow:0 4px 14px color-mix(in srgb,var(--brand) 40%,transparent)}
 @media(max-width:520px){.ai-input-bar{width:calc(100% - 16px)}}
@@ -1042,6 +1063,7 @@ input,textarea{-webkit-user-select:text;user-select:text}
 <div class="quote-chip" id="quoteChip"></div>
     </div>
     <div class="hero-btns">
+  <button onclick="openGlobalSearch()" title="Поиск по приложению"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="10.8" cy="10.8" r="6.8"/><path d="M16 16l4.2 4.2"/></svg></button>
   <button onclick="openHelp()" title="Возможности"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M9.5 9a2.5 2.5 0 015 .2c0 1.7-2.5 2-2.5 3.8"/><circle cx="12" cy="17" r=".6" fill="currentColor"/></svg></button>
   <button onclick="openSettings()" title="Настройки"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.6 1.6 0 00.3 1.8 2 2 0 11-2.8 2.8 1.6 1.6 0 00-2.7.7 1.6 1.6 0 01-3.2 0 1.6 1.6 0 00-2.7-.7 2 2 0 11-2.8-2.8 1.6 1.6 0 000-2.7 1.6 1.6 0 01.9-2.9 1.6 1.6 0 00.9-2.7 2 2 0 112.8-2.8 1.6 1.6 0 002.7-.7 1.6 1.6 0 013.2 0 1.6 1.6 0 002.7.7 2 2 0 112.8 2.8 1.6 1.6 0 000 2.7z"/></svg></button>
   <button onclick="toggleTheme()" title="Тема"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.8A8 8 0 1111.2 3 6.5 6.5 0 0021 12.8z"/></svg></button>
@@ -1053,7 +1075,7 @@ input,textarea{-webkit-user-select:text;user-select:text}
 <div class="filters" id="filters"></div>
 
 <div class="search-wrap" id="search-wrap">
-  <input id="search" placeholder="🔍 Поиск..." oninput="debouncedRender()">
+  <input id="search" placeholder="🔍 Поиск по всему приложению..." oninput="debouncedRender()">
 </div>
 
 <div id="view"></div>
@@ -1064,6 +1086,7 @@ input,textarea{-webkit-user-select:text;user-select:text}
 </div>
 <div class="ai-input-bar" id="ai-bar" style="display:none">
   <button class="mic-btn" id="mic" onclick="toggleMic()">🎤</button>
+  <button class="receipt-ai-btn" onclick="openAIReceipt()" title="Добавить чек"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M7 3h10a2 2 0 012 2v16l-3-2-4 2-4-2-3 2V5a2 2 0 012-2z"/><path d="M8 8h8M8 12h6M8 16h4"/></svg></button>
   <input id="ai-input" placeholder="Напиши или надиктуй..." onkeydown="if(event.key==='Enter')aiSend()">
   <button class="send-btn" onclick="aiSend()">➤</button>
 </div>
@@ -1155,6 +1178,29 @@ input,textarea{-webkit-user-select:text;user-select:text}
     <div class="field"><label>Комментарий</label><input id="e-desc" placeholder="Необязательно"></div>
     <button class="btn" onclick="saveExpModal()">Сохранить</button>
     <button class="btn ghost" onclick="closeExpModal()">Отмена</button>
+  </div>
+</div>
+<div class="modal" id="modal-receipt">
+  <div class="sheet">
+    <h3>Сканировать чек</h3>
+    <div class="local-edit-note">Распознавание выполняется на устройстве. При первом запуске потребуется интернет для загрузки OCR и русского словаря.</div>
+    <div class="receipt-drop">
+      <img id="receipt-preview" alt="Фото чека">
+      <input id="receipt-file" type="file" accept="image/*" capture="environment" onchange="receiptFilePicked(event)" style="display:none">
+      <button class="btn ghost" onclick="document.getElementById('receipt-file').click()">Сфотографировать или выбрать чек</button>
+    </div>
+    <div class="receipt-progress"><i id="receipt-progress-bar"></i></div>
+    <div class="receipt-status" id="receipt-status">Выбери чёткое фото чека</div>
+    <button class="btn" id="receipt-scan-btn" onclick="scanReceipt()" disabled>Распознать чек</button>
+    <div id="receipt-review" style="display:none">
+      <div class="field"><label>Магазин</label><input id="receipt-merchant"></div>
+      <div class="two-col"><div class="field"><label>Итого ₽</label><input id="receipt-total" type="number" inputmode="decimal"></div><div class="field"><label>Дата</label><input id="receipt-date" type="date"></div></div>
+      <div class="field"><label>Категория</label><select id="receipt-category"></select></div>
+      <div class="field"><label>Найденные позиции</label><textarea id="receipt-items" style="min-height:90px"></textarea></div>
+      <details><summary style="font-size:.72rem;color:var(--muted);margin-bottom:8px">Текст OCR</summary><textarea id="receipt-raw" style="min-height:110px"></textarea><button class="btn ghost" onclick="reviewReceiptText()">Разобрать исправленный текст</button></details>
+      <button class="btn" onclick="saveReceiptExpense()">Записать расход</button>
+    </div>
+    <button class="btn ghost" onclick="closeReceiptScanner()">Закрыть</button>
   </div>
 </div>
 
@@ -1822,9 +1868,9 @@ function render(){
   const view=document.getElementById('view');
   const _isFamilyMember=getFamilyState(); // вычисляем один раз
   let tasks=getTasks().slice();
-  if(currentTab!=='all')tasks=tasks.filter(t=>t.module===currentTab);
   const q=(document.getElementById('search')?.value||'').toLowerCase().trim();
-  if(q)tasks=tasks.filter(x=>(x.title+' '+(x.desc||'')).toLowerCase().includes(q));
+  if(q){renderGlobalSearch(q);return;}
+  if(currentTab!=='all')tasks=tasks.filter(t=>t.module===currentTab);
   const tk=todayKey();
   if(filterState==='active')tasks=tasks.filter(t=>!t.done);
   else if(filterState==='done')tasks=tasks.filter(t=>t.done);
@@ -2719,6 +2765,7 @@ function renderFinance(){
     <div class="fin-chart">${donutSVG(s.byCat,s.total)}<div class="center"><b>${fmtMoney(s.total)} ₽</b><small>Расходы</small></div></div>
   </div>`;
 
+  html+=`<div style="padding:0 16px 8px"><button class="btn ghost" onclick="openReceiptScanner()">📷 Сканировать чек</button></div>`;
   html+=`<div class="fin-insight">${weekInsight()}</div>`;
   html+=dayBars(y,m);
   html+=renderGoals();
@@ -2836,6 +2883,107 @@ function saveExpModal(){
   closeExpModal();confetti();vibrate(30);
   if(cat)checkBudgetAlert(cat);
   renderFinance();
+}
+
+let receiptFile=null,receiptWorker=null,receiptSource='finance';
+function openReceiptScanner(source='finance'){
+  receiptSource=source;
+  receiptFile=null;
+  document.getElementById('receipt-file').value='';
+  document.getElementById('receipt-preview').style.display='none';
+  document.getElementById('receipt-review').style.display='none';
+  document.getElementById('receipt-scan-btn').disabled=true;
+  setReceiptProgress(0,'Выбери чёткое фото чека');
+  document.getElementById('modal-receipt').classList.add('on');
+}
+function openAIReceipt(){
+  aiAddMsg('user','📷 Хочу добавить чек');
+  aiAddMsg('ai','Выбери фотографию чека или сделай новый снимок. Я локально распознаю сумму, дату, магазин и покупки, а перед сохранением дам всё проверить.');
+  openReceiptScanner('ai');
+  setTimeout(()=>document.getElementById('receipt-file').click(),120);
+}
+async function closeReceiptScanner(){
+  document.getElementById('modal-receipt').classList.remove('on');
+  if(receiptWorker){try{await receiptWorker.terminate();}catch(e){}receiptWorker=null;}
+}
+function receiptFilePicked(ev){
+  receiptFile=ev.target.files?.[0]||null;if(!receiptFile)return;
+  const img=document.getElementById('receipt-preview');img.src=URL.createObjectURL(receiptFile);img.style.display='block';
+  document.getElementById('receipt-scan-btn').disabled=false;setReceiptProgress(0,'Фото готово к распознаванию');
+}
+function setReceiptProgress(p,text){
+  document.getElementById('receipt-progress-bar').style.width=Math.max(0,Math.min(100,Math.round(p)))+'%';
+  if(text)document.getElementById('receipt-status').textContent=text;
+}
+function loadReceiptOCR(){
+  if(window.Tesseract)return Promise.resolve();
+  return new Promise((resolve,reject)=>{
+    const old=document.getElementById('tesseract-loader');if(old){old.addEventListener('load',resolve,{once:true});old.addEventListener('error',reject,{once:true});return;}
+    const s=document.createElement('script');s.id='tesseract-loader';s.src='https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js';s.onload=resolve;s.onerror=()=>reject(new Error('Не удалось загрузить локальный OCR'));document.head.appendChild(s);
+  });
+}
+function prepareReceiptImage(file){
+  return new Promise((resolve,reject)=>{
+    const img=new Image(),url=URL.createObjectURL(file);
+    img.onload=()=>{
+      const scale=Math.min(1,1800/img.naturalWidth),w=Math.max(1,Math.round(img.naturalWidth*scale)),h=Math.max(1,Math.round(img.naturalHeight*scale));
+      const c=document.createElement('canvas');c.width=w;c.height=h;const ctx=c.getContext('2d',{willReadFrequently:true});ctx.drawImage(img,0,0,w,h);
+      const d=ctx.getImageData(0,0,w,h);
+      for(let i=0;i<d.data.length;i+=4){const g=.299*d.data[i]+.587*d.data[i+1]+.114*d.data[i+2];const v=Math.max(0,Math.min(255,(g-128)*1.35+128));d.data[i]=d.data[i+1]=d.data[i+2]=v;}
+      ctx.putImageData(d,0,0);URL.revokeObjectURL(url);resolve(c.toDataURL('image/jpeg',.88));
+    };
+    img.onerror=()=>{URL.revokeObjectURL(url);reject(new Error('Не удалось открыть изображение'));};img.src=url;
+  });
+}
+async function scanReceipt(){
+  if(!receiptFile)return;
+  const btn=document.getElementById('receipt-scan-btn');btn.disabled=true;
+  try{
+    setReceiptProgress(3,'Загружаю локальный OCR…');await loadReceiptOCR();
+    const image=await prepareReceiptImage(receiptFile);
+    receiptWorker=await Tesseract.createWorker('rus+eng',1,{logger:m=>{
+      const pct=m.progress!=null?8+m.progress*88:5;const labels={'loading tesseract core':'Загружаю OCR…','loading language traineddata':'Загружаю русский словарь…','initializing api':'Готовлю распознавание…','recognizing text':'Читаю чек…'};
+      setReceiptProgress(pct,labels[m.status]||'Обрабатываю чек…');
+    }});
+    const result=await receiptWorker.recognize(image);await receiptWorker.terminate();receiptWorker=null;
+    document.getElementById('receipt-raw').value=result.data.text||'';reviewReceiptText();setReceiptProgress(100,'Чек распознан — проверь результат');
+  }catch(e){
+    setReceiptProgress(0,e.message||'Не удалось распознать чек');toast('Ошибка распознавания чека');
+  }finally{btn.disabled=false;}
+}
+function receiptNumber(s){return Number(String(s).replace(/\s/g,'').replace(',','.').replace(/[^\d.]/g,''))||0;}
+function parseReceiptText(text){
+  const lines=String(text||'').split(/\r?\n/).map(x=>x.replace(/\s+/g,' ').trim()).filter(Boolean);
+  const moneyRe=/(\d{1,3}(?:[ \u00a0]\d{3})*[,.]\d{2}|\d+[,.]\d{2})/g;
+  const moneyTest=/(\d{1,3}(?:[ \u00a0]\d{3})*[,.]\d{2}|\d+[,.]\d{2})/;
+  const isDateLine=x=>/\b[0-3]?\d[./-][01]?\d[./-](?:20)?\d{2}\b/.test(x);
+  let total=0;
+  lines.forEach(line=>{if(/итого|к оплате|сумма чека|всего/i.test(line)){const nums=[...(line.match(moneyRe)||[])].map(receiptNumber);if(nums.length)total=Math.max(total,...nums);}});
+  if(!total){const tail=lines.slice(-15).filter(x=>!isDateLine(x)).flatMap(x=>(x.match(moneyRe)||[]).map(receiptNumber));if(tail.length)total=Math.max(...tail);}
+  let date=todayKey();const dm=text.match(/\b([0-3]?\d)[./-]([01]?\d)[./-](20\d{2}|\d{2})\b/);
+  if(dm){const y=dm[3].length===2?'20'+dm[3]:dm[3];date=`${y}-${String(dm[2]).padStart(2,'0')}-${String(dm[1]).padStart(2,'0')}`;}
+  const merchant=(lines.slice(0,12).find(x=>/[а-яa-z]{3}/i.test(x)&&!/касс|чек|инн|фн|фд|фп|смен|добро пожаловать/i.test(x))||'Магазин').slice(0,80);
+  const items=lines.filter(x=>!isDateLine(x)&&moneyTest.test(x)&&!(/итого|оплат|сумма|налич|безнал|сдача|ндс|скидка/i.test(x))).map(x=>x.replace(moneyRe,'').replace(/[*=]+/g,'').trim()).filter(x=>x.length>2).slice(0,40);
+  return {merchant,total,date,items,category:expenseCategory(text)};
+}
+function reviewReceiptText(){
+  const raw=document.getElementById('receipt-raw').value,parsed=parseReceiptText(raw);
+  document.getElementById('receipt-merchant').value=parsed.merchant;document.getElementById('receipt-total').value=parsed.total||'';
+  document.getElementById('receipt-date').value=parsed.date;document.getElementById('receipt-items').value=parsed.items.join('\n');
+  const cat=document.getElementById('receipt-category');cat.innerHTML=getExpCats().map(c=>`<option value="${esc(c.name)}">${c.i} ${esc(c.name)}</option>`).join('');
+  if([...cat.options].some(x=>x.value===parsed.category))cat.value=parsed.category;
+  document.getElementById('receipt-review').style.display='block';
+}
+function saveReceiptExpense(){
+  const amount=Number(document.getElementById('receipt-total').value)||0;if(!amount){toast('Проверь итоговую сумму');return;}
+  const merchant=document.getElementById('receipt-merchant').value.trim()||'Магазин',category=document.getElementById('receipt-category').value;
+  const items=document.getElementById('receipt-items').value.split(/\n+/).map(x=>x.trim()).filter(Boolean);
+  const d=load();if(!d.finance)d.finance=[];d.finance.push({id:Date.now()+Math.floor(Math.random()*1000),date:document.getElementById('receipt-date').value||todayKey(),desc:'Чек: '+merchant,amount,category,receiptItems:items});
+  save(d);checkBudgetAlert(category);closeReceiptScanner();confetti();toast('Расход по чеку записан');
+  if(receiptSource==='ai'){
+    switchTab('ai');
+    aiAddMsg('ai',`✅ Чек сохранён<br><b>${esc(merchant)}</b> · ${fmtMoney(amount)} ₽<br><small>${esc(category)} · ${items.length} позиций</small>`);
+  }else renderFinance();
 }
 
 /* ===== ДОСТИЖЕНИЯ ===== */
@@ -3301,13 +3449,14 @@ function aiHello(){
   const chat=document.getElementById('ai-chat');
   const name=getMyName();
   const greet=name?`Привет, ${esc(name)}! 👋`:'Привет! 👋';
-  aiAddMsg('ai',`${greet}<br>Я локальный помощник Lumo. Можешь продиктовать весь день одной фразой — я разделю её на дела, покупки, расходы и привычки, а перед сохранением покажу результат.<br><br><small>Работаю без Groq и не отправляю такие команды в интернет.</small>`);
+  aiAddMsg('ai',`${greet}<br>Я локальный помощник Lumo. Можешь продиктовать весь день одной фразой — я разделю её на дела, покупки, расходы и привычки. Кнопкой чека рядом с микрофоном можно сфотографировать покупку.<br><br><small>Перед сохранением всё покажу. Основные команды и распознавание чека работают без Groq.</small>`);
   renderAISuggest();
 }
 function renderAISuggest(){
   const box=document.getElementById('ai-suggest');if(!box)return;
   const s=['🎙️ Завтра позвонить маме в 18 купить молоко','📊 Мои дела на сегодня','💰 Сколько потратил за месяц'];
-  box.innerHTML=s.map(x=>`<button onclick="aiQuick('${x.replace(/'/g,'')}')">${x}</button>`).join('');
+  box.innerHTML=s.map(x=>`<button onclick="aiQuick('${x.replace(/'/g,'')}')">${x}</button>`).join('')+
+    '<button onclick="openAIReceipt()">🧾 Добавить чек</button>';
 }
 function aiQuick(t){document.getElementById('ai-input').value=t;aiSend();}
 function aiAddMsg(who,html){
@@ -3363,6 +3512,7 @@ function timeFromText(low){
 function findOrNull(name){return getExpCats().some(c=>c.name===name)?name:null;}
 let pendingCat=null;
 let pendingLocalPlan=null;
+let pendingLocalOps=null;
 const LOCAL_MEMORY_KEY='lumo_local_memory_v1';
 function getLocalMemory(){
   try{
@@ -3519,6 +3669,13 @@ function localPlanMeta(a){
 }
 function tryLocalAnswer(text){
   const low=text.toLowerCase();
+  if(/покаж\w*.*(?:дел|задач).*(?:недел)/.test(low)){
+    const end=new Date();end.setDate(end.getDate()+7);const endKey=localDateKey(end);
+    let list=getTasks().filter(t=>!t.done&&t.date>=todayKey()&&t.date<=endKey);
+    if(/рабоч|работ/.test(low))list=list.filter(t=>t.module==='work');
+    list.sort((a,b)=>(a.date+a.time).localeCompare(b.date+b.time));
+    return list.length?`На ближайшие 7 дней:<br>${list.slice(0,12).map(t=>`• ${esc(t.title)} — ${fmtDate(t.date)}${t.time?', '+esc(t.time):''}`).join('<br>')}`:'На ближайшие 7 дней подходящих дел нет.';
+  }
   if(/(?:мои|какие|сколько).*(?:дел|задач).*(?:сегодня)|(?:дел|задач).*(?:на сегодня)/.test(low)){
     const list=getTasks().filter(t=>!t.done&&t.date===todayKey());
     return list.length
@@ -3641,6 +3798,116 @@ function confirmLocalPlan(){
   refreshCurrentTab();
 }
 
+function commandTokens(text){
+  const stop=new Set(['задачу','задача','дело','дела','встречу','перенеси','перенести','удали','удалить','отметь','выполненной','выполнено','сделанной','сегодня','завтра','послезавтра','понедельник','вторник','среду','четверг','пятницу','субботу','воскресенье','последнюю','последний','добавь','подзадачи','подзадачу']);
+  return memoryTokens(text).filter(x=>!stop.has(x));
+}
+function findTaskForCommand(query){
+  const tasks=getTasks().filter(t=>!t.done);
+  if(!tasks.length)return null;
+  if(/последн/.test(query.toLowerCase()))return tasks.slice().sort((a,b)=>(b.id||0)-(a.id||0))[0];
+  const q=commandTokens(query);let best=null,bestScore=0;
+  tasks.forEach(t=>{
+    const tt=commandTokens(t.title+' '+(t.desc||''));
+    let score=q.reduce((n,x)=>n+(tt.some(y=>y===x||y.startsWith(x)||x.startsWith(y))?1:0),0);
+    if(String(t.title).toLowerCase().includes(query.toLowerCase().trim()))score+=3;
+    if(score>bestScore){best=t;bestScore=score;}
+  });
+  return bestScore?best:null;
+}
+function taskCommandQuery(text){
+  return String(text).toLowerCase()
+    .replace(/^(?:пожалуйста\s+)?(?:перенеси|перенести|отметь|удали|удалить|измени|добавь)\s*/,'')
+    .replace(/^(?:дело|задачу|задача)\s*/,'')
+    .replace(/\s+(?:на|в)\s+(?:сегодня|завтра|послезавтра|понедельник|вторник|среду?|четверг|пятницу?|субботу?|воскресенье).*$/,'')
+    .replace(/\s+(?:в|на)\s*\d{1,2}(?::\d{2})?.*$/,'')
+    .replace(/\s+(?:выполненн\w*|сделанн\w*)$/,'').trim();
+}
+function taskOpState(t){
+  if(!t)return '—';
+  return `${esc(t.title||'Дело')}<br>${esc(t.date?fmtDate(t.date):'Без даты')}${t.time?' · '+esc(t.time):''}${t.done?' · Выполнено':''}`;
+}
+function expenseOpState(x){
+  if(!x)return '—';
+  return `${fmtMoney(x.amount)} ₽ · ${esc(x.category||'Прочее')}<br>${esc(x.date?fmtDate(x.date):'')}${x.desc?' · '+esc(x.desc):''}`;
+}
+function parseLocalManagement(text){
+  const low=text.toLowerCase().replace(/ё/g,'е'),ops=[];
+  if(/перенес\S*\s+(?:все\s+)?просроченн/.test(low)){
+    const list=getTasks().filter(t=>isOverdue(t));
+    if(!list.length)return {error:'Просроченных дел нет.'};
+    ops.push({kind:'tasks_bulk_today',ids:list.map(x=>x.id),title:`Перенести просроченные дела: ${list.length}`,before:`${list.length} дел с прошедшей датой`,after:`Все на сегодня · ${fmtDate(todayKey())}`});
+    return {ops};
+  }
+  if(/добав\S*\s+к\s+(?:делу|задаче)/.test(low)&&/подзадач|пункт/.test(low)){
+    const m=text.match(/добав\S*\s+к\s+(?:делу|задаче)\s+(.+?)\s+(?:подзадач\S*|пункт\S*)\s*:?\s*(.+)$/i);
+    if(m){
+      const task=findTaskForCommand(m[1]);if(!task)return {error:`Не нашёл дело «${m[1]}».`};
+      const items=m[2].split(/\s+и\s+|,\s*|;\s*/).map(x=>x.trim()).filter(Boolean);
+      if(!items.length)return {error:'Не услышал названия подзадач.'};
+      const after={...task,subs:[...(task.subs||[]),...items.map(t=>({t,done:false}))]};
+      ops.push({kind:'task_update',id:task.id,title:'Добавить подзадачи',before:taskOpState(task),after:taskOpState(after)+`<br>+ ${items.map(esc).join(', ')}`,patch:{subs:after.subs}});
+      return {ops};
+    }
+  }
+  if(/измени\s+категори\S*\s+(?:последн\S*\s+)?(?:траты|расхода)/.test(low)){
+    const all=(load().finance||[]).slice().sort((a,b)=>(b.id||0)-(a.id||0));const x=all[0];
+    if(!x)return {error:'Расходов пока нет.'};
+    const m=text.match(/\sна\s+([^,.;]+)$/i);if(!m)return {error:'Скажи новую категорию после слова «на».'};
+    const wanted=m[1].trim();const found=getExpCats().find(c=>c.name.toLowerCase()===wanted.toLowerCase());
+    const category=found?found.name:wanted.charAt(0).toUpperCase()+wanted.slice(1);
+    ops.push({kind:'expense_update',id:x.id,title:'Изменить категорию расхода',before:expenseOpState(x),after:expenseOpState({...x,category}),patch:{category}});
+    return {ops};
+  }
+  if(/удал\S*.*(?:расход|трат)/.test(low)){
+    const amountM=low.match(/(\d[\d\s]*)\s*(?:р|руб|₽)?/);const amount=amountM?Number(amountM[1].replace(/\s/g,'')):0;
+    const all=(load().finance||[]).slice().sort((a,b)=>(b.id||0)-(a.id||0));
+    const x=amount?all.find(a=>Number(a.amount)===amount):all[0];
+    if(!x)return {error:'Не нашёл подходящий расход.'};
+    ops.push({kind:'expense_delete',id:x.id,title:'Удалить расход',before:expenseOpState(x),after:'Будет удалён'});
+    return {ops};
+  }
+  if(/^(?:отмет\S*).*(?:выполн|сделан)/.test(low)){
+    const task=findTaskForCommand(taskCommandQuery(text));if(!task)return {error:'Не нашёл подходящее активное дело.'};
+    ops.push({kind:'task_update',id:task.id,title:'Выполнить дело',before:taskOpState(task),after:taskOpState({...task,done:true}),patch:{done:true}});
+    return {ops};
+  }
+  if(/^удал\S*(?:\s+(?:дело|задачу))?/.test(low)&&!/(?:расход|трат)/.test(low)){
+    const task=findTaskForCommand(taskCommandQuery(text));if(!task)return {error:'Не нашёл подходящее дело.'};
+    ops.push({kind:'task_delete',id:task.id,title:'Удалить дело',before:taskOpState(task),after:'Будет удалено'});
+    return {ops};
+  }
+  if(/^перенес\S*/.test(low)){
+    const task=findTaskForCommand(taskCommandQuery(text));if(!task)return {error:'Не нашёл дело, которое нужно перенести.'};
+    const date=dateFromText(low),time=timeFromText(low)||task.time||'';
+    ops.push({kind:'task_update',id:task.id,title:'Перенести дело',before:taskOpState(task),after:taskOpState({...task,date,time}),patch:{date,time}});
+    return {ops};
+  }
+  return null;
+}
+function localOpsHTML(plan,demo=false){
+  let html='<div class="local-ops"><div class="local-plan-head">Подтвердить изменения</div><div class="local-op-warn">Lumo ничего не изменит, пока ты не нажмёшь «Применить».</div>';
+  plan.ops.forEach(op=>{html+=`<div class="local-op"><div class="local-op-title">${esc(op.title)}</div><div class="local-op-diff"><div class="local-op-side"><small>Было</small>${op.before}</div><div class="local-op-arrow">→</div><div class="local-op-side"><small>Станет</small>${op.after}</div></div></div>`;});
+  html+=demo?'<div class="local-op-warn">Учебный пример — кнопки отключены.</div></div>':'<div class="local-plan-actions"><button class="local-plan-cancel" onclick="cancelLocalOps()">Отмена</button><button class="local-plan-save" onclick="confirmLocalOps()">Применить</button></div></div>';
+  return html;
+}
+function showLocalOps(plan){pendingLocalOps=plan;aiAddMsg('ai',localOpsHTML(plan));}
+function cancelLocalOps(){pendingLocalOps=null;document.querySelector('.local-ops')?.closest('.ai-msg')?.remove();aiAddMsg('ai','Изменения отменены.');}
+function confirmLocalOps(){
+  if(!pendingLocalOps||!Array.isArray(pendingLocalOps.ops))return;
+  let tasks=getTasks(),data=load();
+  pendingLocalOps.ops.forEach(op=>{
+    if(op.kind==='task_update'){const t=tasks.find(x=>x.id===op.id);if(t)Object.assign(t,op.patch);}
+    else if(op.kind==='task_delete')tasks=tasks.filter(x=>x.id!==op.id);
+    else if(op.kind==='tasks_bulk_today')tasks.forEach(t=>{if(op.ids.includes(t.id))t.date=todayKey();});
+    else if(op.kind==='expense_update'){const x=(data.finance||[]).find(a=>a.id===op.id);if(x){Object.assign(x,op.patch);if(op.patch.category&&!getExpCats().some(c=>c.name===op.patch.category)){const cats=getExpCats();cats.splice(cats.length-1,0,{name:op.patch.category,i:'📦',c:CAT_COLORS[cats.length%CAT_COLORS.length]});data.expcats=cats;}}}
+    else if(op.kind==='expense_delete')data.finance=(data.finance||[]).filter(x=>x.id!==op.id);
+  });
+  data.tasks=tasks;save(data);syncPushData();scheduleAllTimeouts();updateAppBadge();
+  const n=pendingLocalOps.ops.length;pendingLocalOps=null;confetti();vibrate([30,40,30]);
+  aiAddMsg('ai',`✅ Изменения применены: <b>${n}</b>`);refreshCurrentTab();
+}
+
 function tryLocalCommand(text){
   const parts=text.split(/[\n,;]|(?:\s+(?:после|потом|затем|также|так[- ]?же|ещё|еще|а)\s+)/i).map(s=>s.trim()).filter(s=>s.length>2);
   let results=[];let anyDone=false;
@@ -3739,8 +4006,8 @@ async function aiSend(){
   window._lastUserText=text;
   inp.value='';aiAddMsg('user',esc(text));
 
-  if(pendingLocalPlan){
-    aiAddMsg('ai','Сначала сохрани или отмени предыдущий разбор.');
+  if(pendingLocalPlan||pendingLocalOps){
+    aiAddMsg('ai','Сначала примени или отмени предыдущий разбор.');
     return;
   }
 
@@ -3769,6 +4036,13 @@ async function aiSend(){
   if(isWeatherQuery(text)){
     const w=weatherSummaryText();
     if(w){aiAddMsg('ai','🌤️ '+w.replace(/\n/g,'<br>'));return;}
+  }
+
+  const management=parseLocalManagement(text);
+  if(management){
+    if(management.error)aiAddMsg('ai','🤔 '+esc(management.error));
+    else showLocalOps(management);
+    return;
   }
 
   const localPlan=parseLocalPlan(text);
@@ -4248,6 +4522,36 @@ function renderToday(){
   view.innerHTML=html;
   attachSwipes();
 }
+function globalOpen(type,id){
+  document.getElementById('search').value='';
+  if(type==='task'){switchTab('all');setTimeout(()=>editTask(id),80);}
+  else if(type==='expense'){switchTab('finance');setTimeout(()=>editExpense(id),80);}
+  else if(type==='income'){switchTab('finance');setTimeout(()=>editIncome(id),80);}
+  else if(type==='shopping'){openShopping();}
+  else if(type==='note'){switchTab('notes');}
+}
+function openGlobalSearch(){
+  switchTab('all');
+  setTimeout(()=>{
+    const input=document.getElementById('search');
+    if(!input)return;
+    input.focus();
+    input.scrollIntoView({behavior:'smooth',block:'center'});
+  },80);
+}
+function renderGlobalSearch(q){
+  const view=document.getElementById('view'),data=load(),groups=[];
+  const has=(...parts)=>parts.join(' ').toLowerCase().includes(q);
+  const tasks=(data.tasks||[]).filter(x=>has(x.title,x.desc,(x.subs||[]).map(s=>s.t).join(' '))).map(x=>({type:'task',id:x.id,icon:'✓',title:x.title,meta:`Дело · ${fmtDate(x.date)}${x.time?' · '+x.time:''}`}));
+  const expenses=(data.finance||[]).filter(x=>has(x.desc,x.category,x.amount)).map(x=>({type:'expense',id:x.id,icon:'₽',title:`${fmtMoney(x.amount)} ₽ · ${x.category}`,meta:`Расход · ${fmtDate(x.date)}`}));
+  const incomes=(data.income||[]).filter(x=>has(x.desc,x.source,x.amount)).map(x=>({type:'income',id:x.id,icon:'＋',title:`${fmtMoney(x.amount)} ₽ · ${x.source}`,meta:`Доход · ${fmtDate(x.date)}`}));
+  const shopping=(data.shopping||[]).filter(x=>has(x.t)).map(x=>({type:'shopping',id:x.id,icon:'🛒',title:x.t,meta:x.done?'Куплено':'В списке покупок'}));
+  const notes=(data.notes||[]).filter(x=>has(x.title,x.text)).map(x=>({type:'note',id:x.id,icon:'📝',title:x.title||'Заметка',meta:(x.text||'').slice(0,70)}));
+  if(tasks.length)groups.push(['Дела',tasks]);if(expenses.length||incomes.length)groups.push(['Финансы',[...expenses,...incomes]]);if(shopping.length)groups.push(['Покупки',shopping]);if(notes.length)groups.push(['Заметки',notes]);
+  renderStats();
+  if(!groups.length){view.innerHTML='<div class="empty"><div>🔎</div>Ничего не найдено во всём приложении</div>';return;}
+  view.innerHTML='<div class="global-results">'+groups.map(([name,items])=>`<div class="global-group">${name} · ${items.length}</div>${items.slice(0,20).map(x=>`<div class="global-result" onclick="globalOpen(${jsArg(x.type)},${Number(x.id)||0})"><div class="gr-icon">${x.icon}</div><div><b>${esc(x.title)}</b><small>${esc(x.meta)}</small></div><span>›</span></div>`).join('')}`).join('')+'</div>';
+}
 function handleTodayProgress(){
   const hasTodayTasks=getTasks().some(t=>t.date===todayKey()&&!t.done);
   if(!hasTodayTasks){
@@ -4489,7 +4793,7 @@ function scheduleOnboarding(delay){
 }
 
 let tourStep=-1,tourDemoDone=false,tourTypingTimer=null,tourOwnPlan=false;
-const TOUR_TOTAL=15,TOUR_AI_STEP=13;
+const TOUR_TOTAL=18,TOUR_AI_STEP=15,TOUR_MANAGE_STEP=16;
 function clearTourFocus(){document.querySelectorAll('.tour-focus').forEach(x=>x.classList.remove('tour-focus'));}
 function closeTourModals(){
   document.querySelectorAll('.modal.on').forEach(x=>x.classList.remove('on'));
@@ -4547,10 +4851,24 @@ function showTourStep(){
     renderTourCoach({title:'Список покупок',text:'Добавляй продукты одной строкой и отмечай купленное прямо в магазине. В семейном режиме список становится общим.',example:'Помощник тоже умеет добавлять покупки голосом.',top:true});return;
   }
   if(tourStep===6){
+    switchTab('all');
+    setTimeout(()=>{
+      const input=document.getElementById('search');input.value='продукты';
+      document.getElementById('view').innerHTML=`<div class="global-results tour-search-demo">
+        <div class="global-group">Результаты из всех разделов</div>
+        <div class="global-result"><div class="gr-icon">✓</div><div><b>Купить продукты</b><small>Дело · завтра</small></div><span>›</span></div>
+        <div class="global-result"><div class="gr-icon">₽</div><div><b>2 450 ₽ · Продукты</b><small>Расход · сегодня</small></div><span>›</span></div>
+        <div class="global-result"><div class="gr-icon">🛒</div><div><b>Продукты на завтрак</b><small>В списке покупок</small></div><span>›</span></div>
+      </div>`;
+      focusTourElement('.tour-search-demo');
+    },80);
+    renderTourCoach({title:'Общий поиск',text:'Лупа в шапке открывает один поиск по делам, расходам и доходам, покупкам и заметкам. Результаты сразу разделяются по типам.',example:'Нажатие на результат открывает нужную запись. Сейчас показан безопасный пример.'});return;
+  }
+  if(tourStep===7){
     switchTab('finance');setTimeout(()=>focusTourElement('.fin-hero'),100);
     renderTourCoach({title:'Обзор финансов',text:'Верхняя карточка показывает доходы, расходы, баланс и диаграмму выбранного месяца. Стрелки переключают месяцы.',example:'Ниже находятся аналитика по дням и история операций.'});return;
   }
-  if(tourStep===7){
+  if(tourStep===8){
     switchTab('finance');
     setTimeout(()=>{
       openExpModal();document.getElementById('e-amount').value='850';document.getElementById('e-desc').value='Продукты на неделю';
@@ -4558,23 +4876,27 @@ function showTourStep(){
     },80);
     renderTourCoach({title:'Как записать расход или доход',text:'На экране финансов кнопка «+» открывает эту форму. Выбери тип операции, сумму, категорию, дату и комментарий.',example:'Пример 850 ₽ показан только для обучения и не сохранится.',top:true});return;
   }
-  if(tourStep===8){
+  if(tourStep===9){
+    switchTab('finance');setTimeout(()=>openReceiptScanner(),80);
+    renderTourCoach({title:'Умный просмотр чека',text:'Сфотографируй чек или выбери снимок. Lumo локально распознает магазин, итог, дату и позиции, а затем предложит проверить результат.',example:'Сканер доступен в «Финансах» и кнопкой чека рядом с микрофоном в ИИ. Фото и текст не отправляются на сервер.',top:true});return;
+  }
+  if(tourStep===10){
     switchTab('finance');setTimeout(()=>focusTourElement('.goal-card, .budget-card, button[onclick=\"openGoal()\"]'),120);
     renderTourCoach({title:'Планирование денег',text:'Бюджеты ограничивают расходы по категориям, цели-копилки показывают накопления, регулярные платежи создают операции по расписанию.',example:'Здесь же можно учитывать долги и сроки возврата.'});return;
   }
-  if(tourStep===9){
+  if(tourStep===11){
     switchTab('more');setTimeout(()=>openFamily(),80);
     renderTourCoach({title:'Семейный режим',text:'Создай семью или войди по коду. Участникам доступны общие покупки, поручения, совместные расходы и рейтинг выполнения.',example:'Без семейного кода личные данные продолжают храниться отдельно.',top:true});return;
   }
-  if(tourStep===10){
+  if(tourStep===12){
     switchTab('more');setTimeout(()=>focusTourElement('#view .assign-btn'),100);
     renderTourCoach({title:'Остальные разделы',text:'В «Ещё» находятся заметки, матрица приоритетов, покупки, семья, награды и разделы, которые не помещаются снизу.',example:'Состав этого экрана зависит от выбранного нижнего меню.'});return;
   }
-  if(tourStep===11){
+  if(tourStep===13){
     switchTab('more');setTimeout(()=>openMenuEditor(),80);
     renderTourCoach({title:'Настрой нижнее меню',text:'Можно выбрать пять самых нужных разделов и поменять их порядок. Всё остальное автоматически останется в «Ещё».',example:'Кнопка «Ещё» всегда остаётся последней.',top:true});return;
   }
-  if(tourStep===12){
+  if(tourStep===14){
     switchTab('more');setTimeout(()=>openSettings(),80);
     renderTourCoach({title:'Настройки и сохранность данных',text:'Здесь меняются тема, цвет, тихие часы и уведомления. В разделе «Данные» скачивается и восстанавливается резервная JSON-копия.',example:'Регулярно делай копию: удаление PWA может удалить локальные данные.',top:true});return;
   }
@@ -4588,6 +4910,16 @@ function showTourStep(){
       renderTourCoach({title:'Локальный помощник',text:'Lumo печатает длинный запрос без запятых. Нажми кнопку ниже — помощник разделит его на отдельные действия, но ничего не сохранит.',example:'Основной разбор работает локально, Groq нужен только как необязательный резерв.',primary:'Разобрать пример',top:true});
     },80);return;
   }
+  if(tourStep===TOUR_MANAGE_STEP){
+    switchTab('ai');
+    setTimeout(()=>{
+      const fake={ops:[{title:'Перенести дело',before:'Встреча с мамой<br>30 июля · 15:00',after:'Встреча с мамой<br>31 июля · 18:00'}]};
+      aiAddMsg('user','Перенеси встречу с мамой на завтра в 18:00');
+      aiAddMsg('ai',`<div class="tour-management-demo">${localOpsHTML(fake,true)}</div>`);
+      focusTourElement('.tour-management-demo');
+    },80);
+    renderTourCoach({title:'Управление существующими данными',text:'Помощник умеет переносить, выполнять и удалять дела, менять расходы и добавлять подзадачи. Перед изменением он всегда показывает «Было → Станет».',example:'Это безопасный пример: реальная встреча не создаётся и не изменяется.'});return;
+  }
   switchTab('today');setTimeout(()=>focusTourElement('.today-card'),100);
   renderTourCoach({title:'Готово — теперь можно начинать',text:'Ты увидел все основные возможности Lumo на настоящих экранах. Обучение всегда можно повторить кнопкой «?».',primary:'Завершить'});
 }
@@ -4598,6 +4930,10 @@ function tourNext(){
     pendingLocalPlan=null;tourOwnPlan=false;
     document.querySelector('.local-plan')?.closest('.ai-msg')?.remove();
   }
+  if(tourStep===6){
+    const input=document.getElementById('search');if(input)input.value='';
+  }
+  if(tourStep===TOUR_MANAGE_STEP)document.querySelector('.tour-management-demo')?.closest('.ai-msg')?.remove();
   tourStep++;showTourStep();vibrate(10);
 }
 function runTourAssistantDemo(){
@@ -4622,6 +4958,7 @@ function runTourAssistantDemo(){
 function finishAppTour(){
   clearInterval(tourTypingTimer);clearTourFocus();closeTourModals();
   if(tourOwnPlan){pendingLocalPlan=null;document.querySelector('.local-plan')?.closest('.ai-msg')?.remove();}
+  document.querySelector('.tour-management-demo')?.closest('.ai-msg')?.remove();
   tourOwnPlan=false;tourStep=-1;
   document.getElementById('tour-layer').style.display='none';
   document.getElementById('tour-layer').innerHTML='';
