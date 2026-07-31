@@ -1,4 +1,4 @@
-const CACHE = 'planner-v42';
+const CACHE = 'planner-v47';
 const PUSH_STATE_CACHE = 'lumo-push-state-v1';
 
 const ASSETS = [

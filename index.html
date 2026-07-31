@@ -1061,6 +1061,47 @@ input,textarea{-webkit-user-select:text;user-select:text}
   font-size:.62rem;padding:2px 7px;
   border-radius:8px;margin-left:6px;
 }
+/* ===== CALM PRODUCTIVITY — нативная оболочка Lumo ===== */
+:root{--bg:#F5F5F3;--card:#FFF;--card2:#F4F4F2;--line:#E8E8E4;--text:#20201F;--muted:#858581;--brand:#6658D9;--brand2:#8175E8;--radius:20px;--shadow:0 1px 2px rgba(28,28,24,.03),0 10px 28px rgba(28,28,24,.055)}
+body.dark{--bg:#111210;--card:#1B1C19;--card2:#242521;--line:#30312C;--text:#F4F4EF;--muted:#96978F;--brand:#8B80F2;--brand2:#A299F7}
+body{letter-spacing:-.01em;padding-bottom:calc(82px + env(safe-area-inset-bottom))}body::before{background:none}
+.hero{background:color-mix(in srgb,var(--bg) 92%,transparent);border-bottom:0;padding:calc(env(safe-area-inset-top) + 12px) 20px 10px;backdrop-filter:blur(18px);-webkit-backdrop-filter:blur(18px)}
+.hero-top{align-items:center}.hero-btns{gap:1px;margin:0}.hero-btns button{width:36px;height:36px;padding:7px;color:var(--muted);border-radius:50%}.hero-btns button svg{width:21px;height:21px}#hero-title{font-size:1.55rem;letter-spacing:-.035em}#hero-date{font-size:.78rem;margin-top:2px}
+.nav{bottom:0;width:100%;max-width:480px;border-radius:0;padding:7px 10px calc(7px + env(safe-area-inset-bottom));background:color-mix(in srgb,var(--card) 94%,transparent);border:0;border-top:1px solid var(--line);box-shadow:0 -8px 28px rgba(25,25,22,.04);backdrop-filter:blur(22px) saturate(150%);-webkit-backdrop-filter:blur(22px) saturate(150%);overflow:visible}
+.nav button{min-height:51px;padding:6px 3px 5px;font-size:.61rem;gap:2px;color:var(--muted)}.nav button i svg{width:23px;height:23px}.nav button.active{color:var(--brand);font-weight:700}.nav button.active i{animation:none;transform:none}
+#nav-pill{display:none}.nav button.active::after{content:'';position:absolute;bottom:2px;width:4px;height:4px;border-radius:50%;background:var(--brand)}
+@media(max-width:520px){.nav{width:100%;border-radius:0}}.fab{width:auto;min-width:54px;height:54px;bottom:82px;padding:0 18px;border-radius:18px;gap:8px;background:var(--text);box-shadow:0 10px 24px rgba(28,28,24,.2)}.fab svg{width:22px;height:22px}.fab span{font-size:.78rem;font-weight:750;white-space:nowrap}body.dark .fab{box-shadow:0 10px 24px rgba(0,0,0,.45)}.ai-input-bar{bottom:82px;border-radius:20px}
+.today-shell{padding:8px 20px 24px}.today-head{display:flex;justify-content:space-between;align-items:flex-end;margin:2px 0 18px}.today-greeting{font-size:1.72rem;font-weight:790;letter-spacing:-.045em;line-height:1.08}.today-date{font-size:.78rem;color:var(--muted);margin-top:6px;text-transform:capitalize}.today-weather-compact{font-size:.75rem;color:var(--muted);background:var(--card);border:1px solid var(--line);padding:7px 10px;border-radius:999px}
+.today-progress-action{padding:18px!important;min-height:122px;border-radius:24px!important;border:1px solid var(--line)!important}.today-progress-action::after{font-size:1.35rem}.ring-wrap,.ring-wrap svg{width:76px;height:76px}.ring-wrap{flex-basis:76px}.ring-side .rs-big{font-size:1.2rem;letter-spacing:-.025em}.ring-side .rs-sub{margin-top:6px}
+.tw-grid{gap:10px;margin:10px 0 4px}.tw-card{border-radius:18px;padding:15px;box-shadow:none}.tw-card .tw-ico{width:36px;height:36px;border-radius:11px;color:var(--brand)}.tw-card .tw-ico svg{width:20px;height:20px;stroke:currentColor}.tw-card .tw-lbl{font-size:.64rem;margin-top:12px}.tw-card .tw-val{font-size:1.25rem}
+.sub-h{font-size:.66rem;letter-spacing:1.35px;margin:24px 2px 11px}.qa-grid{gap:9px}.qa-btn{padding:12px;border-radius:17px;box-shadow:none;font-size:.82rem}.qa-btn .qa-ico{width:36px;height:36px;border-radius:11px!important;background:var(--card2)!important;color:var(--brand)}.qa-btn .qa-ico svg{width:20px;height:20px;stroke:currentColor}
+#view .tw-card,#view .qa-btn{animation:calmIn .35s ease-out backwards}@keyframes calmIn{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}@media(prefers-reduced-motion:reduce){#view .tw-card,#view .qa-btn{animation:none}.nav *,#nav-pill{transition:none!important}}
+
+/* Дела: компактный нативный список, действия по кнопке или свайпу */
+.list{padding:5px 20px 20px}.day-sep{margin:20px 2px 9px;font-size:.65rem;letter-spacing:1.25px}
+.task{gap:12px;padding:15px 13px 15px 15px;margin-bottom:8px;border-radius:18px;box-shadow:none;overflow:visible;align-items:flex-start}
+.task .bar{left:10px;top:18px;bottom:auto;width:4px;height:4px;border-radius:50%}.chk{width:25px;height:25px;border-radius:50%;margin-left:7px;border-width:1.5px}.t-title{font-size:.94rem;line-height:1.3;cursor:pointer;padding-right:2px}.t-meta{margin-top:6px;gap:5px}.t-meta span{padding:2px 0;border:0;background:none!important;font-size:.68rem;color:var(--muted)!important}.t-meta span+span::before{content:'·';margin-right:5px;color:var(--muted)}.t-desc{font-size:.76rem;margin-top:5px}
+.task-more{width:28px;height:28px;display:grid;place-items:center;flex:0 0 28px;border:0;border-radius:9px;background:transparent;color:var(--muted)}.task-more svg{width:18px;height:18px;stroke:currentColor}.task[data-id] .t-acts{display:none;position:absolute;right:10px;top:47px;z-index:4;flex-direction:row;gap:3px;padding:5px;background:var(--card);border:1px solid var(--line);border-radius:13px;box-shadow:var(--shadow-lg)}.task[data-id].actions-open .t-acts{display:flex;animation:calmIn .18s ease-out}.task.actions-open .task-more{background:var(--card2);color:var(--text)}.t-acts button{opacity:1;width:34px;height:34px}
+.filters{padding:10px 20px 5px;gap:5px}.filters button{box-shadow:none;border:0;background:transparent;padding:8px 12px}.filters button.active{background:var(--text);color:var(--bg);box-shadow:none}.search-wrap{padding:7px 20px 3px}#search{box-shadow:none;background:var(--card2);border-color:transparent;border-radius:14px}
+
+/* Единый визуальный язык разделов */
+.finance-page{padding-bottom:25px}.fin-hero{margin:8px 20px 12px;padding:18px;border-radius:24px;background:var(--card);color:var(--text);box-shadow:none;border:1px solid var(--line)}.fin-hero::after{display:none}.fin-monthnav{margin-bottom:18px}.fin-monthnav button{background:var(--card2);color:var(--text)}.fin-balance{gap:0;margin:0 -4px 16px}.fin-bal-item{background:none;border:0;text-align:left;padding:8px}.fin-bal-item small{color:var(--muted);font-size:.64rem}.fin-bal-item b{font-size:.88rem}.money-in{color:var(--ok)}.money-out{color:var(--bad)}.fin-chart{transform:scale(.9);margin:-5px 0}.fin-chart .center b{font-size:1.12rem}.fin-compare{margin:0 20px 12px;padding:12px 14px;border-radius:14px;background:color-mix(in srgb,var(--bad) 8%,var(--card));color:var(--bad);font-size:.79rem;font-weight:750}.fin-compare.good{background:color-mix(in srgb,var(--ok) 9%,var(--card));color:var(--ok)}.fin-compare span{display:block;color:var(--muted);font-size:.67rem;font-weight:500;margin-top:2px}.fin-insight{margin:7px 20px;box-shadow:none}.fin-log-h{margin:22px 20px 8px;font-size:.72rem;text-transform:uppercase;letter-spacing:1px;color:var(--muted)}
+.habit-page{padding:8px 20px 115px}.habit-summary{border-radius:24px;background:var(--card);color:var(--text);box-shadow:none;border:1px solid var(--line)}.habit-summary::after{background:color-mix(in srgb,var(--brand) 9%,transparent)}.habit-card{border-radius:20px;box-shadow:none}.habit-emoji{background:color-mix(in srgb,var(--brand) 9%,var(--card2))}.habit-day .habit-dot{border-radius:10px}.habit-today{border-radius:50%}.habit-card.done{border-color:color-mix(in srgb,var(--ok) 30%,var(--line))}.habit-stats-btn{background:var(--card2);border:0;border-radius:10px;padding:7px 9px;color:var(--muted)}
+.notes-page{padding:8px 20px 115px}.notes-tools{grid-template-columns:1fr}.notes-tools button{display:none}.notes-tools input{background:var(--card2);border:0}.notes-grid{gap:10px}.note-modern{border-radius:18px;box-shadow:none;border:1px solid var(--line);border-top:3px solid var(--note-color)}.note-modern::before{display:none}.note-actions{opacity:.65}
+#modal-note .sheet{height:min(82dvh,720px);max-height:92dvh;border-radius:26px 26px 0 0}#modal-note textarea{min-height:240px!important;background:transparent;border:0;padding-left:0;font-size:1rem;line-height:1.55}#modal-note #note-title{background:transparent;border:0;padding-left:0;font-size:1.2rem;font-weight:800}
+#modal .sheet{max-height:94dvh}.sheet{border-radius:26px 26px 0 0;box-shadow:0 -12px 38px rgba(15,15,12,.14)}.sheet h3{letter-spacing:-.025em}.field input,.field textarea,.field select{background:var(--card2);border-color:transparent}.btn{background:var(--text);color:var(--bg);box-shadow:none}.btn.ghost{background:var(--card2);color:var(--text)}
+.quick-create-sheet{padding-top:10px}.sheet-handle{width:38px;height:5px;border-radius:3px;background:var(--line);margin:0 auto 18px}.quick-create-grid{display:grid;grid-template-columns:1fr 1fr;gap:9px;margin:14px 0}.quick-create-grid button{display:flex;align-items:center;gap:10px;text-align:left;border:1px solid var(--line);background:var(--card);color:var(--text);border-radius:16px;padding:13px}.quick-create-grid button>svg{width:22px;height:22px;stroke:var(--brand);stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round;flex:0 0 auto}.quick-create-grid span{display:flex;flex-direction:column}.quick-create-grid b{font-size:.8rem}.quick-create-grid small{font-size:.62rem;color:var(--muted);margin-top:2px}
+#ai-view{padding-bottom:92px}#ai-chat{padding:10px 20px}.ai-msg .bubble{box-shadow:none!important}.ai-msg.ai .bubble{border-radius:18px;border-color:var(--line)}.ai-msg.user .bubble{background:var(--text);color:var(--bg);box-shadow:none}.assistant-welcome{display:flex;gap:12px}.assistant-mark{width:38px;height:38px;display:grid;place-items:center;flex:0 0 38px;border-radius:12px;background:var(--card2);color:var(--brand)}.assistant-mark svg{width:21px;height:21px;stroke:currentColor}.assistant-welcome b{font-size:1rem}.assistant-welcome p{margin:6px 0;line-height:1.45}.assistant-welcome small{color:var(--muted)}.ai-suggest{padding-left:20px;padding-right:20px}.ai-suggest button{box-shadow:none;border:1px solid var(--line)}.ai-input-bar{box-shadow:0 8px 28px rgba(22,22,18,.12);background:var(--card);border-color:var(--line)}
+.empty-state{text-align:center;padding:52px 24px;color:var(--muted)}.empty-state .empty-icon{width:52px;height:52px;margin:0 auto 14px;border-radius:16px;display:grid;place-items:center;background:var(--card2);color:var(--brand)}.empty-state .empty-icon svg{width:25px;height:25px;stroke:currentColor}.empty-state b{display:block;color:var(--text);font-size:1rem}.empty-state span{display:block;font-size:.78rem;margin:6px auto 15px;max-width:250px;line-height:1.4}.empty-state button{border:0;border-radius:13px;padding:10px 15px;background:var(--text);color:var(--bg);font-weight:750}
+@media(max-width:370px){.quick-create-grid{grid-template-columns:1fr}.today-head{align-items:flex-start;gap:8px}.today-weather-compact{font-size:.68rem}.fin-bal-item b{font-size:.76rem}.fab span{display:none}.fab{width:54px;min-width:54px;padding:0}}
+
+/* Настройки, статистика и экран «Ещё» */
+.hero-stats{padding:0;gap:8px}.hero-stats .hstat{appearance:none;color:var(--text);font-family:inherit;border:1px solid var(--line);cursor:pointer;min-height:76px}.hero-stats .hstat:active{background:var(--card2)}
+.settings-sheet{padding-top:10px}.settings-sheet>h3{margin-bottom:14px}.settings-group{border:1px solid var(--line);border-radius:17px;background:var(--card);margin-bottom:9px;overflow:hidden}.settings-group summary{list-style:none;display:flex;align-items:center;gap:11px;padding:14px;cursor:pointer}.settings-group summary::-webkit-details-marker{display:none}.settings-group summary::after{content:'›';margin-left:auto;color:var(--muted);font-size:1.25rem;transition:transform .2s}.settings-group[open] summary::after{transform:rotate(90deg)}.settings-group summary>span:nth-child(2){display:flex;flex-direction:column;min-width:0}.settings-group summary b{font-size:.88rem}.settings-group summary small{font-size:.66rem;color:var(--muted);margin-top:2px}.settings-icon{width:34px;height:34px;border-radius:11px;background:var(--card2);color:var(--brand);display:grid;place-items:center;font-weight:850}.settings-content{border-top:1px solid var(--line);padding:14px}.settings-content .ai-hint{padding:0 0 10px;text-align:left}.settings-label{display:block;font-size:.68rem;color:var(--muted);font-weight:750;text-transform:uppercase;letter-spacing:.7px;margin:4px 0 9px}.settings-inline{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:12px}.settings-inline button{border:0;border-radius:13px;background:var(--card2);color:var(--text);padding:11px 8px;font-weight:700}.settings-content .btn{margin-top:7px}.btn.danger-soft{background:color-mix(in srgb,var(--bad) 10%,var(--card));color:var(--bad)}
+.finance-tools{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin:0 20px 12px}.finance-tools button{border:1px solid var(--line);background:var(--card);color:var(--text);border-radius:15px;padding:11px 5px;display:flex;flex-direction:column;align-items:center;gap:6px;font-size:.66rem;font-weight:700}.finance-tools svg{width:21px;height:21px;stroke:var(--brand);stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}.finance-tools button:active{background:var(--card2);transform:scale(.97)}
+.more-page{padding:8px 20px 115px}.more-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:9px}.more-tile{border:1px solid var(--line);border-radius:17px;background:var(--card);color:var(--text);min-height:92px;padding:13px 6px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px}.more-tile span{width:34px;height:34px;display:grid;place-items:center;color:var(--brand)}.more-tile svg{width:25px;height:25px;stroke:currentColor}.more-tile b{font-size:.72rem}.more-manage{border:1px solid var(--line);border-radius:18px;overflow:hidden;background:var(--card)}.more-manage button{width:100%;border:0;border-bottom:1px solid var(--line);background:transparent;color:var(--text);padding:14px;display:flex;align-items:center;gap:12px;text-align:left}.more-manage button:last-child{border-bottom:0}.more-manage button>svg{width:23px;height:23px;stroke:var(--brand)}.more-manage button span{display:flex;flex-direction:column}.more-manage b{font-size:.84rem}.more-manage small{font-size:.64rem;color:var(--muted);margin-top:2px}.more-manage i{margin-left:auto;color:var(--muted);font-size:1.25rem;font-style:normal}
+@media(max-width:360px){.more-grid{grid-template-columns:repeat(2,1fr)}.finance-tools{grid-template-columns:repeat(2,1fr)}}
+.receipt-source-grid{display:grid;grid-template-columns:1fr 1fr;gap:9px;margin-top:10px}.receipt-source-grid button{border:1px solid var(--line);border-radius:15px;background:var(--card);color:var(--text);padding:12px 9px;display:flex;align-items:center;gap:9px;text-align:left}.receipt-source-grid svg{width:23px;height:23px;flex:0 0 23px;stroke:var(--brand);stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}.receipt-source-grid span{display:flex;flex-direction:column}.receipt-source-grid b{font-size:.73rem}.receipt-source-grid small{font-size:.6rem;color:var(--muted);margin-top:2px}@media(max-width:350px){.receipt-source-grid{grid-template-columns:1fr}}
 </style>
 </head>
 <body>
@@ -1123,9 +1164,23 @@ input,textarea{-webkit-user-select:text;user-select:text}
   <button class="send-btn" onclick="aiSend()">➤</button>
 </div>
 
-<button class="fab" id="fab" onclick="fabRipple(event);fabAction()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg></button>
+<button class="fab" id="fab" onclick="fabRipple(event);fabAction()" oncontextmenu="event.preventDefault();openQuickCreate()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg><span id="fab-label">Новое дело</span></button>
 
 <div class="nav" id="nav"></div>
+<div class="modal" id="modal-quick-create">
+  <div class="sheet quick-create-sheet">
+    <div class="sheet-handle"></div><h3>Быстро добавить</h3>
+    <div class="quick-create-grid">
+      <button onclick="quickCreate('task')"><svg viewBox="0 0 24 24" fill="none"><path d="M12 5v14M5 12h14"/></svg><span><b>Дело</b><small>Запланировать задачу</small></span></button>
+      <button onclick="quickCreate('expense')"><svg viewBox="0 0 24 24" fill="none"><rect x="3" y="6" width="18" height="13" rx="3"/><path d="M3 10h18M16 15h2"/></svg><span><b>Расход</b><small>Записать операцию</small></span></button>
+      <button onclick="quickCreate('note')"><svg viewBox="0 0 24 24" fill="none"><path d="M6 3h9l4 4v14H6zM9 12h6M9 16h6"/></svg><span><b>Заметка</b><small>Сохранить мысль</small></span></button>
+      <button onclick="quickCreate('habit')"><svg viewBox="0 0 24 24" fill="none"><path d="M5 12l4 4L19 6"/></svg><span><b>Привычка</b><small>Начать новый ритм</small></span></button>
+      <button onclick="quickCreate('receipt')"><svg viewBox="0 0 24 24" fill="none"><path d="M7 3h10a2 2 0 012 2v16l-3-2-4 2-4-2-3 2V5a2 2 0 012-2zM8 9h8M8 13h6"/></svg><span><b>Чек</b><small>Сканировать покупку</small></span></button>
+      <button onclick="quickCreate('voice')"><svg viewBox="0 0 24 24" fill="none"><rect x="9" y="3" width="6" height="12" rx="3"/><path d="M5 11a7 7 0 0014 0M12 18v3"/></svg><span><b>Продиктовать</b><small>Разобрать одной фразой</small></span></button>
+    </div>
+    <button class="btn ghost" onclick="closeQuickCreate()">Отмена</button>
+  </div>
+</div>
 <div class="modal" id="modal-note">
   <div class="sheet">
     <h3>📝 Новая заметка</h3>
@@ -1228,8 +1283,12 @@ input,textarea{-webkit-user-select:text;user-select:text}
     <div class="local-edit-note">Распознавание выполняется на устройстве. При первом запуске потребуется интернет для загрузки OCR и русского словаря.</div>
     <div class="receipt-drop">
       <img id="receipt-preview" alt="Фото чека">
-      <input id="receipt-file" type="file" accept="image/*" capture="environment" onchange="receiptFilePicked(event)" style="display:none">
-      <button class="btn ghost" onclick="document.getElementById('receipt-file').click()">Сфотографировать или выбрать чек</button>
+      <input id="receipt-camera" type="file" accept="image/*" capture="environment" onchange="receiptFilePicked(event)" style="display:none">
+      <input id="receipt-file" type="file" accept="image/*" onchange="receiptFilePicked(event)" style="display:none">
+      <div class="receipt-source-grid">
+        <button type="button" onclick="document.getElementById('receipt-camera').click()"><svg viewBox="0 0 24 24" fill="none"><path d="M4 8h4l2-3h4l2 3h4v11H4z"/><circle cx="12" cy="13" r="4"/></svg><span><b>Сфотографировать</b><small>Открыть камеру</small></span></button>
+        <button type="button" onclick="document.getElementById('receipt-file').click()"><svg viewBox="0 0 24 24" fill="none"><rect x="3" y="4" width="18" height="16" rx="3"/><path d="M3 16l5-5 4 4 3-3 6 6"/><circle cx="16.5" cy="8.5" r="1.5"/></svg><span><b>Выбрать из Фото</b><small>Галерея iPhone</small></span></button>
+      </div>
     </div>
     <div class="receipt-progress"><i id="receipt-progress-bar"></i></div>
     <div class="receipt-status" id="receipt-status">Выбери чёткое фото чека</div>
@@ -1316,52 +1375,31 @@ input,textarea{-webkit-user-select:text;user-select:text}
 </div>
 
 <div class="modal" id="modal-settings">
-  <div class="sheet">
-    <h3>🎨 Настройки</h3>
-    <div class="sub-h">Акцентный цвет</div>
-    <div class="color-pick" id="color-pick"></div>
-    <div class="sub-h">Тема</div>
-    <div class="seg">
-      <button type="button" class="pri-b" id="th-auto" onclick="setThemeMode('auto')">🌗 Авто</button>
-      <button type="button" class="pri-b" id="th-light" onclick="setThemeMode('light')">☀️ Светлая</button>
-      <button type="button" class="pri-b" id="th-dark" onclick="setThemeMode('dark')">🌙 Тёмная</button>
-    </div>
-    <div class="sub-h">🔔 Время напоминания</div>
-    <div class="field"><input id="notify-hour" type="time" value="09:00" onchange="saveNotifyHour()"></div>
-    <div class="sub-h">🌙 Тихие часы (без пушей)</div>
-    <div class="two-col">
-      <div class="field"><label>С</label><input id="quiet-from" type="time" value="22:00" onchange="saveQuietHours()"></div>
-      <div class="field"><label>До</label><input id="quiet-to" type="time" value="08:00" onchange="saveQuietHours()"></div>
-    </div>
-    <div class="chk-toggle" onclick="toggleQuietEnabled()">
-      <div class="box" id="quiet-box"></div>
-      <div class="lbl">Включить тихие часы</div>
-    </div>
-    <div class="sub-h">Локальный помощник</div>
-    <div class="ai-hint" style="padding:0 0 10px;text-align:left">Работает без ключа и интернета. Groq используется только как необязательный резерв для свободного общения и нераспознанных фраз.</div>
-    <button class="btn ghost" onclick="setupApiKey()">🔑 Настроить резервный Groq</button>
-    <button class="btn ghost" onclick="resetApiKey()">🗑 Отключить Groq</button>
-    <div class="sub-h">Память помощника</div>
-    <div class="ai-hint" id="local-memory-info" style="padding:0 0 8px;text-align:left"></div>
-    <button class="btn ghost" onclick="clearLocalAssistantMemory()">Очистить изученные правила</button>
-
-    <div class="sub-h">🌱 Напоминание о привычках</div>
-    <div class="chk-toggle" onclick="toggleHabitReminder()"><div class="box" id="habit-reminder-box"></div><div class="lbl">Напоминать, если не всё выполнено</div></div>
-    <div class="field"><label>Время</label><input id="habit-reminder-time" type="time" value="09:00" onchange="saveHabitReminderTime()"></div>
-    <div class="ai-hint" style="padding:0 0 8px;text-align:left">Эта настройка не зависит от напоминаний о делах.</div>
-
-    <div class="sub-h">📲 Пуши и напоминания</div>
-    <div class="local-edit-note" id="push-health">Проверяю состояние…</div>
-    <button class="btn ghost" onclick="subscribePush()">📲 Включить фоновые пуши</button>
-    <button class="btn ghost" onclick="requestNotify()">🔔 Разрешить напоминания</button>
-    <button class="btn ghost" onclick="checkPushHealth(true)">🩺 Проверить уведомления</button>
-    <button class="btn ghost" onclick="testPush()">🧪 Отправить один тесовый push</button>
-    <button class="btn ghost" onclick="clearAIChatHistory()">🗑 Очистить историю чата с ИИ</button>
-    <div class="sub-h">Данные</div>
-    <button class="btn" onclick="exportData()">📥 Скачать резервную копию</button>
-    <button class="btn ghost" onclick="document.getElementById('import-file').click()">📤 Загрузить копию</button>
+  <div class="sheet settings-sheet">
+    <div class="sheet-handle"></div><h3>Настройки</h3>
+    <details class="settings-group" open><summary><span class="settings-icon">◐</span><span><b>Оформление</b><small>Тема, цвет и нижнее меню</small></span></summary><div class="settings-content">
+      <label class="settings-label">Акцентный цвет</label><div class="color-pick" id="color-pick"></div>
+      <label class="settings-label">Тема</label><div class="seg"><button type="button" class="pri-b" id="th-auto" onclick="setThemeMode('auto')">Авто</button><button type="button" class="pri-b" id="th-light" onclick="setThemeMode('light')">Светлая</button><button type="button" class="pri-b" id="th-dark" onclick="setThemeMode('dark')">Тёмная</button></div>
+      <div class="settings-inline"><button onclick="openMenuEditor();closeSettings()">Настроить меню</button><button onclick="openCatModal();closeSettings()">Категории</button></div>
+    </div></details>
+    <details class="settings-group"><summary><span class="settings-icon">◷</span><span><b>Напоминания</b><small>Дела, привычки и тихие часы</small></span></summary><div class="settings-content">
+      <div class="field"><label>Напоминание о делах</label><input id="notify-hour" type="time" value="09:00" onchange="saveNotifyHour()"></div>
+      <div class="two-col"><div class="field"><label>Тихо с</label><input id="quiet-from" type="time" value="22:00" onchange="saveQuietHours()"></div><div class="field"><label>До</label><input id="quiet-to" type="time" value="08:00" onchange="saveQuietHours()"></div></div>
+      <div class="chk-toggle" onclick="toggleQuietEnabled()"><div class="box" id="quiet-box"></div><div class="lbl">Включить тихие часы</div></div>
+      <div class="chk-toggle" onclick="toggleHabitReminder()"><div class="box" id="habit-reminder-box"></div><div class="lbl">Напоминать о невыполненных привычках</div></div>
+      <div class="field"><label>Время привычек</label><input id="habit-reminder-time" type="time" value="09:00" onchange="saveHabitReminderTime()"></div>
+    </div></details>
+    <details class="settings-group"><summary><span class="settings-icon">◇</span><span><b>Помощник</b><small>Память и необязательный Groq</small></span></summary><div class="settings-content">
+      <div class="ai-hint">Основные команды работают локально. Groq используется только как резерв.</div>
+      <div class="ai-hint" id="local-memory-info"></div><button class="btn ghost" onclick="clearLocalAssistantMemory()">Очистить изученные правила</button>
+      <button class="btn ghost" onclick="setupApiKey()">Настроить резервный Groq</button><button class="btn danger-soft" onclick="resetApiKey()">Отключить Groq</button><button class="btn ghost" onclick="clearAIChatHistory()">Очистить историю помощника</button>
+    </div></details>
+    <details class="settings-group"><summary><span class="settings-icon">↗</span><span><b>Уведомления PWA</b><small>Разрешения и диагностика</small></span></summary><div class="settings-content">
+      <div class="local-edit-note" id="push-health">Проверяю состояние…</div><button class="btn ghost" onclick="subscribePush()">Включить фоновые push</button><button class="btn ghost" onclick="requestNotify()">Разрешить уведомления</button><button class="btn ghost" onclick="checkPushHealth(true)">Проверить состояние</button><button class="btn ghost" onclick="testPush()">Отправить тестовый push</button>
+    </div></details>
+    <details class="settings-group"><summary><span class="settings-icon">□</span><span><b>Данные</b><small>Резервная копия и восстановление</small></span></summary><div class="settings-content"><button class="btn" onclick="exportData()">Скачать резервную копию</button><button class="btn ghost" onclick="document.getElementById('import-file').click()">Загрузить копию</button></div></details>
     <input type="file" id="import-file" accept="application/json" style="display:none" onchange="importData(event)">
-    <button class="btn ghost" onclick="closeSettings()" style="margin-top:16px">Закрыть</button>
+    <button class="btn ghost" onclick="closeSettings()" style="margin-top:12px">Готово</button>
   </div>
 </div>
 
@@ -1508,6 +1546,7 @@ function parseData(raw){
     return d&&typeof d==='object'&&!Array.isArray(d)?d:null;
   }catch(e){return null;}
 }
+
 function load(){
   const current=parseData(localStorage.getItem(KEY));
   if(current)return current;
@@ -1835,7 +1874,7 @@ function switchTab(tab){
   document.getElementById('ai-view').style.display=isAI?'block':'none';
   document.getElementById('ai-bar').style.display=isAI?'flex':'none';
   document.getElementById('view').style.display=isAI?'none':'block';
-  document.getElementById('fab').style.display=(isAI||isMore||isNotes||isHabits)?'none':'flex';
+  document.getElementById('fab').style.display=(isAI||isMore)?'none':'flex';
   document.getElementById('filters').style.display=(hideList||isCal||isHabits||isMore||isToday||isMatrix||isNotes)?'none':'flex';
   document.getElementById('search-wrap').style.display=(hideList||isCal||isHabits||isMore||isToday||isMatrix||isNotes)?'none':'block';
   document.querySelector('.hero-stats').style.display=(hideList||isCal||isHabits||isMore||isToday||isMatrix||isNotes)?'none':'flex';
@@ -1874,6 +1913,7 @@ document.getElementById('weatherChip').style.display=(hideList||isToday)?'none':
   else if(tab==='notes')renderNotes();
   else if(tab==='matrix')renderMatrix();
   else render();
+  updateFabLabel();
   renderNav();
 }
 function refreshCurrentTab(){
@@ -1886,6 +1926,11 @@ function renderFilters(){
   f.innerHTML=opts.map(([k,l])=>`<button class="${filterState===k?'active':''}" onclick="setFilter('${k}')">${l}</button>`).join('');
 }
 function setFilter(k){filterState=k;renderFilters();render();}
+function openTaskStat(kind){
+  switchTab('all');
+  filterState=kind==='today'?'today':kind==='done'?'done':'active';
+  renderFilters();render();
+}
 
 function isOverdue(t){
   if(t.done||!t.date)return false;
@@ -1905,19 +1950,26 @@ function taskCardHTML(t, isFam){
     <div class="bar" style="background:${over?'var(--bad)':(priColor[t.pri]||priColor.Y)}"></div>
     <div class="chk ${t.done?'on':''}" onclick="toggleTask(${t.id})">${t.done?'✓':''}</div>
     <div class="t-body">
-      <div class="t-title">${esc(t.title)}</div>
+      <div class="t-title" onclick="editTask(${t.id})" role="button" tabindex="0">${esc(t.title)}</div>
       <div class="t-meta"><span>${modLabel[t.module]||'📋 Личное'}</span>${fromBadge}${t.date?`<span class="${over?'overdue-badge':''}">📅 ${fmtDate(t.date)}</span>`:''}${t.time?`<span class="time-badge">🕐 ${esc(t.time)}</span>`:''}${t.repeat?`<span class="rep-badge">🔁 ${t.repeat==='daily'?'день':t.repeat==='weekly'?'нед':'мес'}</span>`:''}${subs.length?`<span class="subprog">✅ ${sdone}/${subs.length}</span>`:''}</div>
       ${t.desc?`<div class="t-desc">${esc(t.desc)}</div>`:''}
 	  ${(t.photos&&t.photos.length)?`<div class="task-photos">${t.photos.map((p,i)=>`<img class="task-photo" src="${p}" onclick="openTaskPhoto(${t.id},${i})">`).join('')}</div>`:''}
       ${subs.length?`<div class="subtasks">${subs.map((s,i)=>`<div class="subtask ${s.done?'done':''}"><div class="sc ${s.done?'on':''}" onclick="toggleSubtask(${t.id},${i})">${s.done?'✓':''}</div><span>${esc(s.t)}</span></div>`).join('')}</div>`:''}
     </div>
-    <div class="t-acts">
+    <button class="task-more" onclick="event.stopPropagation();toggleTaskActions(this)" aria-label="Действия">${ICONS.more}</button>
+    <div class="t-acts" onclick="event.stopPropagation()">
       ${isFam?`<button onclick="openAssign(${t.id})" title="Поручить" aria-label="Поручить">${ICONS.send}</button>`:''}
       <button onclick="openPostpone(${t.id})" title="Отложить" aria-label="Отложить">${ICONS.postpone}</button>
       <button onclick="editTask(${t.id})" title="Изменить" aria-label="Изменить">${ICONS.edit}</button>
       <button onclick="delTask(${t.id})" title="Удалить" aria-label="Удалить">${ICONS.trash}</button>
     </div>
   </div>`;
+}
+
+function toggleTaskActions(button){
+  const card=button?.closest('.task');if(!card)return;
+  document.querySelectorAll('.task.actions-open').forEach(x=>{if(x!==card)x.classList.remove('actions-open')});
+  card.classList.toggle('actions-open');vibrate(8);
 }
 
 function render(){
@@ -1931,14 +1983,14 @@ function render(){
   const tk=todayKey();
   if(filterState==='active')tasks=tasks.filter(t=>!t.done);
   else if(filterState==='done')tasks=tasks.filter(t=>t.done);
-  else if(filterState==='today')tasks=tasks.filter(t=>t.date===tk&&!t.done);
+  else if(filterState==='today')tasks=tasks.filter(t=>t.date===tk);
   renderStats();renderSmartHint();
   const overdueCount=getTasks().filter(t=>isOverdue(t)&&t.date<tk).length;
   let head='';
   if(overdueCount&&filterState!=='done'){
     head=`<div class="reschedule-bar"><span>⚠️ Просрочено: ${overdueCount}</span><button onclick="rescheduleOverdue()">➡️ На сегодня</button></div>`;
   }
-  if(!tasks.length){view.innerHTML=head+`<div class="empty"><div>🎉</div>${q?'Ничего не найдено':'Дел нет — отдыхай!'}</div>`;return;}
+  if(!tasks.length){view.innerHTML=head+(q?emptyState(ICONS.search||ICONS.all,'Ничего не найдено','Попробуй изменить запрос','',''):emptyState(ICONS.all,'Список дел пуст','Добавь первое дело — остальное Lumo поможет организовать','openModal()','Добавить дело'));return;}
   const priOrd={R:0,Y:1,B:2};
   tasks.sort((a,b)=>{const da=a.date||'9999',db=b.date||'9999';if(da!==db)return da<db?-1:1;const ta=a.time||'99:99',tb=b.time||'99:99';if(ta!==tb)return ta<tb?-1:1;return (priOrd[a.pri]??1)-(priOrd[b.pri]??1);});
   const groups={};
@@ -2144,8 +2196,8 @@ function renderStats(){
   let tasks=getTasks();
   if(currentTab!=='all'&&currentTab!=='calendar')tasks=tasks.filter(t=>t.module===currentTab);
   const tk=todayKey();
-  const total=tasks.length,done=tasks.filter(t=>t.done).length,today=tasks.filter(t=>t.date===tk&&!t.done).length;
-  el.innerHTML=`<div class="hstat"><b>${today}</b><small>Сегодня</small></div><div class="hstat"><b>${total-done}</b><small>Активных</small></div><div class="hstat"><b>${done}</b><small>Готово</small></div>`;
+  const total=tasks.length,done=tasks.filter(t=>t.done).length,today=tasks.filter(t=>t.date===tk).length;
+  el.innerHTML=`<button class="hstat" onclick="openTaskStat('today')"><b>${today}</b><small>Сегодня</small></button><button class="hstat" onclick="openTaskStat('active')"><b>${total-done}</b><small>Активных</small></button><button class="hstat" onclick="openTaskStat('done')"><b>${done}</b><small>Готово</small></button>`;
 }
 
 function toggleTask(id){
@@ -2209,8 +2261,25 @@ function editTask(id){
 function fillModuleSelect(){
   document.getElementById('f-module').innerHTML=getCats().map(c=>`<option value="${c.id}">${c.emoji} ${esc(c.name)}</option>`).join('');
 }
-  function fabAction(){
+function updateFabLabel(){
+  const label=document.getElementById('fab-label');if(!label)return;
+  label.textContent=currentTab==='finance'?'Расход':currentTab==='notes'?'Заметка':currentTab==='habits'?'Привычка':'Новое дело';
+}
+function openQuickCreate(){document.getElementById('modal-quick-create').classList.add('on');vibrate(12)}
+function closeQuickCreate(){document.getElementById('modal-quick-create').classList.remove('on')}
+function quickCreate(type){
+  closeQuickCreate();
+  if(type==='task')openModal();
+  else if(type==='expense')openExpModal();
+  else if(type==='note')openNoteModal();
+  else if(type==='habit'){switchTab('habits');setTimeout(()=>toggleHabitComposer(true),80)}
+  else if(type==='receipt')openReceiptScanner();
+  else if(type==='voice'){switchTab('ai');setTimeout(()=>toggleMic(),160)}
+}
+function fabAction(){
   if(currentTab==='finance')openExpModal();
+  else if(currentTab==='notes')openNoteModal();
+  else if(currentTab==='habits')toggleHabitComposer(true);
   else openModal();
 }
 function openModal(){
@@ -2487,6 +2556,7 @@ function noteCardHTML(n){
     <div class="t-acts"><button onclick="openNoteModal(${n.id})" aria-label="Изменить">${ICONS.edit}</button><button onclick="delNote(${n.id})" aria-label="Удалить">${ICONS.trash}</button></div>
   </div>`;
 }
+function emptyState(icon,title,text,action,label){return `<div class="empty-state"><div class="empty-icon">${icon}</div><b>${esc(title)}</b><span>${esc(text||'')}</span>${action?`<button onclick="${action}">${esc(label||'Добавить')}</button>`:''}</div>`}
 function renderNotes(){
   const view=document.getElementById('view');
   const notes=getNotes().slice().sort((a,b)=>{
@@ -2500,7 +2570,7 @@ function renderNotes(){
   });
   let html=`<div class="notes-page"><div class="notes-tools"><input id="notes-search" placeholder="🔍 Поиск по заметкам..." oninput="filterNotes(this.value)"><button onclick="openNoteModal()">${ICONS.plus}<span>Новая</span></button></div>`;
   if(!notes.length){
-    html+=`<div class="empty"><div>📝</div>Заметок пока нет</div>`;
+    html+=emptyState(ICONS.notes,'Заметок пока нет','Сохраняй идеи, списки и важные мысли','openNoteModal()','Создать заметку');
   }else{
     html+='<div class="notes-grid" id="notes-grid">';
     notes.forEach(n=>html+=modernNoteHTML(n));
@@ -2563,7 +2633,7 @@ function renderCalendar(){
       noteList.forEach(n=>html+=noteCardHTML(n)); /* ← ДОБАВЛЕНО */
       html+='</div>';
     }else{
-      html+=`<div class="empty"><div>🗓</div>Нет дел на этот день</div>`;
+      html+=emptyState(ICONS.calendar,'На этот день ничего нет','Можно оставить день свободным или добавить дело','openModal()','Добавить дело');
     }
     /* быстрая кнопка добавить заметку на выбранный день */
     html+=`<div style="text-align:center;margin:4px 16px 14px"><button class="btn ghost" onclick="openNoteModal()">📝 Заметка на ${fmtDate(calSel)}</button></div>`;
@@ -2689,7 +2759,7 @@ function saveBudgets(){
 function renderBudgets(){
   const budgets=getBudgets();
   const keys=Object.keys(budgets);
-  if(!keys.length)return `<div style="text-align:center;margin:0 16px 14px"><button class="btn ghost" onclick="openBudget()">🎯 Установить лимиты по категориям</button></div>`;
+  if(!keys.length)return '';
   const s=getExpenseStats();
   const spent={};s.byCat.forEach(x=>spent[x.name]=x.sum);
   let html=`<div class="fin-log-h">🎯 Бюджеты</div>`;
@@ -2753,6 +2823,7 @@ function delGoal(id){
 }
 function renderGoals(){
   const goals=getGoals();
+  if(!goals.length)return '';
   let html=`<div class="fin-log-h">🎯 Цели-копилки</div>`;
   goals.forEach(g=>{
     const pct=Math.min(100,Math.round((g.saved||0)/g.target*100));
@@ -2846,18 +2917,20 @@ function renderFinance(){
   const y=finDate.getFullYear(),m=finDate.getMonth();
   const ym=y+'-'+String(m+1).padStart(2,'0');
   const s=finStats(y,m);
+  const prevDate=new Date(y,m-1,1),prev=finStats(prevDate.getFullYear(),prevDate.getMonth());
+  const delta=prev.total?Math.round((s.total-prev.total)/prev.total*100):null;
   const monthLbl=monthFull[m]+' '+y;
-  let html=`<div class="fin-hero">
+  let html=`<div class="finance-page"><div class="fin-hero">
     <div class="fin-monthnav"><button onclick="finNav(-1)">‹</button><span>${monthLbl}</span><button onclick="finNav(1)">›</button></div>
     <div class="fin-balance">
-      <div class="fin-bal-item"><small>📈 Доход</small><b style="color:#a8ffcf">${s.income?'+':''}${fmtMoney(s.income)}₽</b></div>
-      <div class="fin-bal-item"><small>📉 Расход</small><b style="color:#ffc7bd">${s.total?'-':''}${fmtMoney(s.total)}₽</b></div>
-      <div class="fin-bal-item"><small>💰 Баланс</small><b>${s.balance>=0?'+':''}${fmtMoney(s.balance)}₽</b></div>
+      <div class="fin-bal-item"><small>Доход</small><b class="money-in">${s.income?'+':''}${fmtMoney(s.income)} ₽</b></div>
+      <div class="fin-bal-item"><small>Расход</small><b class="money-out">${s.total?'-':''}${fmtMoney(s.total)} ₽</b></div>
+      <div class="fin-bal-item"><small>Баланс</small><b>${s.balance>=0?'+':''}${fmtMoney(s.balance)} ₽</b></div>
     </div>
     <div class="fin-chart">${donutSVG(s.byCat,s.total)}<div class="center"><b>${fmtMoney(s.total)} ₽</b><small>Расходы</small></div></div>
-  </div>`;
+  </div>${delta===null?'':`<div class="fin-compare ${delta<=0?'good':''}">${delta<=0?'↓':'↑'} ${Math.abs(delta)}% к прошлому месяцу <span>${delta<=0?'Расходы снизились':'Расходы выросли'}</span></div>`}`;
 
-  html+=`<div style="padding:0 16px 8px;display:grid;grid-template-columns:1fr 1fr;gap:8px"><button class="btn ghost" onclick="openReceiptScanner()">📷 Сканировать чек</button><button class="btn ghost" onclick="renderPriceHistory()">📈 История цен</button></div>`;
+  html+=financeToolHub();
   html+=`<div class="fin-insight">${weekInsight()}</div>`;
   html+=dayBars(y,m);
   html+=renderGoals();
@@ -2883,8 +2956,16 @@ html+=renderDebtBlock();
        html+=expLog.map(t=>{const st=catStyleOf(t.category),split=receiptBreakdownOf(t);const sh=t.shared?'<span class="assign-badge">👨‍👩‍👦 общая</span>':'';const tags=split?`<div class="receipt-breakdown">${Object.entries(split).filter(x=>x[1]>0).map(([c,v])=>`<span>${catStyleOf(c).i} ${esc(c)} · ${fmtMoney(v)}₽</span>`).join('')}</div>`:'';return `<div class="task"><div class="bar" style="background:${st.c}"></div><div class="t-body" ${t.receiptItems?`onclick="openReceiptDetails(${t.id})" style="cursor:pointer"`:''}><div class="t-title">${t.receiptItems?'🧾':st.i} ${fmtMoney(t.amount)}₽ · ${esc(t.category||'Прочее')}</div><div class="t-meta"><span>📅 ${fmtDate(t.date)||t.date}</span>${sh}${t.receiptItems?'<span>Открыть чек ›</span>':''}</div>${t.desc?`<div class="t-desc">${esc(t.desc)}</div>`:''}${tags}</div><div class="t-acts"><button onclick="editExpense(${t.id})" aria-label="Изменить">${ICONS.edit}</button><button onclick="delExpense(${t.id})" aria-label="Удалить">${ICONS.trash}</button></div></div>`;}).join('')+'</div>';
   }
 
-  if(!incLog.length&&!expLog.length)html+=`<div class="empty"><div>💸</div>Нет записей за этот месяц</div>`;
-  view.innerHTML=html;
+  if(!incLog.length&&!expLog.length)html+=emptyState(ICONS.finance,'Операций пока нет','Добавь первый расход или отсканируй чек','openExpModal()','Добавить расход');
+  view.innerHTML=html+'</div>';
+}
+function financeToolHub(){
+  const tools=[
+    ['openReceiptScanner()','receipt','Сканировать чек'],['renderPriceHistory()','trend','История цен'],['openGoal()','target','Новая цель'],
+    ['openBudget()','limit','Лимиты'],['openAutoPaysList()','repeat','Платежи'],['openDebtModal()','debt','Долг']
+  ];
+  const icons={receipt:'<path d="M7 3h10a2 2 0 012 2v16l-3-2-4 2-4-2-3 2V5a2 2 0 012-2zM8 9h8M8 13h6"/>',trend:'<path d="M4 17l5-5 4 3 7-8M15 7h5v5"/>',target:'<circle cx="12" cy="12" r="8"/><circle cx="12" cy="12" r="3"/>',limit:'<path d="M4 18V9M10 18V5M16 18v-7M22 18V3"/>',repeat:'<path d="M4 8h12l-3-3M20 16H8l3 3"/>',debt:'<path d="M4 7h16v11H4zM7 11h6M16 14h1"/>'};
+  return `<div class="finance-tools">${tools.map(x=>`<button onclick="${x[0]}"><svg viewBox="0 0 24 24" fill="none">${icons[x[1]]}</svg><span>${x[2]}</span></button>`).join('')}</div>`;
 }
 function modernNoteHTML(n){const color=n.color||NOTE_COLORS[0],search=esc(((n.title||'')+' '+(n.text||'')).toLowerCase());return `<article class="note-modern ${n.pinned?'pinned':''}" style="--note-color:${color}" data-search="${search}" onclick="openNoteModal(${n.id})"><button class="note-pin" onclick="event.stopPropagation();toggleNotePin(${n.id})" aria-label="Закрепить">${n.pinned?'📌':'○'}</button><h3>${esc(n.title||'Без заголовка')}</h3><p>${esc(n.text||'').replace(/\n/g,'<br>')}</p><div class="note-date">${n.date?'📅 '+fmtDate(n.date):''}</div><div class="note-actions"><button onclick="event.stopPropagation();openNoteModal(${n.id})">${ICONS.edit}</button><button onclick="event.stopPropagation();delNote(${n.id})">${ICONS.trash}</button></div></article>`;}
 function toggleNotePin(id){const notes=getNotes(),n=notes.find(x=>x.id===id);if(!n)return;n.pinned=!n.pinned;n.updatedAt=Date.now();setNotes(notes);renderNotes();vibrate(10);}
@@ -3026,6 +3107,7 @@ function openReceiptScanner(source='finance'){
   receiptSource=source;
   receiptFile=null;
   document.getElementById('receipt-file').value='';
+  document.getElementById('receipt-camera').value='';
   document.getElementById('receipt-preview').style.display='none';
   document.getElementById('receipt-review').style.display='none';
   document.getElementById('receipt-scan-btn').disabled=true;
@@ -3036,7 +3118,6 @@ function openAIReceipt(){
   aiAddMsg('user','📷 Хочу добавить чек');
   aiAddMsg('ai','Выбери фотографию чека или сделай новый снимок. Я локально распознаю сумму, дату, магазин и покупки, а перед сохранением дам всё проверить.');
   openReceiptScanner('ai');
-  setTimeout(()=>document.getElementById('receipt-file').click(),120);
 }
 async function closeReceiptScanner(){
   document.getElementById('modal-receipt').classList.remove('on');
@@ -3661,7 +3742,7 @@ function aiHello(){
   const chat=document.getElementById('ai-chat');
   const name=getMyName();
   const greet=name?`Привет, ${esc(name)}! 👋`:'Привет! 👋';
-  aiAddMsg('ai',`${greet}<br>Я локальный помощник Lumo. Можешь продиктовать весь день одной фразой — я разделю её на дела, покупки, расходы и привычки. Кнопкой чека рядом с микрофоном можно сфотографировать покупку.<br><br><small>Перед сохранением всё покажу. Основные команды и распознавание чека работают без Groq.</small>`);
+  aiAddMsg('ai',`<div class="assistant-welcome"><span class="assistant-mark">${ICONS.ai}</span><div><b>${greet}</b><p>Скажи, что нужно сделать — я разберу фразу на дела, покупки, расходы и привычки.</p><small>Работаю локально и всегда показываю результат перед сохранением.</small></div></div>`);
   renderAISuggest();
 }
 function renderAISuggest(){
@@ -4668,20 +4749,13 @@ function renderMore(){
     matrix:"switchTab('matrix')",
     notes:"switchTab('notes')"
   };
-  let items='';
-  hidden.forEach(s=>{
-    items+=`<button class="assign-btn" onclick="${openers[s.id]}">${s.icon} ${esc(s.name)}</button>`;
-  });
-  // Служебное — всегда тут
-  const service=`
-    <div class="sub-h">Настройки</div>
-    <button class="assign-btn" onclick="openMenuEditor()">${ICONS.settings} Настроить меню</button>
-    <button class="assign-btn" onclick="openCatModal()">${ICONS.all} Категории</button>
-    <button class="assign-btn" onclick="openSettings()">${ICONS.settings} Настройки</button>
-    <button class="assign-btn" onclick="openHelp()">${ICONS.help} Возможности</button>`;
-  view.innerHTML=`<div style="padding:14px 16px">
-    ${hidden.length?'<div class="sub-h">Разделы</div>'+items:''}
-    ${service}
+  const items=hidden.map(s=>`<button class="more-tile" onclick="${openers[s.id]}"><span>${s.icon}</span><b>${esc(s.name)}</b></button>`).join('');
+  view.innerHTML=`<div class="more-page">
+    ${hidden.length?`<div class="sub-h">Все разделы</div><div class="more-grid">${items}</div>`:''}
+    <div class="sub-h">Управление</div><div class="more-manage">
+      <button onclick="openSettings()">${ICONS.settings}<span><b>Настройки</b><small>Оформление, уведомления и данные</small></span><i>›</i></button>
+      <button onclick="openHelp()">${ICONS.help}<span><b>Обучение</b><small>Повторить интерактивный тур</small></span><i>›</i></button>
+    </div>
   </div>`;
 }
 
@@ -4706,7 +4780,7 @@ function renderToday(){
 
   const w=getWeatherCache();
   const weatherLine=(w&&w.temp!=null)
-    ?`<div class="today-weather">${w.icon} ${w.temp}°C · ${esc(w.desc)}${w.rainToday>=50?' · ☔ возьми зонт':''}</div>`
+    ?`<div class="today-weather-compact">${w.icon} ${w.temp}° · ${esc(w.desc)}</div>`
     :'';
 
   // текст рядом с кольцом
@@ -4719,9 +4793,9 @@ function renderToday(){
   // кольцо (r=32, длина окружности ≈ 201)
    const R=34, C=2*Math.PI*R, off=C-(pct/100)*C;
 
-  let html=`<div style="padding:14px 16px">
-    <div style="font-size:1.2rem;font-weight:800;margin-bottom:${weatherLine?'4px':'10px'}">${greet}</div>
-    ${weatherLine}
+  const todayLabel=new Date().toLocaleDateString('ru-RU',{weekday:'long',day:'numeric',month:'long'});
+  let html=`<div class="today-shell">
+    <div class="today-head"><div><div class="today-greeting">${greet}</div><div class="today-date">${todayLabel}</div></div>${weatherLine}</div>
     <div class="tw-card today-progress-action" role="button" tabindex="0"
          aria-label="${todayTasks.length?'Перейти к делам на сегодня':'Добавить дело на сегодня'}"
          onclick="handleTodayProgress()"
@@ -4746,13 +4820,13 @@ function renderToday(){
   const habitsDone=habits.filter(hb=>hb.log&&hb.log[tk]).length;
   html+=`<div class="tw-grid">
     <div class="tw-card" onclick="switchTab('finance')">
-      <div class="tw-ico">💰</div>
+      <div class="tw-ico">${ICONS.finance}</div>
       <div class="tw-lbl">Расходы за месяц</div>
       <div class="tw-val">${fmtMoney(fs.total)} ₽</div>
       <div class="tw-sub">Баланс: ${fs.balance>=0?'+':''}${fmtMoney(fs.balance)} ₽</div>
     </div>
     <div class="tw-card" onclick="switchTab('habits')">
-      <div class="tw-ico">💪</div>
+      <div class="tw-ico">${ICONS.habits}</div>
       <div class="tw-lbl">Привычки</div>
       <div class="tw-val">${habitsDone}/${habits.length}</div>
       <div class="tw-sub">${habitsDone===habits.length&&habits.length?'Все готовы! 🔥':'выполнено сегодня'}</div>
@@ -4763,13 +4837,13 @@ function renderToday(){
     html+=`<div class="reschedule-bar" style="margin:6px 0 10px"><span>⚠️ Просрочено: ${overdue.length}</span><button onclick="rescheduleOverdue()">➡️ На сегодня</button></div>`;
   }
 
-  html+=`<div class="sub-h" id="today-task-section">📅 Дела на сегодня</div>`;
+  html+=`<div class="sub-h" id="today-task-section">Дела на сегодня</div>`;
   if(todayTasks.length){
     html+='<div class="list" style="padding:0">';
     todayTasks.forEach(t=>html+=taskCardHTML(t));
     html+='</div>';
   }else{
-    html+=`<div class="empty" style="padding:22px 20px"><div>☀️</div>Свободный день — отдыхай!</div>`;
+    html+=emptyState(ICONS.today,'Сегодня всё свободно','Хороший момент отдохнуть или запланировать что-то важное','openModal()','Добавить дело');
   }
 
   html+=`<div class="sub-h">Быстрые действия</div>
@@ -4811,20 +4885,16 @@ function renderGlobalSearch(q){
   const notes=(data.notes||[]).filter(x=>has(x.title,x.text)).map(x=>({type:'note',id:x.id,icon:'📝',title:x.title||'Заметка',meta:(x.text||'').slice(0,70)}));
   if(tasks.length)groups.push(['Дела',tasks]);if(expenses.length||incomes.length)groups.push(['Финансы',[...expenses,...incomes]]);if(shopping.length)groups.push(['Покупки',shopping]);if(notes.length)groups.push(['Заметки',notes]);
   renderStats();
-  if(!groups.length){view.innerHTML='<div class="empty"><div>🔎</div>Ничего не найдено во всём приложении</div>';return;}
+  if(!groups.length){view.innerHTML=emptyState(ICONS.all,'Ничего не найдено','Попробуй изменить поисковый запрос','','');return;}
   view.innerHTML='<div class="global-results">'+groups.map(([name,items])=>`<div class="global-group">${name} · ${items.length}</div>${items.slice(0,20).map(x=>`<div class="global-result" onclick="globalOpen(${jsArg(x.type)},${Number(x.id)||0})"><div class="gr-icon">${x.icon}</div><div><b>${esc(x.title)}</b><small>${esc(x.meta)}</small></div><span>›</span></div>`).join('')}`).join('')+'</div>';
 }
 function handleTodayProgress(){
-  const hasTodayTasks=getTasks().some(t=>t.date===todayKey()&&!t.done);
+  const hasTodayTasks=getTasks().some(t=>t.date===todayKey());
   if(!hasTodayTasks){
     openModal();
     return;
   }
-  const section=document.getElementById('today-task-section');
-  if(section){
-    vibrate(10);
-    section.scrollIntoView({behavior:'smooth',block:'start'});
-  }
+  openTaskStat('today');vibrate(10);
 }
   let _searchTimer=null;
 function debouncedRender(){
@@ -5083,7 +5153,7 @@ function showTourStep(){
   clearInterval(tourTypingTimer);clearTourFocus();closeTourModals();
   if(tourStep===0){
     switchTab('today');setTimeout(()=>focusTourElement('.today-card'),100);
-    renderTourCoach({title:'Экран «Сегодня»',text:'Это главный экран дня: прогресс, ближайшие дела, привычки и быстрые действия. Нажатие на прогресс переносит к сегодняшним задачам.',example:'Начинай день отсюда — Lumo покажет только актуальное.'});return;
+    renderTourCoach({title:'Экран «Сегодня»',text:'Это главный экран дня: прогресс, ближайшие дела, привычки и быстрые действия. Если на сегодня есть записи, нажатие на прогресс откроет их все, включая выполненные. Если записей нет — откроется создание дела.',example:'Карточки статистики в разделе дел тоже нажимаются: «Сегодня», «Активных» и «Готово» открывают соответствующие списки.'});return;
   }
   if(tourStep===1){
     switchTab('all');
@@ -5128,7 +5198,7 @@ function showTourStep(){
   }
   if(tourStep===7){
     switchTab('finance');setTimeout(()=>focusTourElement('.fin-hero'),100);
-    renderTourCoach({title:'Обзор финансов',text:'Верхняя карточка показывает доходы, расходы, баланс и диаграмму выбранного месяца. Стрелки переключают месяцы.',example:'Ниже находятся аналитика по дням и история операций.'});return;
+    renderTourCoach({title:'Обзор финансов',text:'Верхняя карточка показывает доходы, расходы, баланс, сравнение с прошлым месяцем и диаграмму. Компактная панель ниже открывает чек, историю цен, цели, лимиты, платежи и долги.',example:'Стрелками переключаются месяцы, а операции остаются в общей ленте ниже.'});return;
   }
   if(tourStep===8){
     switchTab('finance');
@@ -5140,11 +5210,11 @@ function showTourStep(){
   }
   if(tourStep===9){
     switchTab('finance');setTimeout(()=>openReceiptScanner(),80);
-    renderTourCoach({title:'Умный просмотр чека',text:'Сфотографируй чек или выбери снимок. Lumo распознает магазин, итог, каждую позицию и цену. Категории товаров можно исправить перед сохранением.',example:'Диаграмма разделит смешанный чек по категориям. «История цен» покажет изменения, а ИИ ответит: «Сколько стоило молоко?»',top:true});return;
+    renderTourCoach({title:'Умный просмотр чека',text:'Выбери отдельную кнопку: «Сфотографировать» откроет камеру, а «Выбрать из Фото» — галерею iPhone. Lumo распознает магазин, итог, каждую позицию и цену.',example:'Категории можно исправить перед сохранением. «История цен» покажет изменения, а помощник ответит: «Сколько стоило молоко?»',top:true});return;
   }
   if(tourStep===10){
     switchTab('finance');setTimeout(()=>focusTourElement('.goal-card, .budget-card, button[onclick=\"openGoal()\"]'),120);
-    renderTourCoach({title:'Планирование денег',text:'Бюджеты ограничивают расходы по категориям, цели-копилки показывают накопления, регулярные платежи создают операции по расписанию.',example:'Здесь же можно учитывать долги и сроки возврата.'});return;
+    renderTourCoach({title:'Планирование денег',text:'В панели финансов открой «Цель», «Лимиты», «Платежи» или «Долг». Бюджеты контролируют категории, цели показывают накопления, регулярные платежи создают операции по расписанию.',example:'Все инструменты собраны в одной компактной панели без длинного списка пустых кнопок.'});return;
   }
   if(tourStep===11){
     switchTab('more');setTimeout(()=>openFamily(),80);
@@ -5152,15 +5222,15 @@ function showTourStep(){
   }
   if(tourStep===12){
     switchTab('more');setTimeout(()=>focusTourElement('#view .assign-btn'),100);
-    renderTourCoach({title:'Заметки и другие разделы',text:'Заметки можно закреплять, выделять цветом, искать по тексту и привязывать к дате в календаре. В «Ещё» также находятся матрица, покупки, семья и награды.',example:'Закреплённые заметки всегда остаются сверху.'});return;
+    renderTourCoach({title:'Заметки и другие разделы',text:'Заметки можно закреплять, выделять цветом, искать и привязывать к календарю. Экран «Ещё» показывает только разделы, которых нет в нижнем меню, плюс настройки и обучение.',example:'Так список остаётся коротким, а нужные разделы можно вынести вниз.'});return;
   }
   if(tourStep===13){
     switchTab('more');setTimeout(()=>openMenuEditor(),80);
-    renderTourCoach({title:'Настрой нижнее меню',text:'Можно выбрать пять самых нужных разделов и поменять их порядок. Всё остальное автоматически останется в «Ещё».',example:'Кнопка «Ещё» всегда остаётся последней.',top:true});return;
+    renderTourCoach({title:'Настрой нижнее меню',text:'Открой «Настройки → Оформление → Настроить меню», выбери нужные разделы и поменяй их порядок. Остальные автоматически появятся в компактной сетке «Ещё».',example:'Кнопка «Ещё» всегда остаётся последней.',top:true});return;
   }
   if(tourStep===14){
     switchTab('more');setTimeout(()=>openSettings(),80);
-    renderTourCoach({title:'Настройки и сохранность данных',text:'Здесь меняются тема, цвет, тихие часы и уведомления. В разделе «Данные» скачивается и восстанавливается резервная JSON-копия.',example:'Регулярно делай копию: удаление PWA может удалить локальные данные.',top:true});return;
+    renderTourCoach({title:'Настройки и сохранность данных',text:'Настройки разделены на раскрывающиеся группы: оформление, напоминания, помощник, PWA-уведомления и данные. Открывай только нужный раздел.',example:'В группе «Данные» скачивается и восстанавливается резервная JSON-копия.',top:true});return;
   }
   if(tourStep===TOUR_AI_STEP){
     switchTab('ai');
@@ -5355,6 +5425,16 @@ function exportData(){
   const a=document.createElement('a');a.href=URL.createObjectURL(blob);
   a.download='planner-backup-'+todayKey()+'.json';a.click();toast('📥 Копия скачана');
 }
+let _fabLongPressed=false;
+function initFabLongPress(){
+  const fab=document.getElementById('fab');if(!fab)return;
+  let timer=null;
+  const start=()=>{_fabLongPressed=false;timer=setTimeout(()=>{_fabLongPressed=true;openQuickCreate()},520)};
+  const cancel=()=>clearTimeout(timer);
+  fab.addEventListener('touchstart',start,{passive:true});fab.addEventListener('touchend',cancel);fab.addEventListener('touchmove',cancel);
+  fab.addEventListener('mousedown',start);fab.addEventListener('mouseup',cancel);fab.addEventListener('mouseleave',cancel);
+  fab.addEventListener('click',e=>{if(_fabLongPressed){e.stopImmediatePropagation();e.preventDefault();_fabLongPressed=false}},true);
+}
 function validateImportedData(d){
   if(!d||typeof d!=='object'||Array.isArray(d))return false;
   const arrayFields=['tasks','notes','habits','finance','income','goals','shopping','autopays','debts','cats','expcats'];
@@ -5470,6 +5550,7 @@ if('serviceWorker' in navigator){
   // приветствие ключа при первом ИИ
   handleLaunchActions();
   initMicLongPress();
+  initFabLongPress();
   checkAchievements();
     // Haptic-подобная вибрация на все интерактивные тапы
   document.addEventListener('pointerdown',e=>{
@@ -5875,9 +5956,7 @@ function scheduleAutoPayReminders(){
 function renderAutoPayBlock(){
   const pays=getAutoPays();
   if(!pays.length){
-    return `<div style="text-align:center;margin:4px 16px 14px">
-      <button class="btn ghost" onclick="openAutoPaysList()">🔁 Добавить регулярный платёж</button>
-    </div>`;
+    return '';
   }
   const sorted=pays.slice().sort((a,b)=>nextPayDateKey(a)<nextPayDateKey(b)?-1:1);
   let html=`<div class="fin-log-h">🔁 Регулярные платежи
@@ -6099,9 +6178,7 @@ function renderDebtBlock(){
   const debts=getDebts();
   const active=debts.filter(d=>!d.closed);
   if(!active.length){
-    return `<div style="text-align:center;margin:4px 16px 14px">
-      <button class="btn ghost" onclick="openDebtModal()">💸 Записать долг</button>
-    </div>`;
+    return '';
   }
   const tome=active.filter(d=>d.type==='tome').reduce((s,d)=>s+d.amount,0);
   const iowe=active.filter(d=>d.type==='iowe').reduce((s,d)=>s+d.amount,0);
