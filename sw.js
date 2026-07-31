@@ -1,4 +1,5 @@
-const CACHE = 'planner-v38';
+const CACHE = 'planner-v41';
+const PUSH_STATE_CACHE = 'lumo-push-state-v1';
 
 const ASSETS = [
   './',
@@ -11,6 +12,10 @@ const ASSETS = [
 self.addEventListener('message', e => {
   if(e.data && e.data.type === 'SKIP_WAITING'){
     self.skipWaiting();
+  }
+  if(e.data && e.data.type === 'TASK_SNAPSHOT'){
+    const body=JSON.stringify({tasks:Array.isArray(e.data.tasks)?e.data.tasks:[],savedAt:Date.now()});
+    e.waitUntil(caches.open(PUSH_STATE_CACHE).then(c=>c.put('./__task_snapshot__',new Response(body,{headers:{'Content-Type':'application/json'}}))));
   }
 });
 // ===== УСТАНОВКА =====
@@ -45,18 +50,38 @@ self.addEventListener('fetch', e => {
   );
 });
 
-// ===== PUSH — ЕДИНЫЙ ОБРАБОТЧИК =====
-self.addEventListener('push', e => {
-  let d = {};
-  try { d = e.data ? e.data.json() : {}; } catch(_) {}
+async function pushAllowed(d){
+  if(d.type==='morning')return true;
+  const looksReminder=!!d.taskId||/напоминани|повторное/i.test(String(d.title||''));
+  if(!looksReminder)return true;
+  try{
+    const cache=await caches.open(PUSH_STATE_CACHE),snapshotResp=await cache.match('./__task_snapshot__');
+    if(!snapshotResp)return false;
+    if(snapshotResp){
+      const snapshot=await snapshotResp.json(),tasks=snapshot.tasks||[];
+      const body=String(d.taskTitle||d.body||'').trim().toLowerCase();
+      const task=tasks.find(t=>String(t.id)===String(d.taskId))||tasks.find(t=>body.includes(String(t.title||'').trim().toLowerCase()));
+      if(!task)return false;
+      const taskAt=Number(task.scheduledAt)||new Date(task.date+'T'+(task.time||'09:00')).getTime();
+      // Одно актуальное напоминание рядом со временем дела; ранние и просроченные push гасим.
+      if(Number.isFinite(taskAt)&&(Date.now()>taskAt+10*60000||Date.now()<taskAt-30000))return false;
+      const dedupeKey='task:'+task.id+':'+taskAt;
+      if(await cache.match('./__push_seen__/'+encodeURIComponent(dedupeKey)))return false;
+      await cache.put('./__push_seen__/'+encodeURIComponent(dedupeKey),new Response(String(Date.now())));
+    }
+  }catch(_){return false;}
+  return true;
+}
+
+async function showPush(d){
+  if(!(await pushAllowed(d)))return;
   if(self.registration.setAppBadge){
-    self.registration.setAppBadge(d.badgeCount||undefined).catch(()=>{});
+    await self.registration.setAppBadge(d.badgeCount||undefined).catch(()=>{});
   }
 
   // ── Утренний брифинг ──
   if(d.type === 'morning'){
-    e.waitUntil(
-      self.registration.showNotification(d.title || '☀️ Доброе утро!', {
+    await self.registration.showNotification(d.title || '☀️ Доброе утро!', {
         body: d.body || '',
         icon: './icon.png',
         badge: './icon.png',
@@ -68,14 +93,12 @@ self.addEventListener('push', e => {
           { action: 'ok',   title: '✅ Всё понял'    },
           { action: 'open', title: '📋 Открыть план'  }
         ]
-      })
-    );
+      });
     return;
   }
 
   // ── Обычное напоминание ──
-  e.waitUntil(
-    self.registration.showNotification(d.title || '⏰ Напоминание', {
+  await self.registration.showNotification(d.title || '⏰ Напоминание', {
       body: d.body || '',
       icon: './icon.png',
       badge: './icon.png',
@@ -87,8 +110,13 @@ self.addEventListener('push', e => {
         { action: 'done',   title: '✅ Выполнено'   },
         { action: 'snooze', title: '⏰ Отложить 1ч'  }
       ]
-    })
-  );
+    });
+}
+
+// ===== PUSH — ЕДИНЫЙ ОБРАБОТЧИК =====
+self.addEventListener('push', e => {
+  let d={};try{d=e.data?e.data.json():{};}catch(_){}
+  e.waitUntil(showPush(d));
 });
 
 // ===== КЛИК — ЕДИНЫЙ ОБРАБОТЧИК =====

@@ -651,6 +651,20 @@ body.dark .tour-focus{box-shadow:0 0 0 4px #171525,0 0 0 9px color-mix(in srgb,v
 .receipt-progress{height:7px;border-radius:7px;background:var(--line);overflow:hidden;margin:10px 0}
 .receipt-progress i{display:block;height:100%;width:0;background:linear-gradient(90deg,var(--brand),var(--brand2));transition:width .25s}
 .receipt-status{font-size:.72rem;color:var(--muted);text-align:center;margin-bottom:8px}
+.receipt-items-editor{display:grid;gap:8px;margin:8px 0 12px}
+.receipt-item-row{display:grid;grid-template-columns:minmax(0,1fr) 82px 112px 30px;gap:6px;align-items:center;
+  padding:8px;border:1px solid var(--line);border-radius:14px;background:var(--card2)}
+.receipt-item-row input,.receipt-item-row select{min-width:0;width:100%;border:1px solid var(--line);border-radius:10px;
+  padding:8px;background:var(--card);color:var(--text);font-size:.72rem}
+.receipt-item-row button{border:0;background:transparent;color:var(--muted);font-size:1.1rem}
+.price-history{padding:8px 16px 120px;display:grid;gap:10px}
+.price-card{padding:13px;border:1px solid var(--line);border-radius:17px;background:var(--card);box-shadow:var(--shadow)}
+.price-card-head{display:flex;justify-content:space-between;gap:10px;align-items:flex-start}
+.price-card small{display:block;color:var(--muted);margin-top:4px;font-size:.68rem}
+.price-trend{font-weight:850;color:var(--brand);white-space:nowrap}
+.receipt-breakdown{display:flex;gap:5px;flex-wrap:wrap;margin-top:7px}
+.receipt-breakdown span{font-size:.62rem;padding:4px 7px;border-radius:8px;background:var(--card2);color:var(--muted)}
+@media(max-width:420px){.receipt-item-row{grid-template-columns:minmax(0,1fr) 74px 30px}.receipt-item-row select{grid-column:1/3}}
 
 /* Панель ввода ИИ — плавающая стеклянная */
 .ai-input-bar{
@@ -1196,11 +1210,19 @@ input,textarea{-webkit-user-select:text;user-select:text}
       <div class="field"><label>Магазин</label><input id="receipt-merchant"></div>
       <div class="two-col"><div class="field"><label>Итого ₽</label><input id="receipt-total" type="number" inputmode="decimal"></div><div class="field"><label>Дата</label><input id="receipt-date" type="date"></div></div>
       <div class="field"><label>Категория</label><select id="receipt-category"></select></div>
-      <div class="field"><label>Найденные позиции</label><textarea id="receipt-items" style="min-height:90px"></textarea></div>
+      <div class="field"><label>Найденные позиции, цены и категории</label><div id="receipt-items-editor" class="receipt-items-editor"></div>
+        <button class="btn ghost" onclick="addReceiptItem()">＋ Добавить позицию</button></div>
       <details><summary style="font-size:.72rem;color:var(--muted);margin-bottom:8px">Текст OCR</summary><textarea id="receipt-raw" style="min-height:110px"></textarea><button class="btn ghost" onclick="reviewReceiptText()">Разобрать исправленный текст</button></details>
       <button class="btn" onclick="saveReceiptExpense()">Записать расход</button>
     </div>
     <button class="btn ghost" onclick="closeReceiptScanner()">Закрыть</button>
+  </div>
+</div>
+<div class="modal" id="modal-receipt-details">
+  <div class="sheet">
+    <h3 id="receipt-details-title">Чек</h3>
+    <div id="receipt-details-body"></div>
+    <button class="btn ghost" onclick="document.getElementById('modal-receipt-details').classList.remove('on')">Закрыть</button>
   </div>
 </div>
 
@@ -1296,9 +1318,11 @@ input,textarea{-webkit-user-select:text;user-select:text}
     <button class="btn ghost" onclick="clearLocalAssistantMemory()">Очистить изученные правила</button>
 
     <div class="sub-h">📲 Пуши и напоминания</div>
+    <div class="local-edit-note" id="push-health">Проверяю состояние…</div>
     <button class="btn ghost" onclick="subscribePush()">📲 Включить фоновые пуши</button>
     <button class="btn ghost" onclick="requestNotify()">🔔 Разрешить напоминания</button>
-    <button class="btn ghost" onclick="testPush()">🧪 Тест пуша</button>
+    <button class="btn ghost" onclick="checkPushHealth(true)">🩺 Проверить уведомления</button>
+    <button class="btn ghost" onclick="testPush()">🧪 Отправить один тесовый push</button>
     <button class="btn ghost" onclick="clearAIChatHistory()">🗑 Очистить историю чата с ИИ</button>
     <div class="sub-h">Данные</div>
     <button class="btn" onclick="exportData()">📥 Скачать резервную копию</button>
@@ -2690,11 +2714,24 @@ function renderGoals(){
 }
 
 /* ===== ФИНАНСЫ ===== */
+function receiptBreakdownOf(r){
+  if(!Array.isArray(r.receiptItems)||!r.receiptItems.length)return null;
+  const cats={};let itemTotal=0;
+  r.receiptItems.forEach(raw=>{
+    const x=typeof raw==='string'?{name:raw,price:0,category:r.category||'Прочее'}:raw;
+    const price=Math.abs(Number(x.price)||0);if(!price)return;
+    const cat=x.category||r.category||'Прочее';cats[cat]=(cats[cat]||0)+price;itemTotal+=price;
+  });
+  if(!itemTotal)return null;
+  const diff=Math.round((Math.abs(Number(r.amount)||0)-itemTotal)*100)/100;
+  if(Math.abs(diff)>.009)cats[r.category||'Прочее']=(cats[r.category||'Прочее']||0)+diff;
+  return cats;
+}
 function finStats(y,m){
   const ym=y+'-'+String(m+1).padStart(2,'0');
   const exp=load().finance||[],inc=load().income||[];
   let total=0,income=0;const cats={};
-  exp.forEach(r=>{if(!r.amount||!r.date||!r.date.startsWith(ym))return;total+=Math.abs(r.amount);cats[r.category||'Прочее']=(cats[r.category||'Прочее']||0)+r.amount;});
+  exp.forEach(r=>{if(!r.amount||!r.date||!r.date.startsWith(ym))return;total+=Math.abs(r.amount);const split=receiptBreakdownOf(r);if(split)Object.entries(split).forEach(([cat,sum])=>cats[cat]=(cats[cat]||0)+sum);else cats[r.category||'Прочее']=(cats[r.category||'Прочее']||0)+r.amount;});
   inc.forEach(r=>{if(!r.amount||!r.date||!r.date.startsWith(ym))return;income+=r.amount;});
   return{total,income,balance:income-total,byCat:Object.keys(cats).map(k=>({name:k,sum:cats[k]})).sort((a,b)=>b.sum-a.sum)};
 }
@@ -2765,7 +2802,7 @@ function renderFinance(){
     <div class="fin-chart">${donutSVG(s.byCat,s.total)}<div class="center"><b>${fmtMoney(s.total)} ₽</b><small>Расходы</small></div></div>
   </div>`;
 
-  html+=`<div style="padding:0 16px 8px"><button class="btn ghost" onclick="openReceiptScanner()">📷 Сканировать чек</button></div>`;
+  html+=`<div style="padding:0 16px 8px;display:grid;grid-template-columns:1fr 1fr;gap:8px"><button class="btn ghost" onclick="openReceiptScanner()">📷 Сканировать чек</button><button class="btn ghost" onclick="renderPriceHistory()">📈 История цен</button></div>`;
   html+=`<div class="fin-insight">${weekInsight()}</div>`;
   html+=dayBars(y,m);
   html+=renderGoals();
@@ -2788,11 +2825,52 @@ html+=renderDebtBlock();
   const expLog=(load().finance||[]).filter(r=>r.date&&r.date.startsWith(ym)).slice().reverse();
   if(expLog.length){
     html+=`<div class="fin-log-h">📉 Расходы · ${expLog.length}</div><div class="list">`;
-       html+=expLog.map(t=>{const st=catStyleOf(t.category);const sh=t.shared?'<span class="assign-badge">👨‍👩‍👦 общая</span>':'';return `<div class="task"><div class="bar" style="background:${st.c}"></div><div class="t-body"><div class="t-title">${st.i} ${fmtMoney(t.amount)}₽ · ${esc(t.category||'Прочее')}</div><div class="t-meta"><span>📅 ${fmtDate(t.date)||t.date}</span>${sh}</div>${t.desc?`<div class="t-desc">${esc(t.desc)}</div>`:''}</div><div class="t-acts"><button onclick="editExpense(${t.id})" aria-label="Изменить">${ICONS.edit}</button><button onclick="delExpense(${t.id})" aria-label="Удалить">${ICONS.trash}</button></div></div>`;}).join('')+'</div>';
+       html+=expLog.map(t=>{const st=catStyleOf(t.category),split=receiptBreakdownOf(t);const sh=t.shared?'<span class="assign-badge">👨‍👩‍👦 общая</span>':'';const tags=split?`<div class="receipt-breakdown">${Object.entries(split).filter(x=>x[1]>0).map(([c,v])=>`<span>${catStyleOf(c).i} ${esc(c)} · ${fmtMoney(v)}₽</span>`).join('')}</div>`:'';return `<div class="task"><div class="bar" style="background:${st.c}"></div><div class="t-body" ${t.receiptItems?`onclick="openReceiptDetails(${t.id})" style="cursor:pointer"`:''}><div class="t-title">${t.receiptItems?'🧾':st.i} ${fmtMoney(t.amount)}₽ · ${esc(t.category||'Прочее')}</div><div class="t-meta"><span>📅 ${fmtDate(t.date)||t.date}</span>${sh}${t.receiptItems?'<span>Открыть чек ›</span>':''}</div>${t.desc?`<div class="t-desc">${esc(t.desc)}</div>`:''}${tags}</div><div class="t-acts"><button onclick="editExpense(${t.id})" aria-label="Изменить">${ICONS.edit}</button><button onclick="delExpense(${t.id})" aria-label="Удалить">${ICONS.trash}</button></div></div>`;}).join('')+'</div>';
   }
 
   if(!incLog.length&&!expLog.length)html+=`<div class="empty"><div>💸</div>Нет записей за этот месяц</div>`;
   view.innerHTML=html;
+}
+function normalizeReceiptItem(raw,receipt){
+  if(typeof raw==='string')return {name:raw,price:0,category:receipt.category||'Прочее'};
+  return {name:String(raw?.name||'').trim(),price:Number(raw?.price)||0,category:raw?.category||receipt.category||'Прочее'};
+}
+function receiptSearchKey(s){return String(s||'').toLowerCase().replace(/ё/g,'е').replace(/[^\p{L}\p{N}]+/gu,' ').trim();}
+function receiptProductHistory(){
+  const rows=[];
+  (load().finance||[]).filter(r=>Array.isArray(r.receiptItems)).forEach(r=>{
+    r.receiptItems.forEach(raw=>{const x=normalizeReceiptItem(raw,r);if(x.name)rows.push({...x,date:r.date,merchant:r.merchant||String(r.desc||'').replace(/^Чек:\s*/i,'')||'Магазин',receiptId:r.id,key:receiptSearchKey(x.name)});});
+  });
+  return rows.sort((a,b)=>String(b.date).localeCompare(String(a.date)));
+}
+function openReceiptDetails(id){
+  const r=(load().finance||[]).find(x=>x.id===id);if(!r||!Array.isArray(r.receiptItems))return;
+  const items=r.receiptItems.map(x=>normalizeReceiptItem(x,r));
+  document.getElementById('receipt-details-title').textContent='🧾 '+(r.merchant||String(r.desc||'').replace(/^Чек:\s*/i,'')||'Чек');
+  document.getElementById('receipt-details-body').innerHTML=`<div class="local-edit-note">${fmtDate(r.date)} · <b>${fmtMoney(r.amount)} ₽</b></div>
+    ${items.map(x=>`<div class="global-result"><div class="gr-icon">${catStyleOf(x.category).i}</div><div><b>${esc(x.name)}</b><small>${esc(x.category)}</small></div><b>${x.price?fmtMoney(x.price)+' ₽':'—'}</b></div>`).join('')}
+    <div class="receipt-breakdown">${Object.entries(receiptBreakdownOf(r)||{}).filter(x=>x[1]>0).map(([c,v])=>`<span>${catStyleOf(c).i} ${esc(c)} · ${fmtMoney(v)}₽</span>`).join('')}</div>`;
+  document.getElementById('modal-receipt-details').classList.add('on');
+}
+function renderPriceHistory(){
+  const rows=receiptProductHistory(),view=document.getElementById('view');
+  document.getElementById('hero-title').textContent='История цен';
+  const groups=new Map();
+  rows.filter(x=>x.price>0).forEach(x=>{const key=x.key;if(!groups.has(key))groups.set(key,[]);groups.get(key).push(x);});
+  const cards=[...groups.values()].sort((a,b)=>b.length-a.length||String(b[0].date).localeCompare(String(a[0].date)));
+  view.innerHTML=`<div class="price-history"><button class="btn ghost" onclick="renderFinance()">← Вернуться в финансы</button>
+    <div class="search-wrap" style="display:block;padding:0"><input placeholder="🔍 Найти товар или магазин..." oninput="filterPriceHistory(this.value)"></div>
+    <div id="price-history-list">${cards.length?cards.map(priceHistoryCard).join(''):'<div class="empty"><div>🧾</div>Отсканируй несколько чеков — здесь появится история цен</div>'}</div></div>`;
+}
+function priceHistoryCard(list){
+  const latest=list[0],prev=list[1],delta=prev&&prev.price?Math.round((latest.price-prev.price)/prev.price*100):0;
+  const trend=!prev?'новинка':delta>0?`↑ ${delta}%`:delta<0?`↓ ${Math.abs(delta)}%`:'без изменений';
+  return `<div class="price-card" data-search="${esc(receiptSearchKey(list.map(x=>x.name+' '+x.merchant).join(' ')))}" onclick="openReceiptDetails(${latest.receiptId})">
+    <div class="price-card-head"><div><b>${esc(latest.name)}</b><small>${esc(latest.merchant)} · ${fmtDate(latest.date)} · ${esc(latest.category)}</small></div><div class="price-trend">${fmtMoney(latest.price)} ₽<small>${trend}</small></div></div>
+    ${list.length>1?`<small>Покупок: ${list.length} · раньше ${fmtMoney(prev.price)} ₽ в «${esc(prev.merchant)}»</small>`:''}</div>`;
+}
+function filterPriceHistory(q){
+  const key=receiptSearchKey(q);document.querySelectorAll('#price-history-list .price-card').forEach(x=>x.style.display=!key||x.dataset.search.includes(key)?'block':'none');
 }
 function delExpense(id){if(!confirm('Удалить расход?'))return;const d=load();d.finance=(d.finance||[]).filter(x=>x.id!==id);save(d);renderFinance();toast('Удалено 🗑');}
 function delIncome(id){if(!confirm('Удалить доход?'))return;const d=load();d.income=(d.income||[]).filter(x=>x.id!==id);save(d);renderFinance();toast('Удалено 🗑');}
@@ -2885,7 +2963,7 @@ function saveExpModal(){
   renderFinance();
 }
 
-let receiptFile=null,receiptWorker=null,receiptSource='finance';
+let receiptFile=null,receiptWorker=null,receiptSource='finance',receiptItemsDraft=[];
 function openReceiptScanner(source='finance'){
   receiptSource=source;
   receiptFile=null;
@@ -2952,6 +3030,7 @@ async function scanReceipt(){
   }finally{btn.disabled=false;}
 }
 function receiptNumber(s){return Number(String(s).replace(/\s/g,'').replace(',','.').replace(/[^\d.]/g,''))||0;}
+function receiptItemCategory(name){const cat=expenseCategory(name);return getExpCats().some(c=>c.name===cat)?cat:'Прочее';}
 function parseReceiptText(text){
   const lines=String(text||'').split(/\r?\n/).map(x=>x.replace(/\s+/g,' ').trim()).filter(Boolean);
   const moneyRe=/(\d{1,3}(?:[ \u00a0]\d{3})*[,.]\d{2}|\d+[,.]\d{2})/g;
@@ -2963,13 +3042,31 @@ function parseReceiptText(text){
   let date=todayKey();const dm=text.match(/\b([0-3]?\d)[./-]([01]?\d)[./-](20\d{2}|\d{2})\b/);
   if(dm){const y=dm[3].length===2?'20'+dm[3]:dm[3];date=`${y}-${String(dm[2]).padStart(2,'0')}-${String(dm[1]).padStart(2,'0')}`;}
   const merchant=(lines.slice(0,12).find(x=>/[а-яa-z]{3}/i.test(x)&&!/касс|чек|инн|фн|фд|фп|смен|добро пожаловать/i.test(x))||'Магазин').slice(0,80);
-  const items=lines.filter(x=>!isDateLine(x)&&moneyTest.test(x)&&!(/итого|оплат|сумма|налич|безнал|сдача|ндс|скидка/i.test(x))).map(x=>x.replace(moneyRe,'').replace(/[*=]+/g,'').trim()).filter(x=>x.length>2).slice(0,40);
+  const items=lines.filter(x=>!isDateLine(x)&&moneyTest.test(x)&&!(/итого|оплат|сумма|налич|безнал|сдача|ндс|скидка/i.test(x))).map(x=>{
+    const prices=x.match(moneyRe)||[],price=prices.length?receiptNumber(prices[prices.length-1]):0;
+    const name=x.replace(moneyRe,'').replace(/\b\d+\s*[xх*]\s*$/i,'').replace(/[*=]+/g,'').trim();
+    return {name,price,category:receiptItemCategory(name)};
+  }).filter(x=>x.name.length>2).slice(0,40);
   return {merchant,total,date,items,category:expenseCategory(text)};
 }
+function receiptCatOptions(selected){
+  return getExpCats().map(c=>`<option value="${esc(c.name)}" ${c.name===selected?'selected':''}>${c.i} ${esc(c.name)}</option>`).join('');
+}
+function renderReceiptItemsEditor(){
+  const el=document.getElementById('receipt-items-editor');if(!el)return;
+  el.innerHTML=receiptItemsDraft.length?receiptItemsDraft.map((x,i)=>`<div class="receipt-item-row">
+    <input value="${esc(x.name)}" placeholder="Товар" oninput="receiptItemsDraft[${i}].name=this.value">
+    <input value="${x.price||''}" type="number" inputmode="decimal" placeholder="₽" oninput="receiptItemsDraft[${i}].price=Number(this.value)||0">
+    <select onchange="receiptItemsDraft[${i}].category=this.value">${receiptCatOptions(x.category)}</select>
+    <button onclick="removeReceiptItem(${i})" aria-label="Удалить">×</button>
+  </div>`).join(''):'<div class="local-edit-note">Позиции не найдены — их можно добавить вручную.</div>';
+}
+function addReceiptItem(){receiptItemsDraft.push({name:'',price:0,category:'Прочее'});renderReceiptItemsEditor();}
+function removeReceiptItem(i){receiptItemsDraft.splice(i,1);renderReceiptItemsEditor();}
 function reviewReceiptText(){
   const raw=document.getElementById('receipt-raw').value,parsed=parseReceiptText(raw);
   document.getElementById('receipt-merchant').value=parsed.merchant;document.getElementById('receipt-total').value=parsed.total||'';
-  document.getElementById('receipt-date').value=parsed.date;document.getElementById('receipt-items').value=parsed.items.join('\n');
+  document.getElementById('receipt-date').value=parsed.date;receiptItemsDraft=parsed.items;renderReceiptItemsEditor();
   const cat=document.getElementById('receipt-category');cat.innerHTML=getExpCats().map(c=>`<option value="${esc(c.name)}">${c.i} ${esc(c.name)}</option>`).join('');
   if([...cat.options].some(x=>x.value===parsed.category))cat.value=parsed.category;
   document.getElementById('receipt-review').style.display='block';
@@ -2977,8 +3074,9 @@ function reviewReceiptText(){
 function saveReceiptExpense(){
   const amount=Number(document.getElementById('receipt-total').value)||0;if(!amount){toast('Проверь итоговую сумму');return;}
   const merchant=document.getElementById('receipt-merchant').value.trim()||'Магазин',category=document.getElementById('receipt-category').value;
-  const items=document.getElementById('receipt-items').value.split(/\n+/).map(x=>x.trim()).filter(Boolean);
-  const d=load();if(!d.finance)d.finance=[];d.finance.push({id:Date.now()+Math.floor(Math.random()*1000),date:document.getElementById('receipt-date').value||todayKey(),desc:'Чек: '+merchant,amount,category,receiptItems:items});
+  const items=receiptItemsDraft.map(x=>({name:String(x.name||'').trim(),price:Number(x.price)||0,category:x.category||'Прочее'})).filter(x=>x.name);
+  const breakdown={};items.forEach(x=>breakdown[x.category]=(breakdown[x.category]||0)+x.price);
+  const d=load();if(!d.finance)d.finance=[];d.finance.push({id:Date.now()+Math.floor(Math.random()*1000),date:document.getElementById('receipt-date').value||todayKey(),desc:'Чек: '+merchant,merchant,amount,category,receiptItems:items,receiptBreakdown:breakdown});
   save(d);checkBudgetAlert(category);closeReceiptScanner();confetti();toast('Расход по чеку записан');
   if(receiptSource==='ai'){
     switchTab('ai');
@@ -3135,7 +3233,7 @@ function toggleTheme(){
   setThemeMode(m==='dark'?'light':'dark');
   toast(getThemeMode()==='dark'?'🌙 Тёмная тема':'☀️ Светлая тема');
 }
-function openSettings(){renderColorPick();updateThemeButtons();loadNotifyHour();loadQuietHours();renderLocalMemoryInfo();document.getElementById('modal-settings').classList.add('on');}
+function openSettings(){renderColorPick();updateThemeButtons();loadNotifyHour();loadQuietHours();renderLocalMemoryInfo();document.getElementById('modal-settings').classList.add('on');checkPushHealth(false);}
 function closeSettings(){document.getElementById('modal-settings').classList.remove('on');}
 
 /* НАПОМИНАНИЯ / ТИХИЕ ЧАСЫ */
@@ -3165,7 +3263,8 @@ function scheduleLocalTimeout(t){
   if(when<=0||when>86400000*2)return;
   const id=setTimeout(()=>{
     if(inQuietHours())return;
-    try{new Notification('⏰ '+t.title,{body:catLabel(t.module)+(t.desc?' · '+t.desc:''),icon:'data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><text y="80" font-size="80">📋</text></svg>'});vibrate([50,30,50]);}catch(e){}
+    const key=`task-local:${t.id}:${t.date}:${t.time}`;
+    notifyOnce(key,()=>{try{new Notification('⏰ '+t.title,{body:catLabel(t.module)+(t.desc?' · '+t.desc:''),tag:key,renotify:false,icon:'data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><text y="80" font-size="80">📋</text></svg>'});vibrate([50,30,50]);}catch(e){}});
   },when);
   localTimeouts.push(id);
 }
@@ -3279,12 +3378,43 @@ async function subscribePush(){
 }
 function urlB64ToUint8(b64){const pad='='.repeat((4-b64.length%4)%4);const s=(b64+pad).replace(/-/g,'+').replace(/_/g,'/');const raw=atob(s);return Uint8Array.from([...raw].map(c=>c.charCodeAt(0)));}
 async function testPush(){
-  try{await fetch(FAMILY_SERVER+'/test',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({userId:PUSH_USER_ID})});toast('🧪 Тест отправлен');}
-  catch(e){toast('Сервер недоступен');}
+  try{
+    if(!('serviceWorker'in navigator)||Notification.permission!=='granted'){toast('Сначала разреши уведомления');return;}
+    const reg=await navigator.serviceWorker.ready,sub=await reg.pushManager.getSubscription();
+    if(!sub){toast('Сначала включи фоновые push');return;}
+    const r=await fetch(FAMILY_SERVER+'/test',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({userId:PUSH_USER_ID})});
+    if(!r.ok)throw new Error('HTTP '+r.status);
+    const data=await r.json().catch(()=>({ok:true}));if(data.ok===false)throw new Error(data.error||data.err||'Сервер отклонил push');
+    toast('🧪 Отправлен один тесовый push');
+  }catch(e){toast('Тес push не прошёл');}
+  checkPushHealth(false);
+}
+async function checkPushHealth(showToast=false){
+  const el=document.getElementById('push-health');if(!el)return;
+  const lines=[];let ok=true;
+  const permission=('Notification'in window)?Notification.permission:'unsupported';
+  lines.push(permission==='granted'?'✅ Уведомления разрешены':'❌ Уведомления не разрешены');if(permission!=='granted')ok=false;
+  try{
+    if(!('serviceWorker'in navigator)||!('PushManager'in window))throw new Error();
+    const reg=await navigator.serviceWorker.ready;lines.push(reg.active?'✅ Service worker активен':'❌ Service worker не активен');if(!reg.active)ok=false;
+    const sub=await reg.pushManager.getSubscription();lines.push(sub?'✅ Фоновая push-подписка активна':'❌ Нет фоновой push-подписки');if(!sub)ok=false;
+    const server=await fetch(FAMILY_SERVER+'/key',{cache:'no-store'});lines.push(server.ok?'✅ Push-сервер доступен':'❌ Push-сервер вернул '+server.status);if(!server.ok)ok=false;
+  }catch(e){lines.push('❌ Не удалось проверить push-службу');ok=false;}
+  const now=Date.now(),next=getTasks().filter(t=>!t.done&&t.date&&t.time).map(t=>({...t,_at:new Date(t.date+'T'+t.time).getTime()})).filter(t=>t._at>now).sort((a,b)=>a._at-b._at)[0];
+  lines.push(next?`🕒 Ближайшее: ${esc(next.title)} — ${fmtDate(next.date)}, ${esc(next.time)}`:'ℹ️ Нет будущих дел с точным временем');
+  el.innerHTML=lines.join('<br>');if(showToast)toast(ok?'✅ Push-цепочка готова':'Есть проблема в push-настройках');
 }
 function syncPushData(){
   if(!PUSH_USER_ID)return;
-  const payload={userId:PUSH_USER_ID,name:getMyName(),role:getMyRole(),notifyHour:load().notifyHour||'09:00',quiet:getQuiet(),tasks:getTasks().filter(t=>!t.done&&t.date).map(t=>({title:t.title,date:t.date,time:t.time||'',module:t.module}))};
+  const now=Date.now(),notifyHour=load().notifyHour||'09:00';
+  const tasks=getTasks().filter(t=>!t.done&&t.date).map(t=>{
+    const time=t.time||notifyHour,scheduledAt=new Date(t.date+'T'+time).getTime();
+    return {id:String(t.id),title:t.title,date:t.date,time:t.time||'',module:t.module,scheduledAt:Number.isFinite(scheduledAt)?scheduledAt:null};
+  }).filter(t=>!t.scheduledAt||t.scheduledAt>now-60000);
+  const payload={userId:PUSH_USER_ID,name:getMyName(),role:getMyRole(),notifyHour,quiet:getQuiet(),syncVersion:Date.now(),tasks};
+  const snapshot={type:'TASK_SNAPSHOT',tasks,notifyHour};
+  if(navigator.serviceWorker?.controller)navigator.serviceWorker.controller.postMessage(snapshot);
+  else navigator.serviceWorker?.ready?.then(reg=>reg.active?.postMessage(snapshot)).catch(()=>{});
   sendOrQueue('/sync',payload,'sync');
 }
 function pushDoneStat(){
@@ -3454,7 +3584,7 @@ function aiHello(){
 }
 function renderAISuggest(){
   const box=document.getElementById('ai-suggest');if(!box)return;
-  const s=['🎙️ Завтра позвонить маме в 18 купить молоко','📊 Мои дела на сегодня','💰 Сколько потратил за месяц'];
+  const s=['🎙️ Завтра позвонить маме в 18 купить молоко','📊 Мои дела на сегодня','💰 Сколько потратил за месяц','🧾 Сколько стоило молоко'];
   box.innerHTML=s.map(x=>`<button onclick="aiQuick('${x.replace(/'/g,'')}')">${x}</button>`).join('')+
     '<button onclick="openAIReceipt()">🧾 Добавить чек</button>';
 }
@@ -3487,6 +3617,14 @@ function dateFromText(low){
   if(after){const d=new Date();d.setDate(d.getDate()+(+after[1]));return localDateKey(d);}
   if(/послезавтра/.test(low)){const d=new Date();d.setDate(d.getDate()+2);return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');}
   if(/завтра/.test(low)){const d=new Date();d.setDate(d.getDate()+1);return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');}
+  const numeric=low.match(/(?:^|\s)([0-3]?\d)[./]([01]?\d)(?:[./](20\d{2}|\d{2}))?(?=\s|$)/);
+  if(numeric){
+    const now=new Date(),day=Number(numeric[1]),month=Number(numeric[2]);let year=numeric[3]?Number(numeric[3]):now.getFullYear();
+    if(year<100)year+=2000;
+    const d=new Date(year,month-1,day);
+    if(!numeric[3]&&d<new Date(now.getFullYear(),now.getMonth(),now.getDate()))d.setFullYear(year+1);
+    if(d.getDate()===day&&d.getMonth()===month-1)return localDateKey(d);
+  }
   const months={январ:0,феврал:1,март:2,апрел:3,мая:4,май:4,июн:5,июл:6,август:7,сентябр:8,октябр:9,ноябр:10,декабр:11};
   const dm=low.match(/\b(\d{1,2})\s+(январ\w*|феврал\w*|март\w*|апрел\w*|мая|май|июн\w*|июл\w*|август\w*|сентябр\w*|октябр\w*|ноябр\w*|декабр\w*)/);
   if(dm){
@@ -3505,8 +3643,9 @@ function timeFromText(low){
     else now.setMinutes(now.getMinutes()+n);
     return String(now.getHours()).padStart(2,'0')+':'+String(now.getMinutes()).padStart(2,'0');
   }
-  const tm=low.match(/(\d{1,2})[:.\-](\d{2})|(?:в|к|на)\s*(\d{1,2})(?:\s|ч|$)/);
-  if(tm){const hh=tm[1]||tm[3];const mm=tm[2]||'00';return String(hh).padStart(2,'0')+':'+mm;}
+  const withoutDates=low.replace(/\b[0-3]?\d[./][01]?\d(?:[./](?:20)?\d{2})?\b/g,' ');
+  const tm=withoutDates.match(/(\d{1,2})[:.\-](\d{2})|(?:в|к|на)\s*(\d{1,2})(?:\s|ч|$)/);
+  if(tm){const hh=Number(tm[1]||tm[3]),mm=Number(tm[2]||0);if(hh<=23&&mm<=59)return String(hh).padStart(2,'0')+':'+String(mm).padStart(2,'0');}
   return '';
 }
 function findOrNull(name){return getExpCats().some(c=>c.name===name)?name:null;}
@@ -3557,27 +3696,37 @@ function cleanLocalTitle(text){
     .replace(/(?:^|\s)(?:сегодня|завтра|послезавтра|через\s+\d+\s+(?:дн\w*|час\w*|мин\w*))(?=\s|$)/gi,' ')
     .replace(/(?:^|\s)(?:в|во)\s+(?:понедельник|вторник|среду?|четверг|пятницу?|субботу?|воскресенье)(?=\s|$)/gi,' ')
     .replace(/\b\d{1,2}\s+(?:январ\w*|феврал\w*|март\w*|апрел\w*|мая|июн\w*|июл\w*|август\w*|сентябр\w*|октябр\w*|ноябр\w*|декабр\w*)/gi,'')
+    .replace(/\b[0-3]?\d[./][01]?\d(?:[./](?:20)?\d{2})?\b/g,' ')
     .replace(/(?:^|\s)(?:в|к|на)\s*\d{1,2}(?:[:.\-]\d{2})?\s*(?:час(?:а|ов)?|утра|дня|вечера)?/gi,' ')
     .replace(/\b\d{1,2}[:.]\d{2}\b/g,' ')
     .replace(/(?:^|\s)кажд\S*\s+(?:день|недел\S*|месяц|понедельник|вторник|среду?|четверг|пятницу?|субботу?|воскресенье)(?=\s|$)/gi,' ')
     .replace(/^\s+/,'')
     .replace(/^(?:у\s+меня\s+|мне\s+)?(?:нужно|надо|необходимо)\s+/i,'')
     .replace(/^(?:у\s+меня|мне)\s+/i,'')
+    .replace(/^из\s+них(?:\s+я)?(?:\s+уже)?\s+/i,'')
+    .replace(/^по\s+работе\s+/i,'')
     .replace(/\s+/g,' ').replace(/^[,.\s]+|[,.\s]+$/g,'').trim();
 }
 function splitLocalSpeech(text){
   let s=text.replace(/\s+/g,' ').trim();
-  s=s.replace(/[;,.\n]+/g,' | ');
+  s=s.replace(/[;,\n]+|[.!?]+(?=\s|$)/g,' | ');
   const starters='позвон(?:ить|и)|написать|отправить|забрать|отвезти|сходить|съездить|встретиться|встреча|купить|докупить|заказать|оплатить|заплатить|потратил|потратила|купил|купила|получил|получила|зарплата|аванс|тренировка|заниматься|читать|напомни|добавь|создай';
+  s=s.replace(/\s+(?=из\s+них(?:\s+я)?(?:\s+уже)?\s+(?:потратила?|заплатила?|отдала?|ушло))/gi,' | ');
   // Время непосредственно перед новым глаголом относится к новому действию:
   // «купить хлеб в 18 позвонить маме».
   s=s.replace(new RegExp(`\\s+(?:и\\s+)?(?=(${starters})(?:\\s|$))`,'gi'),' | ');
   // «пришла зарплата 90 тысяч из них 50 тысяч отдал за квартиру»
   // содержит две финансовые операции без союза и пунктуации.
+  s=s.replace(/\s+(?=из\s+них(?:\s+я)?(?:\s+уже)?\s+(?:потратила?|заплатила?|отдала?|ушло))/gi,' | ');
   s=s.replace(/\s+(?=из\s+них(?:\s+я)?(?:\s+уже)?\s+\d)/gi,' | ');
-  s=s.replace(/\s+(?:и\s+)?(?=(?:сегодня|завтра|послезавтра|в\s+(?:понедельник|вторник|среду|четверг|пятницу|субботу|воскресенье)|кажд\S*\s+(?:день|понедельник|вторник|среду|четверг|пятницу|субботу|воскресенье))\s+(?:мне\s+)?(?:нужно\s+|надо\s+)?)/gi,' | ');
+  s=s.replace(/\s+(?:и\s+)?(?=(?:сегодня|завтра|послезавтра|во?\s+(?:понедельник|вторник|среду|четверг|пятницу|субботу|воскресенье)|кажд\S*\s+(?:день|понедельник|вторник|среду|четверг|пятницу|субботу|воскресенье))\s+(?:мне\s+)?(?:нужно\s+|надо\s+)?)/gi,' | ');
   const raw=s.split('|').map(x=>x.trim()).filter(x=>x.length>1),out=[];
   for(let i=0;i<raw.length-1;i++){
+    if(/^из\s+них(?:\s+я)?(?:\s+уже)?$/i.test(raw[i])){raw[i+1]=raw[i]+' '+raw[i+1];raw[i]='';continue;}
+    if(/(?:мне\s+)?(?:нужно|надо)(?:\s+по\s+работе)?\s+(?:в|к)\s*\d{1,2}(?::\d{2})?$/i.test(raw[i])){raw[i+1]=raw[i]+' '+raw[i+1];raw[i]='';}
+  }
+  for(let i=0;i<raw.length-1;i++){
+    if(!raw[i])continue;
     const tm=raw[i].match(/\s+((?:в|к)\s*\d{1,2}(?:[:.\-]\d{2})?\s*(?:час(?:а|ов)?|утра|дня|вечера)?)$/i);
     if(tm){raw[i]=raw[i].slice(0,tm.index).trim();raw[i+1]=tm[1]+' '+raw[i+1];}
     const incomeLead=raw[i].match(/\s+(пришл\S*|получил\S*)$/i);
@@ -3586,8 +3735,9 @@ function splitLocalSpeech(text){
       raw[i+1]=incomeLead[1]+' '+raw[i+1];
     }
   }
-  const onlyWhen=/^(?:и\s+)?(?:сегодня|завтра|послезавтра|в\s+(?:понедельник|вторник|среду?|четверг|пятницу?|субботу?|воскресенье)|кажд\S*\s+(?:день|понедельник|вторник|среду?|четверг|пятницу?|субботу?|воскресенье))(?:\s+(?:у\s+меня|мне))?$/i;
+  const onlyWhen=/^(?:и\s+)?(?:сегодня|завтра|послезавтра|во?\s+(?:понедельник|вторник|среду?|четверг|пятницу?|субботу?|воскресенье)|кажд\S*\s+(?:день|понедельник|вторник|среду?|четверг|пятницу?|субботу?|воскресенье))(?:\s+(?:у\s+меня|мне)(?:\s+(?:нужно|надо))?)?$/i;
   for(let i=0;i<raw.length;i++){
+    if(!raw[i])continue;
     if(onlyWhen.test(raw[i])&&raw[i+1])raw[i+1]=raw[i]+' '+raw[i+1];
     else out.push(raw[i]);
   }
@@ -3604,6 +3754,9 @@ function expenseCategory(text){
   if(/квартир|аренд|ипотек|жиль/.test(low))return findOrNull('Жильё')||'Жильё';
   if(/коммунал|свет|газ|интернет/.test(low))return findOrNull('Коммуналка')||'Коммуналка';
   if(/лекар|аптек|врач/.test(low))return findOrNull('Здоровье')||'Здоровье';
+  if(/шампун|порошок|мыл|чистящ|губк|салфет|бумаг|бытов/.test(low))return findOrNull('Дом')||'Прочее';
+  if(/одеж|футбол|рубаш|джинс|куртк|обув|кроссов|носк/.test(low))return findOrNull('Одежда')||'Прочее';
+  if(/такси|автобус|метро|проезд|билет/.test(low))return findOrNull('Транспорт')||'Прочее';
   if(/корм|собак|кошк|ветеринар/.test(low))return findOrNull('Питомцы')||'Питомцы';
   return 'Прочее';
 }
@@ -3626,12 +3779,13 @@ function parseLocalPlan(text){
   const chunks=splitLocalSpeech(text);const actions=[];const unknown=[];let contextDate=todayKey();
   chunks.forEach(chunk=>{
     const low=chunk.toLowerCase();
-    const hasDate=/(?:^|\s)(?:сегодня|завтра|послезавтра|через\s+\d+\s+д|в\s+(?:понедельник|вторник|среду?|четверг|пятницу?|субботу?|воскресенье)|кажд\S*\s+(?:понедельник|вторник|среду?|четверг|пятницу?|субботу?|воскресенье)|\d{1,2}\s+(?:январ|феврал|март|апрел|мая|июн|июл|август|сентябр|октябр|ноябр|декабр))/.test(low);
+    const hasDate=/(?:^|\s)(?:сегодня|завтра|послезавтра|через\s+\d+\s+д|во?\s+(?:понедельник|вторник|среду?|четверг|пятницу?|субботу?|воскресенье)|кажд\S*\s+(?:понедельник|вторник|среду?|четверг|пятницу?|субботу?|воскресенье)|\d{1,2}\s+(?:январ|феврал|март|апрел|мая|июн|июл|август|сентябр|октябр|ноябр|декабр)|[0-3]?\d[./][01]?\d(?:[./](?:20)?\d{2})?)(?=\s|$)/.test(low);
     if(hasDate)contextDate=dateFromText(low);
     const date=contextDate;const time=timeFromText(low)||extractTime(low);
     let amountMatch=low.match(/(\d[\d\s]{0,9})\s*(₽|р\b|руб(?:лей)?|тыс(?:яч[аиу]?)?|тыщ[аиу]?)/);
     let amount=amountMatch?Number(amountMatch[1].replace(/\s/g,'')):0;
     if(amountMatch&&/тыс|тыщ/.test(amountMatch[2])&&amount<1000)amount*=1000;
+    if(!amount&&/(потрат|купил|заплат|оплат|отдал|ушло)/.test(low)){const plain=low.match(/\b(\d[\d\s]{2,})\b/);amount=plain?Number(plain[1].replace(/\s/g,'')):0;}
     if(/зарплат|аванс|преми|получил|получила|доход|заработал/.test(low)){
       if(!amount){const m=low.match(/\b(\d[\d\s]{2,})\b/);amount=m?Number(m[1].replace(/\s/g,'')):0;}
       actions.push({type:'income',amount,source:/аванс/.test(low)?'Аванс':/преми/.test(low)?'Премия':'Зарплата',date:hasDate?date:todayKey(),desc:chunk,_source:chunk});return;
@@ -3669,6 +3823,7 @@ function localPlanMeta(a){
 }
 function tryLocalAnswer(text){
   const low=text.toLowerCase();
+  const receiptAnswer=tryReceiptAnswer(text);if(receiptAnswer)return receiptAnswer;
   if(/покаж\w*.*(?:дел|задач).*(?:недел)/.test(low)){
     const end=new Date();end.setDate(end.getDate()+7);const endKey=localDateKey(end);
     let list=getTasks().filter(t=>!t.done&&t.date>=todayKey()&&t.date<=endKey);
@@ -3695,6 +3850,31 @@ function tryLocalAnswer(text){
     return s.length?`В списке покупок:<br>${s.slice(0,12).map(x=>'• '+esc(x.t)).join('<br>')}`:'Список покупок пуст.';
   }
   return null;
+}
+function receiptQueryTerms(text){
+  return receiptSearchKey(text).split(' ').filter(x=>x.length>1&&!/^(найди|найти|покажи|показать|чек|чеки|чека|где|когда|сколько|стоил|стоила|стоило|стоит|цена|купил|купила|покупал|покупала|покупали|последний|последняя|последний|раз|дешевле|дороже|история|цен|цены|товар|магазин|из|в|на|за|я|мы)$/.test(x));
+}
+function receiptTextMatches(haystack,terms){
+  return terms.every(t=>haystack.includes(t)||(t.length>4&&haystack.includes(t.slice(0,-1)))||(t.length>6&&haystack.includes(t.slice(0,-2))));
+}
+function tryReceiptAnswer(text){
+  const low=receiptSearchKey(text);
+  if(!/(чек|стоил|стоила|стоило|цена|дешевле|дороже|покупал|покупала)/.test(low))return null;
+  const rows=receiptProductHistory(),terms=receiptQueryTerms(text);
+  const found=rows.filter(x=>terms.length?receiptTextMatches(x.key+' '+receiptSearchKey(x.merchant),terms):true);
+  if(!rows.length)return 'История чеков пока пуста. Нажми кнопку чека рядом с микрофоном и отсканируй первую покупку.';
+  if(!found.length)return `В сохранённых чеках ничего не нашёл по запросу «${esc(terms.join(' '))}».`;
+  if(/дешевле|минимальн|самая низкая/.test(low)){
+    const priced=found.filter(x=>x.price>0).sort((a,b)=>a.price-b.price);if(!priced.length)return 'Нашёл товар, но в старом чеке не сохранена его цена.';
+    const x=priced[0];return `Самая низкая найденная цена: <b>${esc(x.name)} — ${fmtMoney(x.price)} ₽</b><br>${esc(x.merchant)} · ${fmtDate(x.date)}<br><button class="local-plan-edit" onclick="openReceiptDetails(${x.receiptId})">Открыть чек</button>`;
+  }
+  if(/сколько|стоил|стоила|стоило|цена|последн/.test(low)){
+    const x=found.find(x=>x.price>0)||found[0],same=found.filter(y=>y.key===x.key&&y.price>0);
+    const prev=same[1],change=prev&&prev.price?Math.round((x.price-prev.price)/prev.price*100):0;
+    return `<b>${esc(x.name)}</b> в последний раз стоил ${x.price?`<b>${fmtMoney(x.price)} ₽</b>`:'без распознанной цены'}<br>${esc(x.merchant)} · ${fmtDate(x.date)}${prev?`<br>Предыдущая цена: ${fmtMoney(prev.price)} ₽${change?` (${change>0?'+':''}${change}%)`:''}`:''}<br><button class="local-plan-edit" onclick="openReceiptDetails(${x.receiptId})">Открыть чек</button>`;
+  }
+  const unique=[];found.forEach(x=>{if(!unique.some(y=>y.receiptId===x.receiptId))unique.push(x);});
+  return `Нашёл ${unique.length} ${unique.length===1?'чек':'чека'}:<br>${unique.slice(0,8).map(x=>`• <button class="local-plan-edit" onclick="openReceiptDetails(${x.receiptId})">${esc(x.merchant)} · ${fmtDate(x.date)}</button> — ${esc(x.name)}${x.price?' '+fmtMoney(x.price)+' ₽':''}`).join('<br>')}`;
 }
 function localPlanHTML(plan){
   const icons={task:'✓',expense:'−₽',income:'+₽',shopping:'🛒',habit:'↻'};
@@ -4525,7 +4705,7 @@ function renderToday(){
 function globalOpen(type,id){
   document.getElementById('search').value='';
   if(type==='task'){switchTab('all');setTimeout(()=>editTask(id),80);}
-  else if(type==='expense'){switchTab('finance');setTimeout(()=>editExpense(id),80);}
+  else if(type==='expense'){const x=(load().finance||[]).find(r=>r.id===id);switchTab('finance');setTimeout(()=>x?.receiptItems?openReceiptDetails(id):editExpense(id),80);}
   else if(type==='income'){switchTab('finance');setTimeout(()=>editIncome(id),80);}
   else if(type==='shopping'){openShopping();}
   else if(type==='note'){switchTab('notes');}
@@ -4543,7 +4723,7 @@ function renderGlobalSearch(q){
   const view=document.getElementById('view'),data=load(),groups=[];
   const has=(...parts)=>parts.join(' ').toLowerCase().includes(q);
   const tasks=(data.tasks||[]).filter(x=>has(x.title,x.desc,(x.subs||[]).map(s=>s.t).join(' '))).map(x=>({type:'task',id:x.id,icon:'✓',title:x.title,meta:`Дело · ${fmtDate(x.date)}${x.time?' · '+x.time:''}`}));
-  const expenses=(data.finance||[]).filter(x=>has(x.desc,x.category,x.amount)).map(x=>({type:'expense',id:x.id,icon:'₽',title:`${fmtMoney(x.amount)} ₽ · ${x.category}`,meta:`Расход · ${fmtDate(x.date)}`}));
+  const expenses=(data.finance||[]).filter(x=>has(x.desc,x.merchant,x.category,x.amount,(x.receiptItems||[]).map(i=>typeof i==='string'?i:[i.name,i.category,i.price].join(' ')).join(' '))).map(x=>({type:'expense',id:x.id,icon:x.receiptItems?'🧾':'₽',title:x.receiptItems?`${x.merchant||x.desc} · ${fmtMoney(x.amount)} ₽`:`${fmtMoney(x.amount)} ₽ · ${x.category}`,meta:`Расход · ${fmtDate(x.date)}`}));
   const incomes=(data.income||[]).filter(x=>has(x.desc,x.source,x.amount)).map(x=>({type:'income',id:x.id,icon:'＋',title:`${fmtMoney(x.amount)} ₽ · ${x.source}`,meta:`Доход · ${fmtDate(x.date)}`}));
   const shopping=(data.shopping||[]).filter(x=>has(x.t)).map(x=>({type:'shopping',id:x.id,icon:'🛒',title:x.t,meta:x.done?'Куплено':'В списке покупок'}));
   const notes=(data.notes||[]).filter(x=>has(x.title,x.text)).map(x=>({type:'note',id:x.id,icon:'📝',title:x.title||'Заметка',meta:(x.text||'').slice(0,70)}));
@@ -4878,7 +5058,7 @@ function showTourStep(){
   }
   if(tourStep===9){
     switchTab('finance');setTimeout(()=>openReceiptScanner(),80);
-    renderTourCoach({title:'Умный просмотр чека',text:'Сфотографируй чек или выбери снимок. Lumo локально распознает магазин, итог, дату и позиции, а затем предложит проверить результат.',example:'Сканер доступен в «Финансах» и кнопкой чека рядом с микрофоном в ИИ. Фото и текст не отправляются на сервер.',top:true});return;
+    renderTourCoach({title:'Умный просмотр чека',text:'Сфотографируй чек или выбери снимок. Lumo распознает магазин, итог, каждую позицию и цену. Категории товаров можно исправить перед сохранением.',example:'Диаграмма разделит смешанный чек по категориям. «История цен» покажет изменения, а ИИ ответит: «Сколько стоило молоко?»',top:true});return;
   }
   if(tourStep===10){
     switchTab('finance');setTimeout(()=>focusTourElement('.goal-card, .budget-card, button[onclick=\"openGoal()\"]'),120);
