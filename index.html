@@ -850,103 +850,55 @@ body.dark .fab{box-shadow:0 0 26px color-mix(in srgb,var(--brand) 55%,transparen
 .confetti{position:fixed;width:10px;height:10px;z-index:300;pointer-events:none}
 
 /* ═══════════════════════════════════════════════════════════
-   ЗАСТАВКА LUMO (кино-вход) — под новую палитру
+   БЫСТРЫЙ ЗАПУСК LUMO — в одном визуальном языке с iOS PWA
    ═══════════════════════════════════════════════════════════ */
 #cinematic{
-  position:fixed;
-  top:0;left:0;right:0;bottom:0;
-  background-attachment:fixed;z-index:99999;
-  padding-top:env(safe-area-inset-top);
-  display:flex;flex-direction:column;align-items:center;justify-content:center;gap:0;
-  background:linear-gradient(160deg,#4B35C8 0%,#7B5CFF 45%,#9D8DFF 100%);
-  transition:opacity .6s ease;overflow:hidden;
+  position:fixed;inset:0;z-index:99999;
+  padding:env(safe-area-inset-top) 24px env(safe-area-inset-bottom);
+  display:flex;flex-direction:column;align-items:center;justify-content:center;
+  color:var(--text);background:var(--bg);overflow:hidden;
+  opacity:1;transition:opacity .28s ease,visibility .28s ease;
 }
-#cinematic.hide{opacity:0;pointer-events:none}
-
-/* Фоновый узор как у Пятёрочки */
+#cinematic.hide{opacity:0;visibility:hidden;pointer-events:none}
 #cinematic::before{
-  content:'';position:absolute;inset:0;
-  background-image:
-    repeating-linear-gradient(45deg,rgba(255,255,255,.04) 0,rgba(255,255,255,.04) 1px,transparent 0,transparent 50%),
-    repeating-linear-gradient(-45deg,rgba(255,255,255,.04) 0,rgba(255,255,255,.04) 1px,transparent 0,transparent 50%);
-  background-size:40px 40px;
-  pointer-events:none;
+  content:'';position:absolute;inset:0;pointer-events:none;
+  background:
+    radial-gradient(45% 35% at 50% 45%,color-mix(in srgb,var(--brand) 15%,transparent),transparent 72%),
+    radial-gradient(35% 28% at 72% 70%,color-mix(in srgb,var(--brand2) 8%,transparent),transparent 75%);
 }
-
-/* Свечение снизу */
-#cinematic::after{
-  content:'';position:absolute;bottom:-20%;left:50%;transform:translateX(-50%);
-  width:70%;height:40%;border-radius:50%;
-  background:radial-gradient(ellipse,rgba(255,255,255,.18),transparent 70%);
-  pointer-events:none;
+.cin-glow{
+  position:absolute;left:50%;top:50%;width:142px;height:142px;border-radius:50%;
+  transform:translate(-50%,-62%) scale(.72);opacity:0;
+  background:color-mix(in srgb,var(--brand) 16%,transparent);
+  filter:blur(28px);animation:cinGlowIn .55s ease .05s forwards;
 }
-
-/* Круглый логотип */
 .cin-logo{
-  width:140px;height:140px;border-radius:50%;
-  display:flex;align-items:center;justify-content:center;
-  background:rgba(255,255,255,.18);
-  border:3px solid rgba(255,255,255,.35);
-  box-shadow:
-    0 0 0 12px rgba(255,255,255,.07),
-    0 20px 60px rgba(0,0,0,.25),
-    inset 0 2px 0 rgba(255,255,255,.3);
-  opacity:0;transform:scale(.6);
-  animation:cinLogoIn .9s cubic-bezier(.34,1.5,.5,1) .1s forwards;
+  width:82px;height:82px;border-radius:26px;display:grid;place-items:center;
+  background:linear-gradient(145deg,color-mix(in srgb,var(--card) 94%,var(--brand) 6%),var(--card));
+  border:1px solid color-mix(in srgb,var(--brand) 16%,var(--line));
+  box-shadow:0 18px 42px color-mix(in srgb,var(--brand) 22%,transparent),inset 0 1px 0 color-mix(in srgb,#fff 72%,transparent);
+  opacity:0;transform:translateY(8px) scale(.88);
+  animation:cinLogoIn .5s cubic-bezier(.22,1,.36,1) .04s forwards;
   position:relative;z-index:1;
 }
-@keyframes cinLogoIn{to{opacity:1;transform:scale(1)}}
-
+.cin-logo::after{content:'';position:absolute;inset:7px;border-radius:20px;border:1px solid color-mix(in srgb,var(--brand) 7%,transparent)}
 .cin-drop{
-  opacity:0;
-  filter:drop-shadow(0 4px 16px rgba(255,255,255,.4));
-  animation:cinDropIn .8s ease .3s forwards;
+  width:45px;height:45px;opacity:0;filter:drop-shadow(0 7px 12px color-mix(in srgb,var(--brand) 26%,transparent));
+  animation:cinDropIn .38s ease .2s forwards;position:relative;z-index:1;
 }
-@keyframes cinDropIn{from{opacity:0;transform:translateY(8px) scale(.9)}to{opacity:1;transform:none}}
-
-/* Название */
 .cin-title{
-  color:#fff;
-  font-size:2.6rem;
-  font-weight:900;
-  letter-spacing:10px;
-  margin-top:32px;
-  opacity:0;transform:translateY(12px);
-  text-shadow:0 4px 30px rgba(0,0,0,.2);
-  animation:cinTextIn .7s ease .55s forwards;
-  position:relative;z-index:1;
+  color:var(--text);font-size:1.55rem;font-weight:850;letter-spacing:-.035em;margin-top:20px;
+  opacity:0;transform:translateY(6px);animation:cinTextIn .36s ease .22s forwards;position:relative;z-index:1;
 }
-
-/* Слоган */
 .cin-tagline{
-  color:rgba(255,255,255,.8);
-  font-size:.85rem;
-  letter-spacing:3px;
-  text-transform:uppercase;
-  margin-top:10px;
-  opacity:0;
-  animation:cinTextIn .7s ease .75s forwards;
-  position:relative;z-index:1;
+  color:var(--muted);font-size:.76rem;letter-spacing:.01em;margin-top:5px;opacity:0;
+  animation:cinTextIn .36s ease .3s forwards;position:relative;z-index:1;
 }
-@keyframes cinTextIn{to{opacity:1;transform:translateY(0)}}
-
-/* Точки загрузки */
-.cin-dots{
-  display:flex;gap:8px;margin-top:52px;
-  opacity:0;animation:cinTextIn .5s ease 1s forwards;
-  position:relative;z-index:1;
-}
-.cin-dots span{
-  width:7px;height:7px;border-radius:50%;
-  background:rgba(255,255,255,.5);
-  animation:cinDot 1.2s ease-in-out infinite;
-}
-.cin-dots span:nth-child(2){animation-delay:.2s}
-.cin-dots span:nth-child(3){animation-delay:.4s}
-@keyframes cinDot{
-  0%,80%,100%{transform:scale(.7);opacity:.4}
-  40%{transform:scale(1.1);opacity:1}
-}
+@keyframes cinGlowIn{to{opacity:1;transform:translate(-50%,-62%) scale(1)}}
+@keyframes cinLogoIn{to{opacity:1;transform:none}}
+@keyframes cinDropIn{from{opacity:0;transform:scale(.82)}to{opacity:1;transform:none}}
+@keyframes cinTextIn{to{opacity:1;transform:none}}
+@media(prefers-reduced-motion:reduce){#cinematic,.cin-glow,.cin-logo,.cin-drop,.cin-title,.cin-tagline{animation:none!important;transition:none!important;opacity:1;transform:none}}
 
 /* SVG в SVG-defs (градиент кольца прогресса) — прячем контейнер */
 svg[width="0"]{position:absolute;width:0;height:0}
@@ -1114,19 +1066,17 @@ body{letter-spacing:-.01em;padding-bottom:calc(82px + env(safe-area-inset-bottom
 <stop offset="0" stop-color="#6c5ce7"/><stop offset="1" stop-color="#a29bfe"/>
 </linearGradient></defs></svg>
 <!-- КИНЕМАТОГРАФИЧНЫЙ ВХОД LUMO -->
-<div id="cinematic">
+<div id="cinematic" aria-hidden="true">
   <div class="cin-glow"></div>
   <div class="cin-logo">
     <svg class="cin-drop" width="72" height="72" viewBox="0 0 512 512">
-      <path d="M256 118 C 322 210, 352 262, 352 318 a96 96 0 0 1 -192 0 C 160 262, 190 210, 256 118 Z" fill="#fff"/>
-      <path d="M256 176 C 302 238, 324 274, 324 316 a68 68 0 0 1 -56 67 C 302 344, 286 252, 256 176 Z" fill="#a29bfe" opacity=".5"/>
+      <defs><linearGradient id="cinDropGradient" x1="120" y1="100" x2="390" y2="410"><stop stop-color="var(--brand2)"/><stop offset="1" stop-color="var(--brand)"/></linearGradient></defs>
+      <path d="M256 118 C 322 210, 352 262, 352 318 a96 96 0 0 1 -192 0 C 160 262, 190 210, 256 118 Z" fill="url(#cinDropGradient)"/>
+      <path d="M256 176 C 302 238, 324 274, 324 316 a68 68 0 0 1 -56 67 C 302 344, 286 252, 256 176 Z" fill="#fff" opacity=".2"/>
     </svg>
   </div>
-  <div class="cin-title">LUMO</div>
+  <div class="cin-title">Lumo</div>
   <div class="cin-tagline">освети свой день</div>
-  <div class="cin-dots">
-    <span></span><span></span><span></span>
-  </div>
 </div>
 <div class="hero">
     <div class="hero-top">
@@ -1386,12 +1336,14 @@ body{letter-spacing:-.01em;padding-bottom:calc(82px + env(safe-area-inset-bottom
       <label class="settings-label">Тема</label><div class="seg"><button type="button" class="pri-b" id="th-auto" onclick="setThemeMode('auto')">Авто</button><button type="button" class="pri-b" id="th-light" onclick="setThemeMode('light')">Светлая</button><button type="button" class="pri-b" id="th-dark" onclick="setThemeMode('dark')">Тёмная</button></div>
       <div class="settings-inline"><button onclick="openMenuEditor();closeSettings()">Настроить меню</button><button onclick="openCatModal();closeSettings()">Категории</button></div>
     </div></details>
-    <details class="settings-group"><summary><span class="settings-icon">◷</span><span><b>Напоминания</b><small>Дела, привычки и тихие часы</small></span></summary><div class="settings-content">
+    <details class="settings-group"><summary><span class="settings-icon">◷</span><span><b>Напоминания</b><small>Дела, привычки, покупки и тишина</small></span></summary><div class="settings-content">
       <div class="field"><label>Напоминание о делах</label><input id="notify-hour" type="time" value="09:00" onchange="saveNotifyHour()"></div>
       <div class="two-col"><div class="field"><label>Тихо с</label><input id="quiet-from" type="time" value="22:00" onchange="saveQuietHours()"></div><div class="field"><label>До</label><input id="quiet-to" type="time" value="08:00" onchange="saveQuietHours()"></div></div>
       <div class="chk-toggle" onclick="toggleQuietEnabled()"><div class="box" id="quiet-box"></div><div class="lbl">Включить тихие часы</div></div>
       <div class="chk-toggle" onclick="toggleHabitReminder()"><div class="box" id="habit-reminder-box"></div><div class="lbl">Напоминать о невыполненных привычках</div></div>
       <div class="field"><label>Время привычек</label><input id="habit-reminder-time" type="time" value="09:00" onchange="saveHabitReminderTime()"></div>
+      <div class="chk-toggle" onclick="toggleShoppingReminder()"><div class="box" id="shopping-reminder-box"></div><div class="lbl">Напоминать о незакрытых покупках</div></div>
+      <div class="field"><label>Время списка покупок</label><input id="shopping-reminder-time" type="time" value="18:00" onchange="saveShoppingReminderTime()"></div>
       <div class="chk-toggle" onclick="toggleInsightReminder()"><div class="box" id="insight-reminder-box"></div><div class="lbl">Умные предложения Lumo</div></div>
       <div class="field"><label>Время предложений</label><input id="insight-reminder-time" type="time" value="18:30" onchange="saveInsightReminderTime()"></div>
       <div class="ai-hint">Lumo напомнит только о полезном: просрочках, превышениях бюджета, платежах, покупках и незавершённых привычках.</div>
@@ -2419,10 +2371,11 @@ function saveTask(){
   setTasks(t);
   const assignTo=document.getElementById('f-assign')?document.getElementById('f-assign').value:'';
   if(assignTo){
+    const assignEventId='assign_'+String(obj.id||editId)+'_'+assignTo;
     const assignPayload={userId:PUSH_USER_ID,toUserId:assignTo,task:{
-      title:obj.title,desc:obj.desc||'',date:obj.date||'',time:obj.time||'',pri:obj.pri||'Y',module:obj.module||'personal'
-    }};
-    sendOrQueue('/family/assign',assignPayload,'assign:'+(obj.id||editId)).then(sent=>{
+      title:obj.title,desc:obj.desc||'',date:obj.date||'',time:obj.time||'',pri:obj.pri||'Y',module:obj.module||'personal',clientEventId:assignEventId
+    },familyId:getFamilyState(),fromName:getMyName(),notification:{type:'family-task',eventId:assignEventId,title:'📥 Новое поручение',body:(getMyName()?getMyName()+': ':'')+obj.title,taskId:assignEventId}};
+    sendOrQueue('/family/assign',assignPayload,'assign:'+(obj.id||editId)+':'+assignTo).then(sent=>{
       toast(sent?'✅ Поручено!':'📤 Поручение сохранено в очереди');
     });
   }
@@ -3448,7 +3401,7 @@ function toggleTheme(){
   setThemeMode(m==='dark'?'light':'dark');
   toast(getThemeMode()==='dark'?'🌙 Тёмная тема':'☀️ Светлая тема');
 }
-function openSettings(){renderColorPick();updateThemeButtons();loadNotifyHour();loadQuietHours();loadHabitReminder();loadInsightReminder();renderLocalMemoryInfo();document.getElementById('modal-settings').classList.add('on');checkPushHealth(false);}
+function openSettings(){renderColorPick();updateThemeButtons();loadNotifyHour();loadQuietHours();loadHabitReminder();loadShoppingReminder();loadInsightReminder();renderLocalMemoryInfo();document.getElementById('modal-settings').classList.add('on');checkPushHealth(false);}
 function closeSettings(){document.getElementById('modal-settings').classList.remove('on');}
 
 /* НАПОМИНАНИЯ / ТИХИЕ ЧАСЫ */
@@ -3467,7 +3420,7 @@ function inQuietHours(){
 
 function requestNotify(){
   if(!('Notification'in window)){toast('Уведомления не поддерживаются');return;}
-  Notification.requestPermission().then(p=>{toast(p==='granted'?'🔔 Напоминания включены':'Уведомления отклонены');if(p==='granted')scheduleAllTimeouts();});
+  Notification.requestPermission().then(p=>{toast(p==='granted'?'🔔 Напоминания включены':'Уведомления отклонены');if(p==='granted'){scheduleAllTimeouts();scheduleHabitReminderLocal();scheduleShoppingReminderLocal();scheduleShoppingPushServer(true);}});
 }
 let localTimeouts=[];
 function scheduleAllTimeouts(){localTimeouts.forEach(t=>clearTimeout(t));localTimeouts=[];getTasks().forEach(scheduleLocalTimeout);}
@@ -3492,11 +3445,28 @@ function loadInsightReminder(){const r=getInsightReminder(),box=document.getElem
 function toggleInsightReminder(){const d=load(),r=getInsightReminder();r.enabled=!r.enabled;d.insightReminder=r;save(d);loadInsightReminder();scheduleSmartInsightPush(true);toast(r.enabled?'Умные предложения включены':'Умные предложения выключены')}
 function saveInsightReminderTime(){const d=load(),r=getInsightReminder();r.time=document.getElementById('insight-reminder-time').value||'18:30';d.insightReminder=r;save(d);scheduleSmartInsightPush(true);toast('Время предложений сохранено')}
 let habitReminderTimeout=null;
+let shoppingReminderTimeout=null;
 function incompleteHabits(){const tk=todayKey();return getHabits().filter(h=>!h.log?.[tk]);}
 function scheduleHabitReminderLocal(){
   if(habitReminderTimeout){clearTimeout(habitReminderTimeout);habitReminderTimeout=null;}const r=getHabitReminder();if(!r.enabled||!('Notification'in window)||Notification.permission!=='granted')return;
   const [hh,mm]=(r.time||'09:00').split(':').map(Number),at=new Date();at.setHours(hh||0,mm||0,0,0);if(at.getTime()<=Date.now())at.setDate(at.getDate()+1);
   habitReminderTimeout=setTimeout(()=>{if(!inQuietHours()){const left=incompleteHabits();if(left.length){const key='habit-local:'+todayKey();notifyOnce(key,()=>{try{new Notification('🌱 Не забудь о привычках',{body:left.slice(0,4).map(h=>h.icon+' '+h.name).join(' · '),tag:key,renotify:false,icon:'./icon.png'});}catch(e){}});}}scheduleHabitReminderLocal();},at.getTime()-Date.now());
+}
+function getShoppingReminder(){return load().shoppingReminder||{enabled:true,time:'18:00'};}
+function loadShoppingReminder(){const r=getShoppingReminder(),box=document.getElementById('shopping-reminder-box'),time=document.getElementById('shopping-reminder-time');if(box){box.classList.toggle('on',r.enabled);box.textContent=r.enabled?'✓':'';}if(time)time.value=r.time||'18:00';}
+function toggleShoppingReminder(){const d=load(),r=getShoppingReminder();r.enabled=!r.enabled;d.shoppingReminder=r;save(d);loadShoppingReminder();scheduleShoppingReminderLocal();syncPushData();scheduleShoppingPushServer(true);toast(r.enabled?'🛒 Напоминания о покупках включены':'Напоминания о покупках выключены');}
+function saveShoppingReminderTime(){const d=load(),r=getShoppingReminder();r.time=document.getElementById('shopping-reminder-time').value||'18:00';d.shoppingReminder=r;save(d);scheduleShoppingReminderLocal();syncPushData();scheduleShoppingPushServer(true);toast('🛒 Время покупок сохранено');}
+function activeShoppingItems(){return getShopping().filter(x=>!x.done);}
+async function showShoppingNotification(title,items,type='shopping-reminder',eventId=''){
+  if(!('Notification'in window)||Notification.permission!=='granted'||inQuietHours()||!items.length)return;
+  if(type==='shopping-reminder'){try{const cache=await caches.open('lumo-push-state-v1'),key='./__push_seen__/shopping:'+todayKey();if(await cache.match(key))return;await cache.put(key,new Response(String(Date.now())));}catch(e){}}
+  const body=items.slice(0,5).map(x=>x.t||x).join(' · '),tag=type+':'+(eventId||todayKey());
+  try{const reg=await navigator.serviceWorker.ready;await reg.showNotification(title,{body,icon:'./icon.png',badge:'./icon.png',tag,renotify:false,data:{type,eventId}});}catch(e){try{new Notification(title,{body,icon:'./icon.png',tag});}catch(_){}}
+}
+function scheduleShoppingReminderLocal(){
+  if(shoppingReminderTimeout){clearTimeout(shoppingReminderTimeout);shoppingReminderTimeout=null;}const r=getShoppingReminder();if(!r.enabled||!('Notification'in window)||Notification.permission!=='granted')return;
+  const [hh,mm]=(r.time||'18:00').split(':').map(Number),at=new Date();at.setHours(hh||0,mm||0,0,0);if(at.getTime()<=Date.now())at.setDate(at.getDate()+1);
+  shoppingReminderTimeout=setTimeout(()=>{const items=activeShoppingItems();if(items.length){const key='shopping-local:'+todayKey()+':'+items.map(x=>x.id).join(',');notifyOnce(key,()=>showShoppingNotification('🛒 Не забудь про покупки',items));}scheduleShoppingReminderLocal();},at.getTime()-Date.now());
 }
 function snoozeTaskOneHour(taskId){
   const tasks=getTasks();
@@ -3512,6 +3482,12 @@ function snoozeTaskOneHour(taskId){
   refreshCurrentTab();
   toast('⏰ Отложено на 1 час');
 }
+async function openFamilyTaskFromPush(taskId){
+  await pullAssignedTasks();switchTab('all');
+  const task=getTasks().find(x=>String(x.assignId)===String(taskId)||String(x.id)===String(taskId));
+  if(task)setTimeout(()=>editTask(task.id),120);else toast('📥 Открыл новые семейные поручения');
+}
+function openShoppingFromPush(){switchTab('more');setTimeout(()=>openShopping(),100);}
 function handleLaunchActions(){
   const url=new URL(location.href);
   const taskId=url.searchParams.get('snoozeTask');
@@ -3522,6 +3498,8 @@ function handleLaunchActions(){
   }
   const insight=url.searchParams.get('assistantInsight');
   if(insight){try{const data=JSON.parse(insight);setTimeout(()=>openInsightConversation(data.prompt||'',data.summary||data.body||''),180)}catch(e){}url.searchParams.delete('assistantInsight');history.replaceState(null,'',url.pathname+url.search+url.hash)}
+  const familyTask=url.searchParams.get('familyTask');if(familyTask!==null){setTimeout(()=>openFamilyTaskFromPush(familyTask),180);url.searchParams.delete('familyTask');history.replaceState(null,'',url.pathname+url.search+url.hash)}
+  if(url.searchParams.get('openShopping')==='1'){setTimeout(()=>openShoppingFromPush(),180);url.searchParams.delete('openShopping');history.replaceState(null,'',url.pathname+url.search+url.hash)}
 }
 
 /* ===== СЕМЬЯ + ПУШИ (сервер) ===== */
@@ -3605,7 +3583,7 @@ async function subscribePush(){
     const sub=await reg.pushManager.subscribe({userVisibleOnly:true,applicationServerKey:urlB64ToUint8(pub)});
     await fetch(FAMILY_SERVER+'/subscribe',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({userId:PUSH_USER_ID,subscription:sub,name:getMyName(),role:getMyRole()})});
     toast('📲 Фоновые пуши включены!');
-    syncPushData();
+    syncPushData();scheduleShoppingPushServer(true);
   }catch(e){toast('Не вышло подписаться на пуши');}
 }
 function urlB64ToUint8(b64){const pad='='.repeat((4-b64.length%4)%4);const s=(b64+pad).replace(/-/g,'+').replace(/_/g,'/');const raw=atob(s);return Uint8Array.from([...raw].map(c=>c.charCodeAt(0)));}
@@ -3648,6 +3626,16 @@ async function scheduleHabitPushServer(force=false){
     if(response.ok)localStorage.setItem('habit_push_last_key',key);
   }catch(e){}
 }
+async function scheduleShoppingPushServer(force=false){
+  const r=getShoppingReminder(),items=activeShoppingItems();if(!r.enabled||!items.length||!('serviceWorker'in navigator))return;
+  const fingerprint=items.map(x=>String(x.id)+':'+String(x.t)).join('|').slice(0,220),key=`shopping_push:${todayKey()}:${r.time}:${fingerprint}`;
+  if(!force&&localStorage.getItem('shopping_push_last_key')===key)return;
+  try{
+    const reg=await navigator.serviceWorker.ready,sub=await reg.pushManager.getSubscription();if(!sub)return;
+    const [hour,minute]=(r.time||'18:00').split(':').map(Number),response=await fetch(FAMILY_SERVER+'/schedule-morning',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({userId:PUSH_USER_ID,subscription:sub,type:'shopping-reminder',scheduleId:'shopping:'+PUSH_USER_ID,reminderTime:r.time,title:'🛒 Не забудь про покупки',body:items.slice(0,5).map(x=>x.t).join(' · '),hour:hour||18,minute:minute||0,date:todayKey()})});
+    if(response.ok)localStorage.setItem('shopping_push_last_key',key);
+  }catch(e){}
+}
 function syncPushData(){
   if(!PUSH_USER_ID)return;
   const now=Date.now(),notifyHour=load().notifyHour||'09:00';
@@ -3655,9 +3643,9 @@ function syncPushData(){
     const time=t.time||notifyHour,scheduledAt=new Date(t.date+'T'+time).getTime();
     return {id:String(t.id),title:t.title,date:t.date,time:t.time||'',module:t.module,scheduledAt:Number.isFinite(scheduledAt)?scheduledAt:null};
   }).filter(t=>!t.scheduledAt||t.scheduledAt>now-60000);
-  const habits=getHabits().map(h=>({id:String(h.id),name:h.name,icon:h.icon||'⭐',doneToday:!!h.log?.[todayKey()]})),habitReminder=getHabitReminder();
-  const payload={userId:PUSH_USER_ID,name:getMyName(),role:getMyRole(),notifyHour,quiet:getQuiet(),habitReminder:{...habitReminder,habits},syncVersion:Date.now(),tasks};
-  const snapshot={type:'TASK_SNAPSHOT',tasks,notifyHour,habits,habitReminder,day:todayKey()};
+  const habits=getHabits().map(h=>({id:String(h.id),name:h.name,icon:h.icon||'⭐',doneToday:!!h.log?.[todayKey()]})),habitReminder=getHabitReminder(),shoppingReminder=getShoppingReminder(),shopping=activeShoppingItems().map(x=>({id:String(x.id),t:x.t}));
+  const payload={userId:PUSH_USER_ID,name:getMyName(),role:getMyRole(),notifyHour,quiet:getQuiet(),habitReminder:{...habitReminder,habits},shoppingReminder,shopping,syncVersion:Date.now(),tasks};
+  const snapshot={type:'TASK_SNAPSHOT',tasks,notifyHour,habits,habitReminder,shoppingReminder,shopping,day:todayKey()};
   if(navigator.serviceWorker?.controller)navigator.serviceWorker.controller.postMessage(snapshot);
   else navigator.serviceWorker?.ready?.then(reg=>reg.active?.postMessage(snapshot)).catch(()=>{});
   sendOrQueue('/sync',payload,'sync');
@@ -3757,9 +3745,20 @@ async function openAssign(id){
   catch(e){document.getElementById('assign-body').innerHTML='<div class="empty">Нет связи с сервером</div>';}
 }
 function closeAssign(){document.getElementById('modal-assign').classList.remove('on');}
+async function firstFamilyEvent(eventId){
+  const id=String(eventId||'');if(!id)return true;const key='./__push_seen__/family:'+encodeURIComponent(id);
+  try{const cache=await caches.open('lumo-push-state-v1');if(await cache.match(key))return false;await cache.put(key,new Response(String(Date.now())));return true;}catch(e){const k='family_seen:'+id;if(localStorage.getItem(k))return false;localStorage.setItem(k,String(Date.now()));return true;}
+}
+async function showIncomingFamilyNotification(type,event){
+  if(!event||!await firstFamilyEvent(event.eventId||event.assignId||event.id))return;
+  const title=type==='family-task'?'📥 Новое поручение':'🛒 Новая общая покупка',body=type==='family-task'?`${event.fromName?event.fromName+': ':''}${event.title||'Новое дело'}`:`${event.fromName?event.fromName+' добавил(а): ':''}${(event.items||[]).map(x=>x.t||x).join(' · ')}`;
+  if('Notification'in window&&Notification.permission==='granted'){
+    try{const reg=await navigator.serviceWorker.ready;await reg.showNotification(title,{body,icon:'./icon.png',badge:'./icon.png',tag:type+':'+(event.eventId||event.assignId||event.id),data:{type,eventId:event.eventId||event.assignId||event.id||'',taskId:event.assignId||''}});}catch(e){}
+  }
+}
 async function doAssign(toUserId,toName){
   const t=getTasks().find(a=>a.id===assignTaskId);if(!t)return;
-  const sent=await sendOrQueue('/family/assign',{userId:PUSH_USER_ID,toUserId,task:{title:t.title,desc:t.desc||'',date:t.date||'',time:t.time||'',pri:t.pri||'Y',module:t.module||'personal'}},'assign:'+t.id+':'+toUserId);
+  const eventId='assign_'+String(t.id)+'_'+toUserId,sent=await sendOrQueue('/family/assign',{userId:PUSH_USER_ID,toUserId,familyId:getFamilyState(),fromName:getMyName(),task:{title:t.title,desc:t.desc||'',date:t.date||'',time:t.time||'',pri:t.pri||'Y',module:t.module||'personal',clientEventId:eventId},notification:{type:'family-task',eventId,title:'📥 Новое поручение',body:(getMyName()?getMyName()+': ':'')+t.title,taskId:eventId}},'assign:'+t.id+':'+toUserId);
   if(sent){confetti();toast('📤 Поручено: '+toName);}
   else toast('📤 Поручение сохранено в очереди');
   closeAssign();
@@ -3767,9 +3766,9 @@ async function doAssign(toUserId,toName){
 async function pullAssignedTasks(){
   if(!PUSH_USER_ID)return;
   try{const r=await fetch(FAMILY_SERVER+'/inbox',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({userId:PUSH_USER_ID})});const d=await r.json();
-    if(d.ok&&d.tasks&&d.tasks.length){const t=getTasks();let n=0;
-d.tasks.forEach(a=>{if(!t.some(x=>x.assignId===a.assignId)){t.push({id:Date.now()+Math.floor(Math.random()*10000),assignId:a.assignId,title:a.title,module:a.module||'personal',date:a.date||todayKey(),time:a.time||'',desc:a.desc||'',pri:a.pri||'Y',done:false,fromUserId:a.fromUserId,fromName:a.fromName});n++;}});
-      if(n){setTasks(t);toast('📥 Новых поручений: '+n);if(currentTab!=='ai'&&currentTab!=='finance')render();}}}
+    if(d.ok&&d.tasks&&d.tasks.length){const t=getTasks(),added=[];
+d.tasks.forEach(a=>{if(!t.some(x=>x.assignId===a.assignId)){const task={id:Date.now()+Math.floor(Math.random()*10000),assignId:a.assignId,title:a.title,module:a.module||'personal',date:a.date||todayKey(),time:a.time||'',desc:a.desc||'',pri:a.pri||'Y',done:false,fromUserId:a.fromUserId,fromName:a.fromName};t.push(task);added.push(task);}});
+      if(added.length){setTasks(t);toast('📥 Новых поручений: '+added.length);added.forEach(x=>showIncomingFamilyNotification('family-task',{...x,eventId:x.assignId}));if(currentTab!=='ai'&&currentTab!=='finance')render();}}}
   catch(e){}
 }
 
@@ -3787,14 +3786,19 @@ function closeRating(){document.getElementById('modal-rating').classList.remove(
 
 /* ===== СПИСОК ПОКУПОК ===== */
 function getShopping(){const d=load();return d.shopping||[];}
-function setShopping(s){const d=load();d.shopping=s;save(d);if(getFamilyState())syncShopping();}
+function setShopping(s,event=null){const d=load();d.shopping=s;save(d);scheduleShoppingReminderLocal();syncPushData();scheduleShoppingPushServer(true);if(getFamilyState())syncShopping(event);}
 function openShopping(){renderShopping();document.getElementById('modal-shopping').classList.add('on');if(getFamilyState())pullShopping();}
 function closeShopping(){document.getElementById('modal-shopping').classList.remove('on');}
+function addShoppingItems(names,source='manual'){
+  const clean=(names||[]).map(x=>String(x||'').trim()).filter(Boolean);if(!clean.length)return[];
+  const s=getShopping(),createdAt=Date.now(),eventId='shopping_'+PUSH_USER_ID+'_'+createdAt,items=clean.map((t,i)=>({id:createdAt+i+Math.floor(Math.random()*1000),t,done:false,by:getMyName()||'',byUserId:PUSH_USER_ID,familyEventId:eventId,createdAt,updatedAt:createdAt}));s.push(...items);
+  const event={type:'family-shopping',eventId,fromUserId:PUSH_USER_ID,fromName:getMyName(),familyId:getFamilyState(),createdAt,source,items:items.map(x=>({id:x.id,t:x.t}))};setShopping(s,event);return items;
+}
 function addShopItem(){
   const inp=document.getElementById('shop-input');const v=inp.value.trim();if(!v)return;
-  const s=getShopping();s.push({id:Date.now()+Math.floor(Math.random()*1000),t:v,done:false,by:getMyName()||''});setShopping(s);inp.value='';renderShopping();vibrate(20);
+  addShoppingItems([v]);inp.value='';renderShopping();vibrate(20);toast(getFamilyState()?'🛒 Добавлено в общий список':'🛒 Добавлено в покупки');
 }
-function toggleShopItem(id){const s=getShopping();const x=s.find(a=>a.id===id);if(x){x.done=!x.done;setShopping(s);renderShopping();vibrate(15);}}
+function toggleShopItem(id){const s=getShopping();const x=s.find(a=>a.id===id);if(x){x.done=!x.done;x.updatedAt=Date.now();setShopping(s);renderShopping();vibrate(15);}}
 function delShopItem(id){setShopping(getShopping().filter(a=>a.id!==id));renderShopping();}
 function clearDoneShop(){setShopping(getShopping().filter(a=>!a.done));renderShopping();toast('Куплённое убрано');}
 function renderShopping(){
@@ -3809,12 +3813,12 @@ function renderShopping(){
   }
   document.getElementById('shopping-body').innerHTML=html;
 }
-function syncShopping(){sendOrQueue('/shopping/set',{userId:PUSH_USER_ID,items:getShopping()},'shopping');}
+function syncShopping(event=null){sendOrQueue('/shopping/set',{userId:PUSH_USER_ID,name:getMyName(),familyId:getFamilyState(),items:getShopping(),event:event||undefined},'shopping');}
 async function pullShopping(){
   try{
     const r=await fetch(FAMILY_SERVER+'/shopping/get',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({userId:PUSH_USER_ID})});
     const d=await r.json();
-    if(d.ok&&d.items){const cur=getShopping();const curIds=cur.map(x=>x.id);const merged=cur.slice();d.items.forEach(it=>{if(!curIds.includes(it.id))merged.push(it);});const dd=load();dd.shopping=merged;save(dd);renderShopping();}
+    if(d.ok&&d.items){const cur=getShopping(),curIds=new Set(cur.map(x=>String(x.id))),merged=cur.slice(),added=[];d.items.forEach(it=>{if(!curIds.has(String(it.id))){merged.push(it);if(!it.byUserId||it.byUserId!==PUSH_USER_ID)added.push(it);}});if(added.length){const dd=load();dd.shopping=merged;save(dd);renderShopping();scheduleShoppingReminderLocal();syncPushData();scheduleShoppingPushServer(true);const first=added[0],eventId=first.familyEventId||'shopping_remote_'+added.map(x=>x.id).join('_');showIncomingFamilyNotification('family-shopping',{eventId,fromName:first.by||'',items:added});toast('🛒 В общем списке новые покупки: '+added.length);}}
   }catch(e){}
 }
 
@@ -4214,7 +4218,7 @@ function confirmLocalPlan(){
   pendingLocalPlan.actions.filter(a=>!a._removed).forEach(a=>{
     learnLocalAction(a);
     if(a.type==='shopping'){
-      const s=getShopping();a.items.forEach(x=>s.push({id:Date.now()+Math.floor(Math.random()*9999),t:x,done:false,by:getMyName()||''}));setShopping(s);created.push({type:'shopping',data:a});return;
+      addShoppingItems(a.items,'assistant');created.push({type:'shopping',data:a});return;
     }
     if(a.type==='habit'){
       const h=getHabits();h.push({id:'h'+Date.now()+Math.floor(Math.random()*999),name:a.title,icon:'✨',log:{}});saveHabits(h);
@@ -5158,7 +5162,7 @@ function getHelpSlides(){
       items:[
         ['₽','Доходы и расходы','Категории, месячный баланс, бюджеты и регулярные платежи.'],
         ['◎','Цели и долги','Копилки показывают прогресс, а долги — сроки возврата.'],
-        [ICONS.family,'Семейный режим','Общие покупки, поручения, траты и рейтинг выполнения.']
+        [ICONS.family,'Семейный режим','Общие покупки, поручения, семейные push и рейтинг выполнения.']
       ]
     },
     {
@@ -5269,7 +5273,7 @@ function showTourStep(){
   }
   if(tourStep===5){
     switchTab('more');setTimeout(()=>{renderShopping();document.getElementById('modal-shopping').classList.add('on');},80);
-    renderTourCoach({title:'Список покупок',text:'Добавляй продукты одной строкой и отмечай купленное прямо в магазине. В семейном режиме список становится общим.',example:'Помощник тоже умеет добавлять покупки голосом.',top:true});return;
+    renderTourCoach({title:'Список покупок',text:'Добавляй продукты одной строкой и отмечай купленное прямо в магазине. В семейном режиме новая позиция синхронизируется со всеми участниками и создаёт семейное уведомление.',example:'Помощник тоже умеет добавлять покупки голосом. В настройках отдельно включается напоминание о незакрытом списке и выбирается время.',top:true});return;
   }
   if(tourStep===6){
     switchTab('all');
@@ -5307,7 +5311,7 @@ function showTourStep(){
   }
   if(tourStep===11){
     switchTab('more');setTimeout(()=>openFamily(),80);
-    renderTourCoach({title:'Семейный режим',text:'Создай семью или войди по коду. Участникам доступны общие покупки, поручения, совместные расходы и рейтинг выполнения.',example:'Без семейного кода личные данные продолжают храниться отдельно.',top:true});return;
+    renderTourCoach({title:'Семейный режим',text:'Создай семью или войди по коду. При делегировании участник получает новое поручение, а общие покупки появляются у всей семьи.',example:'Нажатие на семейный push открывает переданное дело или общий список. Для фоновой доставки каждый участник устанавливает PWA и включает push.',top:true});return;
   }
   if(tourStep===12){
     switchTab('more');setTimeout(()=>focusTourElement('#view .assign-btn'),100);
@@ -5553,12 +5557,13 @@ function resumeForegroundServices(force){
   if(!force&&now-_lastForegroundSync<30000)return;
   _lastForegroundSync=now;
   scheduleAllTimeouts();
-  scheduleHabitReminderLocal();scheduleHabitPushServer();scheduleSmartInsightPush();
+  scheduleHabitReminderLocal();scheduleHabitPushServer();scheduleShoppingReminderLocal();scheduleShoppingPushServer();scheduleSmartInsightPush();
   processAutoPays();
   scheduleAutoPayReminders();
   scheduleDebtReminders();
   flushOfflineQueue().then(()=>syncPushData());
   pullAssignedTasks();
+  if(getFamilyState())pullShopping();
   refreshWeather(false);
 }
 function initApp(){
@@ -5571,11 +5576,12 @@ function initApp(){
   switchTab('all');
   const introWasShown=!!sessionStorage.getItem('introShown');
   playCinematicIntro();
-  scheduleOnboarding(introWasShown?450:2900);
+  scheduleOnboarding(introWasShown?350:1050);
   processAutoPays();
 scheduleAutoPayReminders();
 scheduleDebtReminders();
 scheduleHabitReminderLocal();
+scheduleShoppingReminderLocal();
 
 if('serviceWorker' in navigator){
   navigator.serviceWorker.register('sw.js').then(reg => {
@@ -5599,6 +5605,8 @@ if('serviceWorker' in navigator){
   navigator.serviceWorker.addEventListener('message',e=>{
     if(e.data&&e.data.type==='SNOOZE_TASK')snoozeTaskOneHour(e.data.taskId);
     if(e.data&&e.data.type==='OPEN_INSIGHT')openInsightConversation(e.data.prompt||'',e.data.summary||'');
+    if(e.data&&e.data.type==='OPEN_FAMILY_TASK')openFamilyTaskFromPush(e.data.taskId||'');
+    if(e.data&&e.data.type==='OPEN_SHOPPING')openShoppingFromPush();
   });
 }
 
@@ -5613,12 +5621,14 @@ if('serviceWorker' in navigator){
   // синхронизация с сервером
   flushOfflineQueue().then(()=>syncPushData());
   pullAssignedTasks();
+  if(getFamilyState())pullShopping();
   scheduleMorningPush()
   scheduleHabitPushServer();
+  scheduleShoppingPushServer();
   scheduleSmartInsightPush();
 
   // периодические проверки
-  setInterval(pullAssignedTasks,60000);
+  setInterval(()=>{pullAssignedTasks();if(getFamilyState())pullShopping();},60000);
   setInterval(()=>refreshWeather(false),1800000);
   document.addEventListener('visibilitychange',()=>resumeForegroundServices(false));
   window.addEventListener('pageshow',()=>resumeForegroundServices(false));
@@ -5659,43 +5669,15 @@ if('serviceWorker' in navigator){
 }
 
 document.addEventListener('DOMContentLoaded',initApp);
- /* ═══════ ЗАПУСК КИНО-ВХОДА (исправленный) ═══════ */
+ /* ═══════ БЫСТРЫЙ ЗАПУСК LUMO ═══════ */
 function playCinematicIntro(){
   const cin=document.getElementById('cinematic');
   if(!cin)return;
-
-  // Показываем заставку только 1 раз за сессию (не бесит при возврате)
-  if(sessionStorage.getItem('introShown')){
-    cin.remove();
-    return;
-  }
+  if(sessionStorage.getItem('introShown')||window.matchMedia?.('(prefers-reduced-motion: reduce)').matches){cin.remove();return;}
   sessionStorage.setItem('introShown','1');
-
-  // Прячем интерфейс, пока идёт заставка (чтобы не моргал)
-  const main=[document.querySelector('.hero'),document.getElementById('view'),
-    document.querySelector('.filters'),document.querySelector('.search-wrap'),
-    document.getElementById('nav')].filter(Boolean);
-  main.forEach(el=>{el.style.opacity='0';el.style.transition='none';});
-
-  // Каскадное появление интерфейса
-  setTimeout(()=>{
-    main.forEach((el,i)=>{
-      el.style.transition='opacity .6s ease,transform .6s cubic-bezier(.34,1.2,.4,1)';
-      el.style.transform='translateY(16px)';
-      setTimeout(()=>{
-        el.style.opacity='1';
-        el.style.transform='translateY(0)';
-      },i*80);
-      setTimeout(()=>{el.style.transition='';el.style.transform='';},800+i*80);
-    });
-  },1700);
-
-  // Плавно гасим заставку
-  setTimeout(()=>{
-    cin.classList.add('hide');
-    setTimeout(()=>cin.remove(),700);
-  },2000);
-  }
+  // Контент уже готов за заставкой: никакой искусственной двухсекундной задержки.
+  requestAnimationFrame(()=>setTimeout(()=>{cin.classList.add('hide');setTimeout(()=>cin.remove(),320);},680));
+}
 
   // ═══════════════════════════════════════════
 // УМНЫЙ УТРЕННИЙ ПУШ В 8:00

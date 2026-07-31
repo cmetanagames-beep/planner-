@@ -1,4 +1,4 @@
-const CACHE = 'planner-v52';
+const CACHE = 'planner-v54';
 const PUSH_STATE_CACHE = 'lumo-push-state-v1';
 
 const ASSETS = [
@@ -14,7 +14,7 @@ self.addEventListener('message', e => {
     self.skipWaiting();
   }
   if(e.data && e.data.type === 'TASK_SNAPSHOT'){
-    const body=JSON.stringify({tasks:Array.isArray(e.data.tasks)?e.data.tasks:[],habits:Array.isArray(e.data.habits)?e.data.habits:[],habitReminder:e.data.habitReminder||{enabled:false},day:e.data.day||'',savedAt:Date.now()});
+    const body=JSON.stringify({tasks:Array.isArray(e.data.tasks)?e.data.tasks:[],habits:Array.isArray(e.data.habits)?e.data.habits:[],habitReminder:e.data.habitReminder||{enabled:false},shopping:Array.isArray(e.data.shopping)?e.data.shopping:[],shoppingReminder:e.data.shoppingReminder||{enabled:true},day:e.data.day||'',savedAt:Date.now()});
     e.waitUntil(caches.open(PUSH_STATE_CACHE).then(c=>c.put('./__task_snapshot__',new Response(body,{headers:{'Content-Type':'application/json'}}))));
   }
 });
@@ -50,7 +50,21 @@ self.addEventListener('fetch', e => {
   );
 });
 
+function familyPushKind(d){
+  if(['family-task','family-shopping','shopping-reminder'].includes(d.type))return d.type;
+  const title=String(d.title||'').toLowerCase();
+  if(/поручен|делегир|новая задача/.test(title))return 'family-task';
+  if(/общ.*покуп|список покупок/.test(title))return 'family-shopping';
+  return d.type||'';
+}
 async function pushAllowed(d){
+  const kind=familyPushKind(d);
+  if(kind==='family-task'||kind==='family-shopping'){
+    try{const cache=await caches.open(PUSH_STATE_CACHE),eventId=String(d.eventId||d.assignId||d.taskId||d.createdAt||((d.title||'')+':'+(d.body||''))),key='./__push_seen__/family:'+encodeURIComponent(eventId);if(await cache.match(key))return false;await cache.put(key,new Response(String(Date.now())));return true}catch(_){return true}
+  }
+  if(kind==='shopping-reminder'){
+    try{const cache=await caches.open(PUSH_STATE_CACHE),r=await cache.match('./__task_snapshot__');if(!r)return false;const s=await r.json(),items=s.shopping||[];if(!s.shoppingReminder?.enabled||!items.length)return false;const key='./__push_seen__/shopping:'+String(d.date||s.day||'');if(await cache.match(key))return false;await cache.put(key,new Response(String(Date.now())));return true}catch(_){return false}
+  }
   if(d.type==='morning')return true;
   if(d.type==='insight'){
     try{const cache=await caches.open(PUSH_STATE_CACHE),key='./__push_seen__/insight:'+String(d.date||'')+':'+String(d.title||'');if(await cache.match(key))return false;await cache.put(key,new Response(String(Date.now())));return true}catch(_){return true}
@@ -85,8 +99,12 @@ async function pushAllowed(d){
 async function currentHabitBody(fallback,pushDay){
   try{const cache=await caches.open(PUSH_STATE_CACHE),r=await cache.match('./__task_snapshot__');if(!r)return fallback;const s=await r.json(),day=pushDay||s.day,left=(s.habits||[]).filter(h=>s.day!==day||!h.doneToday);return left.slice(0,5).map(h=>(h.icon||'⭐')+' '+h.name).join(' · ')||fallback;}catch(_){return fallback;}
 }
+async function currentShoppingBody(fallback){
+  try{const cache=await caches.open(PUSH_STATE_CACHE),r=await cache.match('./__task_snapshot__');if(!r)return fallback;const s=await r.json(),items=s.shopping||[];return items.slice(0,5).map(x=>x.t).join(' · ')||fallback;}catch(_){return fallback;}
+}
 
 async function showPush(d){
+  d.type=familyPushKind(d);
   if(!(await pushAllowed(d)))return;
   if(self.registration.setAppBadge){
     await self.registration.setAppBadge(d.badgeCount||undefined).catch(()=>{});
@@ -118,6 +136,15 @@ async function showPush(d){
       data:{type:'insight',prompt:d.prompt||'',summary:(d.title||'')+(d.body?' — '+d.body:'')},actions:[{action:'discuss',title:'Обсудить с Lumo'},{action:'later',title:'Позже'}]
     });return;
   }
+  if(d.type === 'family-task'){
+    await self.registration.showNotification(d.title||'📥 Новое поручение',{body:d.body||d.taskTitle||'Тебе передали новое дело',icon:'./icon.png',badge:'./icon.png',tag:'family-task:'+(d.eventId||d.assignId||d.taskId||'new'),data:{type:'family-task',eventId:d.eventId||d.assignId||'',taskId:d.taskId||''},actions:[{action:'open',title:'Открыть дело'}]});return;
+  }
+  if(d.type === 'family-shopping'){
+    await self.registration.showNotification(d.title||'🛒 Новая общая покупка',{body:d.body||'В семейном списке появилась новая позиция',icon:'./icon.png',badge:'./icon.png',tag:'family-shopping:'+(d.eventId||d.createdAt||'new'),data:{type:'family-shopping',eventId:d.eventId||''},actions:[{action:'open',title:'Открыть список'}]});return;
+  }
+  if(d.type === 'shopping-reminder'){
+    const body=await currentShoppingBody(d.body||'В списке остались покупки');await self.registration.showNotification(d.title||'🛒 Не забудь про покупки',{body,icon:'./icon.png',badge:'./icon.png',tag:'shopping-reminder',data:{type:'shopping-reminder'},actions:[{action:'open',title:'Открыть список'}]});return;
+  }
 
   // ── Обычное напоминание ──
   await self.registration.showNotification(d.title || '⏰ Напоминание', {
@@ -137,7 +164,7 @@ async function showPush(d){
 
 // ===== PUSH — ЕДИНЫЙ ОБРАБОТЧИК =====
 self.addEventListener('push', e => {
-  let d={};try{d=e.data?e.data.json():{};}catch(_){}
+  let d={};try{d=e.data?e.data.json():{};if(d.notification&&typeof d.notification==='object')d={...d,...d.notification};}catch(_){}
   e.waitUntil(showPush(d));
 });
 
@@ -153,6 +180,19 @@ self.addEventListener('notificationclick', e => {
     e.waitUntil(clients.matchAll({type:'window',includeUncontrolled:true}).then(cl=>{
       for(const c of cl){c.postMessage({type:'OPEN_INSIGHT',...payload});if('focus'in c)return c.focus()}
       return clients.openWindow('./?assistantInsight='+encodeURIComponent(JSON.stringify(payload)));
+    }));return;
+  }
+  if(data.type==='family-task'){
+    const taskId=data.taskId||data.eventId||'';
+    e.waitUntil(clients.matchAll({type:'window',includeUncontrolled:true}).then(cl=>{
+      for(const c of cl){c.postMessage({type:'OPEN_FAMILY_TASK',taskId});if('focus'in c)return c.focus();}
+      return clients.openWindow('./?familyTask='+encodeURIComponent(taskId));
+    }));return;
+  }
+  if(data.type==='family-shopping'||data.type==='shopping-reminder'){
+    e.waitUntil(clients.matchAll({type:'window',includeUncontrolled:true}).then(cl=>{
+      for(const c of cl){c.postMessage({type:'OPEN_SHOPPING'});if('focus'in c)return c.focus();}
+      return clients.openWindow('./?openShopping=1');
     }));return;
   }
 
