@@ -1,0 +1,20 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>Postpone regression</title>
+<pre id="result">Loading…</pre>
+<iframe id="app" src="../app/index.html?postpone-suite=1" hidden></iframe>
+<script>
+document.getElementById('app').addEventListener('load',()=>{
+  const w=document.getElementById('app').contentWindow,task={date:'2026-08-01',time:'08:00'},now=new Date(2026,6,31,23,49),rows=[];
+  const add=(name,target,date,time)=>rows.push({name,pass:target.date===date&&target.time===time,value:target});
+  add('на час позже срока задачи',w.postponeTarget(task,'hour',now),'2026-08-01','09:00');
+  add('ближайший вечер после срока',w.postponeTarget(task,'evening',now),'2026-08-01','19:00');
+  add('на день позже',w.postponeTarget(task,'day',now),'2026-08-02','08:00');
+  add('следующий понедельник',w.postponeTarget(task,'monday',now),'2026-08-03','08:00');
+  w.eval('bulkMode=true;bulkSelected.clear();updateBulkBar()');
+  rows.push({name:'панель скрыта при нуле выбранных',pass:!w.document.getElementById('bulk-bar').classList.contains('on')});
+  w.eval("bulkSelected.add('1');updateBulkBar()");
+  rows.push({name:'панель появляется после выбора',pass:w.document.getElementById('bulk-bar').classList.contains('on')});
+  const failed=rows.filter(x=>!x.pass);document.getElementById('result').textContent=(failed.length?'FAIL':'PASS')+` · ${rows.length-failed.length}/${rows.length}\n`+rows.map(x=>`${x.pass?'✓':'✗'} ${x.name}${x.pass?'':'\n'+JSON.stringify(x.value)}`).join('\n');
+});
+</script>

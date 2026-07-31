@@ -16,6 +16,8 @@ document.getElementById('app').addEventListener('load',()=>{
   test('напоминание через минуту','поставь напоминание через минуту',p=>p.actions.length===1&&p.actions[0].type==='task'&&p.actions[0].title==='Напоминание'&&p.actions[0].time);
   test('напоминание через час','напомни проверить духовку через час',p=>p.actions.length===1&&p.actions[0].type==='task'&&/проверить духовку/i.test(p.actions[0].title)&&p.actions[0].time);
   test('напоминание через полчаса','напомни позвонить курьеру через полчаса',p=>p.actions.length===1&&p.actions[0].type==='task'&&/позвонить курьеру/i.test(p.actions[0].title)&&p.actions[0].time);
+  test('созвон завтра через дефис','Созвониться с Егором завтра в 8-00',p=>p.actions.length===1&&p.actions[0].type==='task'&&/Созвониться с Егором/i.test(p.actions[0].title)&&p.actions[0].date==='2026-08-01'&&p.actions[0].time==='08:00');
+  test('созвон без явной даты','Созвониться с Егором в 23-59',p=>p.actions.length===1&&p.actions[0].type==='task'&&/Созвониться с Егором/i.test(p.actions[0].title));
   test('длительность и энергия','завтра подготовить сложный отчет на 90 минут с высокой энергией',p=>p.actions.length===1&&p.actions[0].duration===90&&p.actions[0].energy==='high');
   test('несколько покупок','купить молоко хлеб яйца масло',p=>p.actions.length===1&&p.actions[0].type==='shopping'&&p.actions[0].items.length===4);
   test('срочный приоритет','завтра срочно отправить договор клиенту',p=>p.actions.length===1&&p.actions[0].pri==='R'&&p.actions[0].module==='work');
