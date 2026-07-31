@@ -493,6 +493,21 @@ document.getElementById('weatherChip').style.display=(hideList||isToday)?'none':
 function refreshCurrentTab(){
   switchTab(currentTab);
 }
+let activeCalendarDay=todayKey(),dayBoundaryTimer=null;
+function scheduleDayBoundaryRefresh(){
+  if(dayBoundaryTimer)clearTimeout(dayBoundaryTimer);
+  const next=new Date();next.setHours(24,0,1,0);
+  dayBoundaryTimer=setTimeout(()=>{refreshDayBoundary();scheduleDayBoundaryRefresh();},Math.max(1000,next.getTime()-Date.now()));
+}
+function refreshDayBoundary(force=false){
+  const nextDay=todayKey();if(!force&&nextDay===activeCalendarDay)return false;
+  activeCalendarDay=nextDay;bulkMode=false;bulkSelected.clear();updateBulkBar();
+  renderHeroDate();renderStreak();renderFilters();refreshCurrentTab();updateAppBadge();
+  scheduleAllTimeouts();scheduleHabitReminderLocal();scheduleShoppingReminderLocal();
+  processAutoPays();scheduleAutoPayReminders();scheduleDebtReminders();
+  scheduleMorningPush();scheduleHabitPushServer();scheduleShoppingPushServer();scheduleSmartInsightPush();syncPushData();
+  return true;
+}
 let filterState='active';
 let bulkMode=false;
 const bulkSelected=new Set();
@@ -512,7 +527,8 @@ function renderFilters(){
   const opts=[['active','Активные'],['today','Сегодня'],['done','Готово'],['all','Всё']];
   const canSelect=bulkVisibleTasks().length>0;
   if(!canSelect&&bulkMode){bulkMode=false;bulkSelected.clear();updateBulkBar();}
-  f.innerHTML=opts.map(([k,l])=>`<button class="${filterState===k?'active':''}" onclick="setFilter('${k}')">${l}</button>`).join('')+(canSelect?`<button class="bulk-toggle" onclick="toggleBulkMode()">${bulkMode?'Готово':'Выбрать'}</button>`:'');
+  const selectLabel=bulkMode?'Завершить выбор':'Выбрать несколько дел';
+  f.innerHTML=opts.map(([k,l])=>`<button class="${filterState===k?'active':''}" onclick="setFilter('${k}')">${l}</button>`).join('')+(canSelect?`<button class="bulk-toggle ${bulkMode?'on':''}" onclick="toggleBulkMode()" aria-label="${selectLabel}" title="${selectLabel}">${bulkMode?ICONS.habits:ICONS.all}<span>${bulkMode?'Готово':'Выбрать'}</span></button>`:'');
 }
 function setFilter(k){filterState=k;renderFilters();render();}
 function openTaskStat(kind){
@@ -2398,7 +2414,6 @@ async function renderFamily(){
       <div id="fam-members" class="fam-members"></div>
       <button class="btn ghost" onclick="leaveFamily()">🚪 Выйти из семьи</button>`;
   }
-  html+=`<button class="btn ghost" onclick="closeFamily()" style="margin-top:8px">Закрыть</button>`;
   document.getElementById('family-body').innerHTML=html;
   if(fam)loadFamilyMembers();
 }
@@ -4553,8 +4568,9 @@ function importData(ev){
 let _lastForegroundSync=0;
 function resumeForegroundServices(force){
   if(document.visibilityState==='hidden')return;
+  const dayChanged=refreshDayBoundary();scheduleDayBoundaryRefresh();
   const now=Date.now();
-  if(!force&&now-_lastForegroundSync<30000)return;
+  if(!force&&!dayChanged&&now-_lastForegroundSync<30000)return;
   _lastForegroundSync=now;
   scheduleAllTimeouts();
   scheduleHabitReminderLocal();scheduleHabitPushServer();scheduleShoppingReminderLocal();scheduleShoppingPushServer();scheduleSmartInsightPush();
@@ -4575,6 +4591,7 @@ function initApp(){
   renderNav();renderStreak();
   renderHeroDate();
   switchTab('all');
+  activeCalendarDay=todayKey();scheduleDayBoundaryRefresh();
   const introWasShown=!!sessionStorage.getItem('introShown');
   playCinematicIntro();
   scheduleOnboarding(introWasShown?350:2250);
@@ -4634,7 +4651,7 @@ if('serviceWorker' in navigator){
   startFocusTicker();
 
   // периодические проверки
-  setInterval(()=>{pullAssignedTasks();updateNotificationBadge();if(getFamilyState())pullShopping();},60000);
+  setInterval(()=>{refreshDayBoundary();pullAssignedTasks();updateNotificationBadge();if(getFamilyState())pullShopping();},60000);
   setInterval(()=>refreshWeather(false),1800000);
   document.addEventListener('visibilitychange',()=>resumeForegroundServices(false));
   window.addEventListener('pageshow',()=>resumeForegroundServices(false));

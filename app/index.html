@@ -141,7 +141,6 @@
     <h3 id="habit-stats-title">📊 История привычки</h3>
     <div class="seg"><button class="pri-b on" id="habit-stats-month-btn" onclick="setHabitStatsMode('month')">Месяц</button><button class="pri-b" id="habit-stats-year-btn" onclick="setHabitStatsMode('year')">Год</button></div>
     <div id="habit-stats-body"></div>
-    <button class="btn ghost" onclick="closeHabitStats()">Закрыть</button>
   </div>
 </div>
 
@@ -225,14 +224,12 @@
       <details><summary style="font-size:.72rem;color:var(--muted);margin-bottom:8px">Текст OCR</summary><textarea id="receipt-raw" style="min-height:110px"></textarea><button class="btn ghost" onclick="reviewReceiptText()">Разобрать исправленный текст</button></details>
       <button class="btn" id="receipt-save-btn" onclick="saveReceiptExpense()">Записать расход</button>
     </div>
-    <button class="btn ghost" onclick="closeReceiptScanner()">Закрыть</button>
   </div>
 </div>
 <div class="modal" id="modal-receipt-details">
   <div class="sheet">
     <h3 id="receipt-details-title">Чек</h3>
     <div id="receipt-details-body"></div>
-    <button class="btn ghost" onclick="document.getElementById('modal-receipt-details').classList.remove('on')">Закрыть</button>
   </div>
 </div>
 
@@ -245,7 +242,6 @@
     <div class="sub-h">💰 Категории трат</div>
     <div id="expcat-list"></div>
     <button class="btn" onclick="openExpCatEdit()">➕ Новая категория трат</button>
-    <button class="btn ghost" onclick="closeCatModal()">Закрыть</button>
   </div>
 </div>
 
@@ -334,7 +330,6 @@
     </div></details>
     <details class="settings-group"><summary><span class="settings-icon"><svg viewBox="0 0 24 24"><path d="M12 3v12M8 11l4 4 4-4"/><path d="M5 17v3h14v-3"/></svg></span><span><b>Данные</b><small>Резервная копия и восстановление</small></span></summary><div class="settings-content"><button class="btn" onclick="exportData()">Скачать резервную копию</button><button class="btn ghost" onclick="document.getElementById('import-file').click()">Загрузить копию</button></div></details>
     <input type="file" id="import-file" accept="application/json" style="display:none" onchange="importData(event)">
-    <button class="btn ghost" onclick="closeSettings()" style="margin-top:12px">Готово</button>
   </div>
 </div>
 
@@ -342,7 +337,6 @@
   <div class="sheet">
     <h3>🏆 Достижения</h3>
     <div id="ach-body"></div>
-    <button class="btn ghost" onclick="closeAchievements()">Закрыть</button>
   </div>
 </div>
 
@@ -369,7 +363,6 @@
       <button onclick="addShopItem()">+</button>
     </div>
     <div id="shopping-body"></div>
-    <button class="btn ghost" onclick="closeShopping()" style="margin-top:16px">Закрыть</button>
   </div>
 </div>
 
@@ -378,7 +371,6 @@
     <h3>📊 Рейтинг семьи</h3>
     <p style="font-size:.82rem;color:var(--muted);margin-bottom:14px">Кто сколько дел выполнил за 7 дней 💪</p>
     <div id="rating-body"></div>
-    <button class="btn ghost" onclick="closeRating()" style="margin-top:16px">Закрыть</button>
   </div>
 </div>
 <div class="modal" id="modal-menu-editor">
@@ -392,7 +384,6 @@
     <div id="menu-editor-active"></div>
     <div class="sub-h">В разделе «Ещё»</div>
     <div id="menu-editor-hidden"></div>
-    <button class="btn" onclick="closeMenuEditor()" style="margin-top:16px">Готово 👍</button>
   </div>
 </div>
 <div class="modal" id="modal-help">
@@ -407,8 +398,8 @@
     <button class="guide-skip" id="help-skip" onclick="skipOnboarding()">Пропустить обучение</button>
   </div>
 </div>
-<div class="modal" id="modal-notifications"><div class="sheet"><h3>Уведомления</h3><div id="notification-body" class="feed-list"></div><button class="btn ghost" onclick="markAllNotificationsRead()">Отметить всё прочитанным</button><button class="btn ghost" onclick="document.getElementById('modal-notifications').classList.remove('on')">Закрыть</button></div></div>
-<div class="modal" id="modal-inbox"><div class="sheet"><h3>Входящие поручения</h3><div id="inbox-body"></div><button class="btn ghost" onclick="document.getElementById('modal-inbox').classList.remove('on')">Закрыть</button></div></div>
+<div class="modal" id="modal-notifications"><div class="sheet"><h3>Уведомления</h3><div id="notification-body" class="feed-list"></div><button class="btn ghost" onclick="markAllNotificationsRead()">Отметить всё прочитанным</button></div></div>
+<div class="modal" id="modal-inbox"><div class="sheet"><h3>Входящие поручения</h3><div id="inbox-body"></div></div></div>
 <div class="modal" id="modal-rules"><div class="sheet"><h3>Правила помощника</h3><p class="ai-hint">Здесь хранятся категории и объяснённые фразы. Например, «аптека» → «Здоровье», а непонятную команду можно один раз объяснить другими словами.</p><div id="rules-body"></div><button class="btn ghost" onclick="addAssistantRule()">Добавить правило</button><button class="btn" onclick="saveAssistantRules()">Сохранить правила</button><button class="btn ghost" onclick="document.getElementById('modal-rules').classList.remove('on')">Отмена</button></div></div>
 <div class="modal" id="modal-sync-conflict"><div class="sheet"><h3>Данные изменены на двух устройствах</h3><p class="ai-hint" id="sync-conflict-info">Выбери, какую версию оставить. Ничего не будет удалено без твоего решения.</p><button class="btn" onclick="resolveCloudConflict('merge')">Объединить версии</button><button class="btn ghost" onclick="resolveCloudConflict('local')">Оставить это устройство</button><button class="btn ghost" onclick="resolveCloudConflict('server')">Загрузить версию с сервера</button></div></div>
 <div class="modal" id="modal-bulk-edit"><div class="sheet"><h3>Изменить выбранные дела</h3><div class="field"><label>Дата</label><input id="bulk-date" type="date"></div><div class="field"><label>Категория</label><select id="bulk-category"></select></div><div class="field"><label>Приоритет</label><select id="bulk-priority"><option value="">Не менять</option><option value="R">Важно</option><option value="Y">Средне</option><option value="B">Потом</option></select></div><button class="btn" onclick="applyBulkEdit()">Применить</button><button class="btn ghost" onclick="document.getElementById('modal-bulk-edit').classList.remove('on')">Отмена</button></div></div>
@@ -427,7 +418,6 @@
     <div class="link-current" id="link-current"></div>
     <div class="field"><label>Связать с</label><select id="link-target"></select></div>
     <button class="btn" onclick="saveDataLink()">Добавить связь</button>
-    <button class="btn ghost" onclick="closeDataLinks()">Готово</button>
   </div>
 </div>
 <div class="modal" id="modal-dialog">
@@ -557,10 +547,6 @@
     <button class="btn" onclick="openDebtModal()">
       ➕ Добавить долг
     </button>
-    <button class="btn ghost" 
-            onclick="closeDebtsList()">
-      Закрыть
-    </button>
   </div>
 </div>
 
@@ -571,9 +557,6 @@
     <div id="autopays-body"></div>
     <button class="btn" onclick="closeAutoPaysList();openAutoPay()">
       ➕ Новый платёж
-    </button>
-    <button class="btn ghost" onclick="closeAutoPaysList()">
-      Закрыть
     </button>
   </div>
 </div>

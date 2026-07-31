@@ -1,0 +1,21 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>UI shell regression</title>
+<pre id="result">Loading…</pre>
+<iframe id="app" src="../app/index.html?ui-shell-suite=1" hidden></iframe>
+<script>
+document.getElementById('app').addEventListener('load',async()=>{
+  const w=document.getElementById('app').contentWindow,rows=[];
+  w.setTasks([{id:1,title:'Тестовое дело',date:w.todayKey(),time:'12:00',module:'personal',done:false}]);w.switchTab('all');w.renderFilters();
+  const select=w.document.querySelector('.bulk-toggle'),selectStyle=w.getComputedStyle(select),hiddenLabel=w.getComputedStyle(select.querySelector('span'));
+  rows.push({name:'выбор оформлен компактной иконкой',pass:!!select.querySelector('svg')&&parseFloat(selectStyle.width)<=44&&parseFloat(hiddenLabel.width)<=1});
+  w.eval("activeCalendarDay='1999-01-01'");
+  rows.push({name:'смена дня обновляет приложение',pass:w.refreshDayBoundary()===true&&w.document.getElementById('hero-date').textContent.length>0});
+  await w.renderFamily();
+  const duplicate=[...w.document.querySelectorAll('.modal button')].filter(b=>/^(?:закрыть|готово(?:\s+👍)?)$/i.test(b.textContent.trim())&&!b.closest('#modal-help'));
+  rows.push({name:'нет дублирующих кнопок закрытия',pass:duplicate.length===0,value:duplicate.map(x=>x.textContent.trim())});
+  const navStyle=w.getComputedStyle(w.document.getElementById('nav'));
+  rows.push({name:'высота нижнего меню ограничена',pass:parseFloat(navStyle.maxHeight)<=100});
+  const failed=rows.filter(x=>!x.pass);document.getElementById('result').textContent=(failed.length?'FAIL':'PASS')+` · ${rows.length-failed.length}/${rows.length}\n`+rows.map(x=>`${x.pass?'✓':'✗'} ${x.name}${x.pass?'':'\n'+JSON.stringify(x.value)}`).join('\n');
+});
+</script>
