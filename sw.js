@@ -1,4 +1,4 @@
-const CACHE = 'planner-v47';
+const CACHE = 'planner-v52';
 const PUSH_STATE_CACHE = 'lumo-push-state-v1';
 
 const ASSETS = [
@@ -27,7 +27,7 @@ self.addEventListener('install', e => {
 // ===== АКТИВАЦИЯ =====
 self.addEventListener('activate', e => {
   e.waitUntil(caches.keys().then(keys => Promise.all(
-    keys.filter(k => k !== CACHE).map(k => caches.delete(k))
+    keys.filter(k => k !== CACHE && k !== PUSH_STATE_CACHE).map(k => caches.delete(k))
   )));
   self.clients.claim();
 });
@@ -52,6 +52,9 @@ self.addEventListener('fetch', e => {
 
 async function pushAllowed(d){
   if(d.type==='morning')return true;
+  if(d.type==='insight'){
+    try{const cache=await caches.open(PUSH_STATE_CACHE),key='./__push_seen__/insight:'+String(d.date||'')+':'+String(d.title||'');if(await cache.match(key))return false;await cache.put(key,new Response(String(Date.now())));return true}catch(_){return true}
+  }
   if(d.type==='habit'){
     try{
       const cache=await caches.open(PUSH_STATE_CACHE),response=await cache.match('./__task_snapshot__');if(!response)return false;
@@ -109,6 +112,12 @@ async function showPush(d){
   if(d.type === 'habit'){
     const body=await currentHabitBody(d.body||'Отметь сегодняшний ритм',d.date);await self.registration.showNotification(d.title || '🌱 Не забудь о привычках',{body,icon:'./icon.png',badge:'./icon.png',tag:'habit-reminder',data:{type:'habit'}});return;
   }
+  if(d.type === 'insight'){
+    await self.registration.showNotification(d.title || 'Предложение Lumo',{
+      body:d.body||'Открой помощника, чтобы посмотреть рекомендацию',icon:'./icon.png',badge:'./icon.png',tag:'smart-insight',
+      data:{type:'insight',prompt:d.prompt||'',summary:(d.title||'')+(d.body?' — '+d.body:'')},actions:[{action:'discuss',title:'Обсудить с Lumo'},{action:'later',title:'Позже'}]
+    });return;
+  }
 
   // ── Обычное напоминание ──
   await self.registration.showNotification(d.title || '⏰ Напоминание', {
@@ -137,6 +146,15 @@ self.addEventListener('notificationclick', e => {
   e.notification.close();
   const action = e.action;
   const data   = e.notification.data || {};
+
+  if(data.type === 'insight'){
+    if(action==='later')return;
+    const payload={prompt:data.prompt||'',summary:data.summary||''};
+    e.waitUntil(clients.matchAll({type:'window',includeUncontrolled:true}).then(cl=>{
+      for(const c of cl){c.postMessage({type:'OPEN_INSIGHT',...payload});if('focus'in c)return c.focus()}
+      return clients.openWindow('./?assistantInsight='+encodeURIComponent(JSON.stringify(payload)));
+    }));return;
+  }
 
   // ── Утренний брифинг ──
   if(data.type === 'morning'){
