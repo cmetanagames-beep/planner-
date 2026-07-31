@@ -317,10 +317,10 @@
       <div class="field"><label>Время предложений</label><input id="insight-reminder-time" type="time" value="18:30" onchange="saveInsightReminderTime()"></div>
       <div class="ai-hint">Lumo напомнит только о полезном: просрочках, превышениях бюджета, платежах, покупках и незавершённых привычках.</div>
     </div></details>
-    <details class="settings-group"><summary><span class="settings-icon"><svg viewBox="0 0 24 24"><path d="M12 3v3"/><rect x="5" y="6" width="14" height="12" rx="3"/><circle cx="9" cy="12" r="1"/><circle cx="15" cy="12" r="1"/></svg></span><span><b>Помощник</b><small>Память и необязательный Groq</small></span></summary><div class="settings-content">
-      <div class="ai-hint">Основные команды работают локально. Groq используется только как резерв.</div>
+    <details class="settings-group"><summary><span class="settings-icon"><svg viewBox="0 0 24 24"><path d="M12 3v3"/><rect x="5" y="6" width="14" height="12" rx="3"/><circle cx="9" cy="12" r="1"/><circle cx="15" cy="12" r="1"/></svg></span><span><b>Помощник</b><small>Локальные правила и память</small></span></summary><div class="settings-content">
+      <div class="ai-hint">Команды разбираются на устройстве и не отправляются внешней языковой модели. Новым формулировкам Lumo учится через локальные правила.</div>
       <div class="ai-hint" id="local-memory-info"></div><button class="btn" onclick="openAssistantRules()">Редактировать правила помощника</button><button class="btn ghost" onclick="clearLocalAssistantMemory()">Очистить изученные правила</button>
-      <button class="btn ghost" onclick="setupApiKey()">Настроить резервный Groq</button><button class="btn danger-soft" onclick="resetApiKey()">Отключить Groq</button><button class="btn ghost" onclick="clearAIChatHistory()">Очистить историю помощника</button>
+      <button class="btn ghost" onclick="clearAIChatHistory()">Очистить историю помощника</button>
     </div></details>
     <details class="settings-group"><summary><span class="settings-icon"><svg viewBox="0 0 24 24"><path d="M20 7h-6V1M4 17h6v6M20 7a9 9 0 00-15-2M4 17a9 9 0 0015 2"/></svg></span><span><b>Синхронизация</b><small>Одинаковые данные на всех устройствах</small></span></summary><div class="settings-content">
       <div class="sync-status" id="cloud-sync-status">Синхронизация не подключена</div>

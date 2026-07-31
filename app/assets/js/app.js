@@ -83,28 +83,6 @@ function finishLumoDialog(ok){const modal=document.getElementById('modal-dialog'
 function lumoConfirm(message,title='Подтвердить действие',confirmText='Продолжить',danger=false){return showLumoDialog({title,message,confirmText,danger});}
 function lumoPrompt(title,message='',value='',label='Значение'){return showLumoDialog({title,message,input:true,value,label,confirmText:'Сохранить'});}
 function lumoAlert(message,title='Важно'){return showLumoDialog({title,message,confirmText:'Понятно',cancelText:''});}
-const API_URL='https://api.groq.com/openai/v1/chat/completions';
-const MODEL='llama-3.3-70b-versatile';
-const AI_KEY_STORE='groq_api_key';
-function getApiKey(){return localStorage.getItem(AI_KEY_STORE)||'';}
-function ensureApiKey(){
-  return getApiKey();
-}
-function resetApiKey(){localStorage.removeItem(AI_KEY_STORE);toast('Ключ удалён. Введи новый в чате ИИ');}
-  async function setupApiKey(){
-  const cur=getApiKey();
-  const k=await lumoPrompt('Резервный Groq','Основные команды Lumo работают локально. Ключ нужен только для свободного общения.\nПолучить его можно на console.groq.com/keys.',cur||'','API-ключ');
-  if(k===null)return;
-  const clean=k.trim();
-  if(clean){
-    localStorage.setItem(AI_KEY_STORE,clean);
-    toast('🔑 Ключ сохранён!');
-  }else{
-    localStorage.removeItem(AI_KEY_STORE);
-    toast('Ключ удалён');
-  }
-}
-
 const KEY='planner_data_v2';
 const BACKUP_KEY='planner_data_v2_backups';
 function parseData(raw){
@@ -2647,14 +2625,7 @@ function dateFromText(low){
   return todayKey();
 }
 function timeFromText(low){
-  // "через 5 минут", "через час"
-  let rel=low.match(/через\s+(\d{1,3})\s*(мин|час)/);
-  if(rel){
-    const n=+rel[1];const now=new Date();
-    if(/час/.test(rel[2]))now.setHours(now.getHours()+n);
-    else now.setMinutes(now.getMinutes()+n);
-    return String(now.getHours()).padStart(2,'0')+':'+String(now.getMinutes()).padStart(2,'0');
-  }
+  const relative=relativeScheduleFromText(low);if(relative)return relative.time;
   const withoutDates=low.replace(/\b[0-3]?\d[./][01]?\d(?:[./](?:20)?\d{2})?\b/g,' ');
   const tm=withoutDates.match(/(?:в|к|на|после)\s*(\d{1,2})(?:[:.\-\s](\d{2}))?(?!\s*(?:т(?:\s|$)|тыс|тыщ|руб|₽))(?:\s*(?:ч(?:ас(?:а|ов)?)?|утра|дня|вечера))?|\b(\d{1,2})[:.\-](\d{2})\b/);
   if(tm){let hh=Number(tm[1]||tm[3]),mm=Number(tm[2]||tm[4]||0);if(/вечера/.test(tm[0])&&hh<12)hh+=12;if(/дня/.test(tm[0])&&hh<7)hh+=12;if(hh<=23&&mm<=59)return String(hh).padStart(2,'0')+':'+String(mm).padStart(2,'0');}
@@ -2664,6 +2635,7 @@ function findOrNull(name){return getExpCats().some(c=>c.name===name)?name:null;}
 let pendingCat=null;
 let pendingLocalPlan=null;
 let pendingLocalOps=null;
+let pendingLocalChoice=null;
 const LOCAL_MEMORY_KEY='lumo_local_memory_v1';
 function getLocalMemory(){
   try{
@@ -2707,8 +2679,20 @@ function localRepeat(text){
   if(/кажд\S*\s+месяц|ежемесяч/.test(text))return 'monthly';
   return '';
 }
+function relativeScheduleFromText(text,base=new Date()){
+  const low=String(text||'').toLowerCase().replace(/ё/g,'е');
+  const match=low.match(/через\s+(?:(\d{1,3})\s*)?(минут(?:у|ы)?|мин(?:ут)?|час(?:а|ов)?|полчаса|полчасика)(?=\s|$)/);
+  if(!match)return null;
+  let amount=match[1]?Number(match[1]):1;
+  const unit=match[2],date=new Date(base);
+  if(/^полчас/.test(unit))date.setMinutes(date.getMinutes()+30);
+  else if(/^час/.test(unit))date.setHours(date.getHours()+amount);
+  else date.setMinutes(date.getMinutes()+amount);
+  return {date:localDateKey(date),time:String(date.getHours()).padStart(2,'0')+':'+String(date.getMinutes()).padStart(2,'0'),raw:match[0]};
+}
 function cleanLocalTitle(text){
-  return text
+  const relative=relativeScheduleFromText(text);
+  return String(text).replace(relative?.raw||/(?!)/,' ')
     .replace(/^(?:у\s+меня\s+|мне\s+)?\d+\s+(?:дела?|задач[аи])\s*/i,'')
     .replace(/^\d{1,2}\s+(?=[а-яё])/i,'')
     .replace(/^(?:срочн\S*|важн\S*|приоритетн\S*|как можно скорее)\s*(?:задач\S*|дело)?\s*/i,'')
@@ -2717,7 +2701,7 @@ function cleanLocalTitle(text){
     .replace(/(?:^|\s)в\s+(\d{1,3})\s+кабинет\w*/gi,' кабинет $1 ')
     .replace(/^(?:и\s+)?(?:напомни|создай|добавь|запиши|запланируй|поставь|нужно|надо|не забыть)\s*/i,'')
     .replace(/^(?:у\s+меня|мне)\s+/i,'')
-    .replace(/(?:^|\s)(?:сегодня|завтра|послезавтра|через\s+\d+\s+(?:дн\w*|час\w*|мин\w*))(?=\s|$)/gi,' ')
+    .replace(/(?:^|\s)(?:сегодня|завтра|послезавтра|через\s+(?:(?:\d+\s+)?(?:дн[а-яё]*|час[а-яё]*|мин[а-яё]*)|полчас(?:а|ика)?))(?=\s|$)/gi,' ')
     .replace(/(?:^|\s)(?:в|во)\s+(?:понедельник|вторник|среду?|четверг|пятницу?|субботу?|воскресенье)(?=\s|$)/gi,' ')
     .replace(/\b\d{1,2}\s+(?:январ\w*|феврал\w*|март\w*|апрел\w*|мая|июн\w*|июл\w*|август\w*|сентябр\w*|октябр\w*|ноябр\w*|декабр\w*)/gi,'')
     .replace(/\b[0-3]?\d[./][01]?\d(?:[./](?:20)?\d{2})?\b/g,' ')
@@ -2738,8 +2722,30 @@ function cleanLocalTitle(text){
     .replace(/\s+так[- ]?же$/i,'')
     .replace(/\s+/g,' ').replace(/^[,.\s]+|[,.\s]+$/g,'').trim();
 }
+function normalizeAssistantText(text){
+  let value=String(text||'').replace(/ё/g,'е').replace(/\s+/g,' ').trim();
+  const rules=[
+    [/(^|\s)(?:севодня|сигодня|сегдня)(?=\s|$)/gi,'$1сегодня'],
+    [/(^|\s)(?:заврта|зафтра|завтр)(?=\s|$)/gi,'$1завтра'],
+    [/(^|\s)(?:послизафтра|послезавтр)(?=\s|$)/gi,'$1послезавтра'],
+    [/(^|\s)чз(?=\s|$)/gi,'$1через'],
+    [/(^|\s)(?:напом|напомнить|напомена|напомени)(?=\s|$)/gi,'$1напомни'],
+    [/(^|\s)(?:позв|позванить|пазвонить|позвонит)(?=\s|$)/gi,'$1позвонить'],
+    [/(^|\s)(?:встретитса|встретица|встретится)(?=\s|$)/gi,'$1встретиться'],
+    [/(^|\s)(?:сделат|зделать)(?=\s|$)/gi,'$1сделать'],
+    [/(^|\s)забрат(?=\s|$)/gi,'$1забрать'],
+    [/(^|\s)отправит(?=\s|$)/gi,'$1отправить'],
+    [/(^|\s)заказат(?=\s|$)/gi,'$1заказать'],
+    [/(^|\s)(?:патратил|потрател)(?=\s|$)/gi,'$1потратил'],
+    [/(^|\s)(?:зарплта|зараплата)(?=\s|$)/gi,'$1зарплата'],
+    [/(^|\s)(?:купи|куп)(?=\s|$)/gi,'$1купить'],
+    [/(^|\s)доб(?=\s|$)/gi,'$1добавить']
+  ];
+  rules.forEach(([pattern,replacement])=>{value=value.replace(pattern,replacement);});
+  return value.replace(/\s+/g,' ').trim();
+}
 function splitLocalSpeech(text){
-  let s=text.replace(/\s+/g,' ').trim();
+  let s=normalizeAssistantText(text);
   s=s.replace(/^так\s+/i,'').replace(/(?:^|\s)в\s+пн(?=\s|$)/gi,' в понедельник').replace(/(?:^|\s)во?\s+вт(?=\s|$)/gi,' во вторник').replace(/(?:^|\s)в\s+ср(?=\s|$)/gi,' в среду').replace(/(?:^|\s)в\s+чт(?=\s|$)/gi,' в четверг').replace(/(?:^|\s)в\s+пт(?=\s|$)/gi,' в пятницу').replace(/(?:^|\s)в\s+сб(?=\s|$)/gi,' в субботу').replace(/(?:^|\s)в\s+вс(?=\s|$)/gi,' в воскресенье').trim();
   s=s.replace(/[;,\n]+|[.!?]+(?=\s|$)/g,' | ');
   const starters='позвон(?:ить|и)|написать|отправить|забрать|отвезти|отнести|привезти|сходить|съездить|встретиться|встретить|встреча|проводить|подготовить|сделать|проверить|закончить|начать|забронировать|вызвать|помыть|убраться|убрать|погулять|полить|посадить|принять|выпить|к\\s+врачу|врач|купить|докупить|заказать|оплат(?:ить|ил[аи]?)|заплат(?:ить|ил[аи]?)|потратил|потратила|купил|купила|отдать|вернуть|получить|получил|получила|пришл[ао]?\\s+(?:зп|зарплата)|зарплата|аванс|премия|тренировка|зарядка|заниматься|читать|напомни|добавь|создай';
@@ -2775,7 +2781,8 @@ function splitLocalSpeech(text){
   const onlyWhen=/^(?:и\s+)?(?:сегодня|завтра|послезавтра|во?\s+(?:понедельник|вторник|среду?|четверг|пятницу?|субботу?|воскресенье)|кажд\S*\s+(?:день|понедельник|вторник|среду?|четверг|пятницу?|субботу?|воскресенье))(?:\s+(?:(?:очень\s+)?срочн\S*|важн\S*|приоритетн\S*|как можно скорее))?(?:\s+(?:у\s+меня|мне)(?:\s+(?:нужно|надо))?)?(?:\s+(?:в|к|на)\s*\d{1,2}(?:(?:[:.\-]|\s)\d{2})?\s*(?:час(?:а|ов)?|утра|дня|вечера)?)?$/i;
   for(let i=0;i<raw.length;i++){
     if(!raw[i])continue;
-    if(onlyWhen.test(raw[i])&&raw[i+1])raw[i+1]=raw[i]+' '+raw[i+1];
+    const relativeOnly=/^(?:напомни\s+)?через\s+(?:(?:\d{1,3}\s+)?(?:минут(?:у|ы)?|мин(?:ут)?|час(?:а|ов)?)|полчас(?:а|ика)?)(?=\s|$)$/i.test(raw[i]);
+    if((onlyWhen.test(raw[i])||relativeOnly)&&raw[i+1])raw[i+1]=raw[i]+' '+raw[i+1];
     else out.push(raw[i]);
   }
   return out;
@@ -2829,7 +2836,8 @@ function parseLocalPlan(text){
     }
     const hasDate=/(?:^|\s)(?:сегодня|завтра|послезавтра|через\s+\d+\s+д|во?\s+(?:понедельник|вторник|среду?|четверг|пятницу?|субботу?|воскресенье)|кажд\S*\s+(?:понедельник|вторник|среду?|четверг|пятницу?|субботу?|воскресенье)|\d{1,2}\s+(?:январ|феврал|март|апрел|мая|июн|июл|август|сентябр|октябр|ноябр|декабр)|[0-3]?\d[./][01]?\d(?:[./](?:20)?\d{2})?)(?=\s|$)/.test(low);
     if(hasDate)contextDate=dateFromText(low);
-    let date=contextDate,time=timeFromText(low)||extractTime(low),timeAdjusted='';
+    const relative=relativeScheduleFromText(low);
+    let date=relative?.date||contextDate,time=relative?.time||timeFromText(low)||extractTime(low),timeAdjusted='';
     if(time&&isPastTaskSchedule(date,time)){
       if(!hasDate){date=matrixFutureKey(1);timeAdjusted='Время сегодня прошло — перенёс на завтра';}
       else{time='';timeAdjusted='Прошедшее время убрано — выбери новое';}
@@ -2859,6 +2867,7 @@ function parseLocalPlan(text){
       let name=cleanLocalTitle(chunk);if(name)actions.push({type:'habit',title:name,date,time,repeat,_source:chunk});else unknown.push(chunk);return;
     }
     let title=cleanLocalTitle(chunk);
+    if(/^(?:напоминани[ея]|напомнить)$/i.test(title))title='Напоминание';
     if(title&&(/напомн|создай|добавь|запиши|заплан|нужно|надо|не забыть|позвон|написать|отправить|забрать|отвезти|сходить|съездить|встреч|заказать|вызвать|оплатить|трениров/.test(low)||date!==todayKey()||time)){
       title=title.charAt(0).toUpperCase()+title.slice(1);
       const durationMatch=low.match(/(?:на|примерно)\s+(\d{1,3})\s*(?:минут|мин\b)/),hourMatch=low.match(/(?:на|примерно)\s+(\d{1,2})\s*(?:час|часа|часов)/);
@@ -3101,21 +3110,32 @@ function confirmLocalPlan(){
 
 function commandTokens(text){
   const stop=new Set(['задачу','задача','дело','дела','встречу','перенеси','перенести','удали','удалить','отметь','выполненной','выполнено','сделанной','сегодня','завтра','послезавтра','понедельник','вторник','среду','четверг','пятницу','субботу','воскресенье','последнюю','последний','добавь','подзадачи','подзадачу']);
-  return memoryTokens(text).filter(x=>!stop.has(x));
+  return memoryTokens(text).filter(x=>!stop.has(x)).map(commandTokenStem);
+}
+function commandTokenStem(token){
+  const value=String(token||'').toLowerCase().replace(/ё/g,'е');
+  if(value.length<5)return value;
+  return value.replace(/(?:ами|ями|ого|ему|ому|ыми|ими|ой|ей|ом|ем|ах|ях|у|ю|а|я|ы|и)$/,'')||value;
 }
 function findTaskForCommand(query){
+  return findTaskCandidatesForCommand(query)[0]||null;
+}
+function findTaskCandidatesForCommand(query){
   const tasks=getTasks().filter(t=>!t.done);
-  if(!tasks.length)return null;
-  if(/^(?:его|её|ее|это|эту|его задачу|эту задачу|это дело)$/i.test(String(query||'').trim())&&assistantDialogue.lastTaskId){const remembered=tasks.find(t=>String(t.id)===String(assistantDialogue.lastTaskId));if(remembered)return remembered;}
-  if(/последн/.test(query.toLowerCase()))return tasks.slice().sort((a,b)=>(b.id||0)-(a.id||0))[0];
-  const q=commandTokens(query);let best=null,bestScore=0;
+  if(!tasks.length)return [];
+  if(/^(?:его|её|ее|это|эту|его задачу|эту задачу|это дело)$/i.test(String(query||'').trim())&&assistantDialogue.lastTaskId){const remembered=tasks.find(t=>String(t.id)===String(assistantDialogue.lastTaskId));if(remembered)return [remembered];}
+  if(/последн/.test(query.toLowerCase()))return [tasks.slice().sort((a,b)=>(b.id||0)-(a.id||0))[0]];
+  const q=commandTokens(query),scored=[];
   tasks.forEach(t=>{
     const tt=commandTokens(t.title+' '+(t.desc||''));
-    let score=q.reduce((n,x)=>n+(tt.some(y=>y===x||y.startsWith(x)||x.startsWith(y))?1:0),0);
+    const overlap=q.reduce((n,x)=>n+(tt.some(y=>y===x||y.startsWith(x)||x.startsWith(y))?1:0),0);let score=overlap;
     if(String(t.title).toLowerCase().includes(query.toLowerCase().trim()))score+=3;
-    if(score>bestScore){best=t;bestScore=score;}
+    if(overlap)scored.push({task:t,score,overlap});
   });
-  return bestScore?best:null;
+  if(!scored.length)return [];
+  scored.sort((a,b)=>b.overlap-a.overlap||b.score-a.score||String(a.task.date||'').localeCompare(String(b.task.date||'')));
+  const best=scored[0].overlap;
+  return scored.filter(x=>x.overlap===best).map(x=>x.task);
 }
 function taskCommandQuery(text){
   return String(text).toLowerCase()
@@ -3134,7 +3154,7 @@ function expenseOpState(x){
   if(!x)return '—';
   return `${fmtMoney(x.amount)} ₽ · ${esc(x.category||'Прочее')}<br>${esc(x.date?fmtDate(x.date):'')}${x.desc?' · '+esc(x.desc):''}`;
 }
-function parseLocalManagement(text){
+function parseLocalManagement(text,forcedTaskId=null){
   text=String(text).replace(/^(?:а\s+)?(?:теперь|тогда|хорошо|ладно)\s+/i,'').replace(/^и\s+(?=(?:перенес|отмет|удал|измени|добав))/i,'');
   const low=text.toLowerCase().replace(/ё/g,'е'),ops=[];
   if(/^(?:не|не надо|не нужно)\s+(?:перенос|удал|отмеч|меняй|измен)/.test(low))return {error:'Понял, ничего менять не буду.'};
@@ -3189,7 +3209,29 @@ function parseLocalManagement(text){
     ops.push({kind:'task_update',id:task.id,title:'Перенести дело',before:taskOpState(task),after:taskOpState({...task,date,time}),patch:{date,time}});
     return {ops};
   }
+  if(/^измени\S*(?:\s+(?:дело|задачу|встречу|созвон))?/.test(low)){
+    const query=taskCommandQuery(text),candidates=forcedTaskId?getTasks().filter(t=>String(t.id)===String(forcedTaskId)&&!t.done):findTaskCandidatesForCommand(query);
+    if(!candidates.length)return {error:'Не нашёл подходящее активное дело. Назови часть названия, человека или дату.'};
+    if(candidates.length>1)return {choice:{kind:'task_edit',text,items:candidates.map(t=>({id:t.id,title:t.title,meta:`${fmtDate(t.date)}${t.time?' · '+t.time:''}`}))}};
+    const task=candidates[0],relative=relativeScheduleFromText(low),hasDate=/(?:сегодня|завтра|послезавтра|через\s+\d+\s+д|понедельник|вторник|сред|четверг|пятниц|суббот|воскрес)/.test(low);
+    const explicitTime=timeFromText(low)||extractTime(low),date=relative?.date||(hasDate?dateFromText(low):task.date),time=relative?.time||explicitTime||task.time||'';
+    if(isPastTaskSchedule(date,time))return {error:'Это время уже прошло. Назови будущее время или другую дату.'};
+    const titleMatch=text.match(/(?:названи\S*|переименуй\S*)\s+(?:на\s+)?[«"]?(.+?)[»"]?$/i),patch={date,time};
+    if(titleMatch&&!/\d{1,2}(?::|\-|\.)\d{2}/.test(titleMatch[1]))patch.title=titleMatch[1].trim();
+    const after={...task,...patch};
+    ops.push({kind:'task_update',id:task.id,title:'Изменить дело',before:taskOpState(task),after:taskOpState(after),patch});
+    return {ops};
+  }
   return null;
+}
+function localChoiceHTML(choice){
+  return `<div class="local-choice"><div class="local-plan-head">Что именно изменить?</div><div class="local-plan-sub">Нашёл несколько актуальных совпадений. Выбери нужную запись.</div>${choice.items.map(x=>`<button class="smart-card" onclick="chooseLocalManagementItem(${jsArg(x.id)})"><span><b>${esc(x.title)}</b><small>${esc(x.meta||'')}</small></span><em>›</em></button>`).join('')}<button class="local-plan-cancel" onclick="cancelLocalManagementChoice()">Отмена</button></div>`;
+}
+function showLocalManagementChoice(choice){pendingLocalChoice=choice;aiAddMsg('ai',localChoiceHTML(choice));}
+function cancelLocalManagementChoice(){pendingLocalChoice=null;document.querySelector('.local-choice')?.closest('.ai-msg')?.remove();aiAddMsg('ai','Изменение отменено.');}
+function chooseLocalManagementItem(id){
+  if(!pendingLocalChoice)return;const choice=pendingLocalChoice;pendingLocalChoice=null;document.querySelector('.local-choice')?.closest('.ai-msg')?.remove();
+  const result=parseLocalManagement(choice.text,id);if(result?.ops)showLocalOps(result);else aiAddMsg('ai','Не удалось подготовить изменение — уточни команду.');
 }
 function localOpsHTML(plan,demo=false){
   let html='<div class="local-ops"><div class="local-plan-head">Подтвердить изменения</div><div class="local-op-warn">Lumo ничего не изменит, пока ты не нажмёшь «Применить».</div>';
@@ -3349,7 +3391,8 @@ async function aiSend(textOverride=null){
 
   const management=parseLocalManagement(text);
   if(management){
-    if(management.error)aiAddMsg('ai','🤔 '+esc(management.error));
+    if(management.choice)showLocalManagementChoice(management.choice);
+    else if(management.error)aiAddMsg('ai','🤔 '+esc(management.error));
     else showLocalOps(management);
     return;
   }
@@ -3366,117 +3409,10 @@ async function aiSend(textOverride=null){
   const localAnswer=tryLocalAnswer(text);
   if(localAnswer){aiAddMsg('ai',localAnswer);return;}
 
-  // Локально не разобралось — пробуем ИИ (если есть ключ)
-  const key=getApiKey();
-  if(!key){
-    aiAddMsg('ai','Не нашёл конкретного действия. Попробуй назвать действие и детали: «завтра позвонить маме в 18», «потратил 500 рублей на продукты» или произнеси несколько таких команд подряд.');
-    return;
-  }
-
-  aiTyping();
-
-  const looksLikeCommand=/напомн|создай|добавь|запиши|встреч|надо|нужно|купил|потрат|заплат|зарплат|получил|доход|расход|трат|съезд|сходить|позвон|не забы|\d+\s*(р|руб|₽)|в \d{1,2}[:.\- ]|завтра|послезавтра|понедельн|вторник|сред|четверг|пятниц|суббот|воскрес/i.test(text);
-
-  if(looksLikeCommand){
-    try{
-      const result=await aiParse(text);
-      aiStopTyping();
-      handleAIResult(result);
-      return;
-    }catch(err){
-      aiStopTyping();
-      aiAddMsg('ai','❌ Ошибка ИИ: '+esc(err.message||''));
-      return;
-    }
+  aiAddMsg('ai','Пока не знаю эту формулировку. Ничего не отправлял в интернет и не сохранил. Попробуй назвать действие, дату или сумму — а эту фразу мы сможем добавить в локальные правила Lumo.');
 }
 
-  aiHistory.push({role:'user',content:text});
-  if(aiHistory.length>10)aiHistory=aiHistory.slice(-10);
-  const sys={role:'system',content:`Ты — дружелюбный русскоязычный ассистент в приложении-планировщике для семьи. Отвечай коротко, по делу, с эмодзи. Помогай с планированием дел, финансами, бытом, огородом, авто. Контекст пользователя: ${buildContext()}`};
-  try{
-    const r=await fetch(API_URL,{method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer '+key},body:JSON.stringify({model:MODEL,messages:[sys,...aiHistory],temperature:0.7,max_tokens:600})});
-    aiStopTyping();
-    if(r.status===401){resetApiKey();aiAddMsg('ai','🔑 Ключ недействителен. Попробуй ещё раз.');return;}
-    if(!r.ok){aiAddMsg('ai','😔 Ошибка сервера ИИ ('+r.status+').');return;}
-    const d=await r.json();
-    const answer=d.choices?.[0]?.message?.content||'Не смог ответить 😔';
-        aiHistory.push({role:'assistant',content:answer});
-    aiAddMsg('ai',esc(answer).replace(/\n/g,'<br>').replace(/\*\*(.+?)\*\*/g,'<b>$1</b>'));
-    if(_handsFree)speak(answer.slice(0,150));
-  }catch(e){aiStopTyping();aiAddMsg('ai','😔 Нет связи с ИИ.');}
-}
-
-async function aiParse(text){
-  const today=todayKey();
-  const now=new Date();
-  const nowHM=String(now.getHours()).padStart(2,'0')+':'+String(now.getMinutes()).padStart(2,'0');
-  const catList=getCats().map(c=>c.id+' ('+c.name+')').join(', ');
-  const expCatList=getExpCats().map(c=>c.name).join(', ');
-        const sys=`Ты помощник-планировщик. Сегодня ${today} (ГГГГ-ММ-ДД). Время ${nowHM}.
-Верни ТОЛЬКО валидный JSON без markdown.
-
-⚠️ КРИТИЧЕСКИ ВАЖНО: анализируй ТОЛЬКО текущее сообщение пользователя ниже. НИКОГДА не копируй пример формата — он показан лишь для структуры JSON, а не как готовый ответ.
-Если в сообщении НЕТ конкретных дел/трат/доходов (просто приветствие, вопрос, болтовня типа "привет", "как дела", "ты тут?") — верни {"chat":"твой ответ"} и ОБЯЗАТЕЛЬНО оставь "tasks","expenses","incomes" пустыми или не включай их вообще.
-
-В сообщении может быть НЕСКОЛЬКО действий. Разложи ВСЁ по группам:
-{
- "tasks":[{"type":"task","title":"суть","date":"ГГГГ-ММ-ДД","time":"ЧЧ:ММ или пусто","module":"id","pri":"R/Y/B","desc":""}],
- "expenses":[{"type":"expense","amount":число,"category":"из списка","desc":"","date":"ГГГГ-ММ-ДД"}],
- "incomes":[{"type":"income","amount":число,"source":"источник","date":"ГГГГ-ММ-ДД"}],
- "chat":"текст, только если это болтовня без действий"
-}
-Пустые группы можно опустить. Каждое дело/трату/доход — ОТДЕЛЬНЫМ элементом в своём массиве.
-⚠️ РАЗДЕЛЯЙ ЗАДАЧИ! Если в тексте несколько дел с РАЗНЫМИ датами/действиями — это РАЗНЫЕ задачи, каждая ОТДЕЛЬНО:
-Пример: "завтра встреча в 15:00, в понедельник сделать пропуска" = ДВЕ задачи:
-[{"title":"Встреча","date":"завтра","time":"15:00"},{"title":"Сделать пропуска","date":"понедельник","time":""}]
-Время привязывай ТОЛЬКО к той задаче, рядом с которой оно стоит! Не переноси время на другую задачу.
-
-ФОРМАТ ДАТ ДЛЯ ПРИМЕРА (не копируй значения, только структуру!):
-{"tasks":[{"type":"task","title":"НАЗВАНИЕ_ИЗ_СООБЩЕНИЯ","date":"ГГГГ-ММ-ДД","time":"ЧЧ:ММ","module":"personal","pri":"Y","desc":""}],
-"expenses":[{"type":"expense","amount":ЧИСЛО_ИЗ_СООБЩЕНИЯ,"category":"КАТЕГОРИЯ","desc":"","date":"ГГГГ-ММ-ДД"}],
-"incomes":[{"type":"income","amount":ЧИСЛО_ИЗ_СООБЩЕНИЯ,"source":"ИСТОЧНИК","date":"ГГГГ-ММ-ДД"}]}
-
-Категории дел: ${catList}. По умолчанию personal.
-Категории трат: ${expCatList}. Если трата НЕ подходит ни под одну — придумай НОВОЕ короткое название категории (1 слово), например для корма животным → "Питомцы", для лекарств → "Здоровье". НЕ пихай в "Продукты" всё подряд! "Продукты" — ТОЛЬКО еда для людей (хлеб, молоко, овощи). 
-НИКОГДА не пихай сюда квартиру, аренду, коммуналку, услуги!
-Примеры правильных категорий:
-- "за квартиру", "аренда", "ипотека", "квартплата" → категория "Жильё"
-- "коммуналка", "свет", "вода", "газ", "интернет" → "Коммуналка"  
-- "бензин", "заправка" → "Топливо"
-- "корм", "ветеринар" → "Питомцы"
-Если сомневаешься — создай НОВУЮ точную категорию, НЕ бросай в "Продукты".
-Приоритет: R=важно, Y=обычно, B=потом.
-Даты: "сегодня"=${today}, "завтра", "послезавтра", дни недели, "через неделю".
-Время: "9-00","9:00","в 9 утра" → "09:00". Всегда возвращай time если оно есть.
-Источники дохода: Зарплата, Аванс, Премия, Подработка, Продажа, Прочее.
-Ещё раз: если сообщение — это НЕ про дела/траты/доходы, а просто разговор — верни только {"chat":"..."}.`;
-
-  const res=await fetchWithRetry(API_URL,{
-    method:'POST',
-    headers:{'Content-Type':'application/json','Authorization':'Bearer '+getApiKey()},
-    body:JSON.stringify({
-      model:MODEL,
-      messages:[{role:'system',content:sys},{role:'user',content:text}],
-      temperature:0.1,
-      max_tokens:1200,
-      response_format:{type:'json_object'}
-    })
-  }, 1, 800);
-  if(!res.ok){
-    if(res.status===401){resetApiKey();throw new Error('Неверный ключ (401)');}
-    if(res.status===429){
-      const retryAfter=res.headers.get('Retry-After');
-      const wait=retryAfter?parseInt(retryAfter,10)*1000:60000;
-      _cooldownUntil=Date.now()+wait;
-      throw new Error(`Слишком много запросов. Подожди ${Math.ceil(wait/1000)} сек 🕐`);
-    }
-    throw new Error('HTTP '+res.status);
-  }
-  const data=await res.json();
-  const content=data.choices[0].message.content;
-  window._lastAIRaw=content;
-  return JSON.parse(content);
-}
+async function aiParse(text){return parseLocalPlan(text);}
   /* ===== НЕДОСТАЮЩИЕ ФУНКЦИИ ДВИЖКА ИИ ===== */
 let _cooldownUntil = 0;
 
@@ -3494,14 +3430,7 @@ async function fetchWithRetry(url, options, retries=1, delay=800){
 
 function extractTime(text){
   if(!text)return '';
-  let rel=text.match(/через\s+(\d{1,3})\s*(мин|минут|минуты|минуту|час|часа|часов)/i);
-  if(rel){
-    const n=+rel[1];
-    const now=new Date();
-    if(/час/i.test(rel[2]))now.setHours(now.getHours()+n);
-    else now.setMinutes(now.getMinutes()+n);
-    return String(now.getHours()).padStart(2,'0')+':'+String(now.getMinutes()).padStart(2,'0');
-  }
+  const relative=relativeScheduleFromText(text);if(relative)return relative.time;
   let m=text.match(/(\b[01]?\d|2[0-3])\s*[:.\-\s]\s*(\d{2})\b/);
   if(m){
     let h=Math.min(23,+m[1]), mi=Math.min(59,+m[2]);
@@ -4111,7 +4040,7 @@ function getHelpSlides(){
       items:[
         ['🎙️','Диктуй естественно','Помощник разделит речь на дела, покупки, расходы и привычки. Если прямой голосовой ввод недоступен, Lumo откроет системную диктовку клавиатуры.'],
         ['👀','Сначала проверка','Перед сохранением появятся карточки — лишнее можно удалить.'],
-        ['⌁','Работает локально','Основные команды обрабатываются на устройстве. Groq — только необязательный резерв.']
+        ['⌁','Работает локально','Команды и текст разбираются на устройстве без внешней языковой модели.']
       ],
       example:'Пример: «завтра встреча в 15 в понедельник сделать отчёт пришла зарплата 90000».'
     }
@@ -4307,7 +4236,7 @@ function showTourStep(){
       const phrase='В понедельник встреча в 15:00 после в 17:00 позвонить коллеге во вторник в 9:00 заказать пропуска';
       const input=document.getElementById('ai-input');input.value='';let i=0;
       tourTypingTimer=setInterval(()=>{input.value=phrase.slice(0,++i);if(i>=phrase.length)clearInterval(tourTypingTimer);},20);
-      renderTourCoach({title:'Локальный помощник и голос',text:'Микрофон работает через собственный Whisper на поддерживаемых телефонах, планшетах и компьютерах. Lumo сам вводит длинный запрос без запятых и разделяет его на действия.',example:'Расшифровка и основной разбор не используют Groq. Перед сохранением всегда показываются карточки проверки.',primary:'Разобрать пример',top:true});
+      renderTourCoach({title:'Локальный помощник и голос',text:'Микрофон работает через собственный Whisper на поддерживаемых телефонах, планшетах и компьютерах. Lumo сам вводит длинный запрос без запятых и разделяет его на действия.',example:'Расшифровка и разбор работают без внешней языковой модели. Перед сохранением всегда показываются карточки проверки.',primary:'Разобрать пример',top:true});
     },80);return;
   }
   if(tourStep===TOUR_MANAGE_STEP){

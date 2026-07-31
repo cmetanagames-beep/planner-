@@ -1,6 +1,4 @@
 import 'dotenv/config';
-const GROQ_KEYS = [process.env.GROQ_KEY_1, process.env.GROQ_KEY_2, process.env.GROQ_KEY_3].filter(Boolean);
-let _keyIdx = 0;
 import express from 'express';
 import cors from 'cors';
 import webpush from 'web-push';
@@ -585,26 +583,6 @@ app.post('/voice/transcribe', express.raw({ type: ['audio/wav', 'audio/x-wav', '
 });
 
 const PORT = process.env.PORT || 3000;
-app.post('/ai', async (req, res) => {
-  const body = req.body;
-  for (let i = 0; i < GROQ_KEYS.length; i++) {
-    const key = GROQ_KEYS[_keyIdx++ % GROQ_KEYS.length];
-    try {
-      const r = await fetch('https://api.groq.com/openai/v1/chat/completions', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + key },
-        body: JSON.stringify(body)
-      });
-      if (r.status === 429) continue;
-      const data = await r.json();
-      return res.status(r.status).json(data);
-    } catch (e) {
-      if (i === GROQ_KEYS.length - 1) return res.status(500).json({ error: 'proxy failed' });
-    }
-  }
-  res.status(429).json({ error: 'all keys busy' });
-});
-
 // ═══════════════════════════════════════════
 // УТРЕННИЙ ПУШ — планировщик
 // ═══════════════════════════════════════════

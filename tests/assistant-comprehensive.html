@@ -13,6 +13,9 @@ document.getElementById('app').addEventListener('load',()=>{
   test('премия и питомцы','получил премию 18000 и потратил 2300 на корм собаке',p=>p.actions.some(x=>x.type==='income'&&x.amount===18000)&&p.actions.some(x=>x.type==='expense'&&x.amount===2300));
   test('заметка с датой','добавь в заметки 5 августа показания счетчика 4512',p=>p.actions.length===1&&p.actions[0].type==='note'&&p.actions[0].date==='2026-08-05');
   test('ежедневная привычка','каждый день в 7 пить воду',p=>p.actions.length===1&&p.actions[0].type==='habit'&&p.actions[0].repeat==='daily'&&p.actions[0].time==='07:00');
+  test('напоминание через минуту','поставь напоминание через минуту',p=>p.actions.length===1&&p.actions[0].type==='task'&&p.actions[0].title==='Напоминание'&&p.actions[0].time);
+  test('напоминание через час','напомни проверить духовку через час',p=>p.actions.length===1&&p.actions[0].type==='task'&&/проверить духовку/i.test(p.actions[0].title)&&p.actions[0].time);
+  test('напоминание через полчаса','напомни позвонить курьеру через полчаса',p=>p.actions.length===1&&p.actions[0].type==='task'&&/позвонить курьеру/i.test(p.actions[0].title)&&p.actions[0].time);
   test('длительность и энергия','завтра подготовить сложный отчет на 90 минут с высокой энергией',p=>p.actions.length===1&&p.actions[0].duration===90&&p.actions[0].energy==='high');
   test('несколько покупок','купить молоко хлеб яйца масло',p=>p.actions.length===1&&p.actions[0].type==='shopping'&&p.actions[0].items.length===4);
   test('срочный приоритет','завтра срочно отправить договор клиенту',p=>p.actions.length===1&&p.actions[0].pri==='R'&&p.actions[0].module==='work');
@@ -22,6 +25,11 @@ document.getElementById('app').addEventListener('load',()=>{
   test('пользовательская длинная фраза','в пн у меня 3 дела 1 в 15-00 встретить сотрудников в 16 заказать им столик проводить до ресторана в 17 проводить до ресторана после в 11 часов вызвать такси сотрудникам так-же пришла зп 100т рублей из них 2300 потратил на собаку',p=>p.actions.filter(x=>x.type==='task').length===4&&p.actions.some(x=>x.type==='income'&&x.amount===100000)&&p.actions.some(x=>x.type==='expense'&&x.amount===2300));
   const many=Array.from({length:50},(_,i)=>`завтра в ${String(8+(i%12)).padStart(2,'0')}:00 позвонить контакту номер ${i+1}`).join(' ');
   test('50 дел одной фразой',many,p=>p.actions.filter(x=>x.type==='task').length===50&&p.unknown.length===0);
+  const noisyTwenty=Array.from({length:20},(_,i)=>`${i%2?'заврта':'завтр'} в ${String(8+(i%12)).padStart(2,'0')}:00 ${i%3?'позв':'позванить'} контакту номер ${i+1}`).join(' ');
+  test('20 дел с сокращениями и ошибками',noisyTwenty,p=>p.actions.filter(x=>x.type==='task').length===20&&p.unknown.length===0);
+  test('нормализация разговорной команды','напом чз минуту позванить курьеру',p=>p.actions.length===1&&p.actions[0].type==='task'&&/позвонить курьеру/i.test(p.actions[0].title)&&p.actions[0].time);
+  const rollover=w.relativeScheduleFromText('через минуту',new Date(2026,6,31,23,59,30));
+  rows.push({name:'относительное время через полночь',pass:rollover?.date==='2026-08-01'&&rollover?.time==='00:00',error:JSON.stringify(rollover)});
   const failed=rows.filter(x=>!x.pass);document.getElementById('result').textContent=(failed.length?'FAIL':'PASS')+` · ${rows.length-failed.length}/${rows.length}\n`+rows.map(x=>`${x.pass?'✓':'✗'} ${x.name}${x.error?'\n  '+x.error:''}`).join('\n');
 });
 </script>

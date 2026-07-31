@@ -1,4 +1,4 @@
-const CACHE = 'planner-v84';
+const CACHE = 'planner-v88';
 const PUSH_STATE_CACHE = 'lumo-push-state-v1';
 
 const ASSETS = [
@@ -36,7 +36,7 @@ self.addEventListener('activate', e => {
 
 // ===== КЭШ (офлайн) =====
 self.addEventListener('fetch', e => {
-  if(e.request.method !== 'GET' || e.request.url.includes('groq.com')){ return; }
+  if(e.request.method !== 'GET'){ return; }
   e.respondWith(
     caches.match(e.request).then(r => r || fetch(e.request).then(resp => {
       if(resp.status === 200 &&

@@ -1,0 +1,19 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>Assistant existing data regression</title>
+<pre id="result">Loading…</pre>
+<iframe id="app" src="../app/index.html?existing-data-suite=1" hidden></iframe>
+<script>
+document.getElementById('app').addEventListener('load',()=>{
+  const w=document.getElementById('app').contentWindow,rows=[];
+  w.setTasks([{id:101,title:'Созвониться с Егором',date:'2026-08-03',time:'07:30',module:'personal',done:false}]);
+  let plan=w.parseLocalManagement('Измени встречу с Егором на 9-00');
+  rows.push({name:'синоним встречи меняет существующее дело',pass:plan?.ops?.length===1&&plan.ops[0].id===101&&plan.ops[0].patch.time==='09:00'&&plan.ops[0].patch.date==='2026-08-03',value:plan});
+  w.setTasks([{id:101,title:'Созвониться с Егором',date:'2026-08-03',time:'07:30',module:'personal',done:false},{id:102,title:'Передать документы Егору',date:'2026-08-04',time:'12:00',module:'personal',done:false}]);
+  plan=w.parseLocalManagement('Измени дело с Егором на 9-00');
+  rows.push({name:'несколько совпадений требуют выбора',pass:plan?.choice?.items?.length===2,value:plan});
+  const picked=w.parseLocalManagement('Измени дело с Егором на 9-00',102);
+  rows.push({name:'выбранная запись изменяется',pass:picked?.ops?.[0]?.id===102&&picked.ops[0].patch.time==='09:00',value:picked});
+  const failed=rows.filter(x=>!x.pass);document.getElementById('result').textContent=(failed.length?'FAIL':'PASS')+` · ${rows.length-failed.length}/${rows.length}\n`+rows.map(x=>`${x.pass?'✓':'✗'} ${x.name}${x.pass?'':'\n'+JSON.stringify(x.value,null,2)}`).join('\n');
+});
+</script>
