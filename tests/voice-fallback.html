@@ -1,0 +1,17 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>Universal voice regression</title>
+<style>body{font:14px system-ui;margin:20px}iframe{width:390px;height:844px;border:0}#result{white-space:pre-wrap}</style>
+<pre id="result">Loading…</pre>
+<iframe id="app" src="../app/index.html?voice-test=82"></iframe>
+<script>
+document.getElementById('app').addEventListener('load',()=>{
+  const w=document.getElementById('app').contentWindow,d=w.document;
+  w.openNativeDictation('Тест запасного режима');
+  requestAnimationFrame(()=>requestAnimationFrame(()=>{
+    const modal=d.getElementById('modal-voice-fallback'),sheet=modal.querySelector('.sheet');
+    const wav=w.encodeVoiceWav([new Float32Array(4800).fill(.1)],48000),reader=new FileReader();
+    reader.onload=()=>{const bytes=new Uint8Array(reader.result),head=String.fromCharCode(...bytes.slice(0,4)),wave=String.fromCharCode(...bytes.slice(8,12));const pass=modal.classList.contains('on')&&!!sheet.querySelector('.sheet-title-icon svg')&&sheet.scrollWidth<=sheet.clientWidth+1&&!!d.getElementById('voice-native-input')&&/Голосовой ввод/.test(sheet.textContent)&&head==='RIFF'&&wave==='WAVE'&&wav.size>44;document.getElementById('result').textContent=(pass?'PASS':'FAIL')+` voice fallback ${sheet.clientWidth}/${sheet.scrollWidth} wav=${wav.size}`;};reader.readAsArrayBuffer(wav);
+  }));
+});
+</script>

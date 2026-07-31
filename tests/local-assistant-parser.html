@@ -1,0 +1,16 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>Local assistant parser regression</title>
+<pre id="result">Loading…</pre>
+<iframe id="app" src="../app/index.html?assistant-test=82" hidden></iframe>
+<script>
+const fixture='Так в понедельник важная встреча в 15-00 после в 17-00 нужно встретиться с одноклассниками во вторник в 9-00 заказать пропуска сотрудникам после в 11 часов вызвать такси сотрудникам так-же отдать долг в 9т рублей и получить премию в 18000';
+document.getElementById('app').addEventListener('load',()=>{
+  const w=document.getElementById('app').contentWindow,plan=w.parseLocalPlan(fixture),notePlan=w.parseLocalPlan('В заметки 1 числа у меня была переработка');
+  const numbered=w.parseLocalPlan('в пн у меня 3 дела 1 в 15-00 встретить сотрудников в 16 заказать им столик проводить до ресторана в 17 проводить до ресторана после в 11 часов вызвать такси сотрудникам так-же пришла зп 100т рублей из них 2300 потратил на собаку');
+  const tasks=plan.actions.filter(x=>x.type==='task'),expense=plan.actions.find(x=>x.type==='expense'),income=plan.actions.find(x=>x.type==='income');
+  const numberedTasks=numbered.actions.filter(x=>x.type==='task'),numberedExpense=numbered.actions.find(x=>x.type==='expense'),numberedIncome=numbered.actions.find(x=>x.type==='income');
+  const note=notePlan.actions[0],pass=tasks.length===4&&tasks[0].time==='15:00'&&tasks[0].pri==='R'&&tasks[1].time==='17:00'&&tasks[2].time==='09:00'&&tasks[3].time==='11:00'&&expense?.amount===9000&&income?.amount===18000&&notePlan.actions.length===1&&note?.type==='note'&&note.date==='2026-08-01'&&/переработка/.test(note.text)&&numberedTasks.length===4&&numberedTasks.map(x=>x.time).join(',')==='15:00,16:00,17:00,11:00'&&numberedExpense?.amount===2300&&numberedIncome?.amount===100000;
+  document.getElementById('result').textContent=(pass?'PASS':'FAIL')+'\nCHUNKS\n'+JSON.stringify(w.splitLocalSpeech(fixture),null,2)+'\nPLAN\n'+JSON.stringify(plan,null,2)+'\nNUMBERED\n'+JSON.stringify(numbered,null,2)+'\nNOTE\n'+JSON.stringify(notePlan,null,2);
+});
+</script>

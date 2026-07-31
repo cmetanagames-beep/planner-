@@ -1,0 +1,30 @@
+{
+  "name": "Lumo — освети свой день",
+  "short_name": "Lumo",
+  "description": "Дела, финансы, привычки и семья в одном месте",
+  "start_url": "./",
+  "display": "standalone",
+  "background_color": "#F6F6FA",
+  "theme_color": "#F6F6FA",
+  "orientation": "any",
+  "shortcuts": [
+    {"name":"Новое дело","short_name":"Дело","url":"./?quick=task","icons":[{"src":"assets/icons/icon.png","sizes":"512x512","type":"image/png"}]},
+    {"name":"Продиктовать день","short_name":"Голос","url":"./?quick=voice","icons":[{"src":"assets/icons/icon.png","sizes":"512x512","type":"image/png"}]},
+    {"name":"Сканировать чек","short_name":"Чек","url":"./?quick=receipt","icons":[{"src":"assets/icons/icon.png","sizes":"512x512","type":"image/png"}]},
+    {"name":"Список покупок","short_name":"Покупки","url":"./?openShopping=1","icons":[{"src":"assets/icons/icon.png","sizes":"512x512","type":"image/png"}]}
+  ],
+  "icons": [
+    {
+      "src": "assets/icons/icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "assets/icons/icon.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
+}

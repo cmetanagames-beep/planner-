@@ -1,0 +1,54 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>Receipt parser regression</title>
+<pre id="result">Loading…</pre>
+<iframe id="app" src="../app/index.html?receipt-test=82" hidden></iframe>
+<script>
+const fixture=`ЗАО ПЕРЕКРЕСТОК
+КАССОВЫЙ ЧЕК
+1: 3279522 Изделия BARILLA макаронные 500г
+1
+=75.00
+2: 3414666 Кантуччи PAN DUCALE 250г
+1
+=229.00
+3: 3414668 Кантуччи PAN DUCALE 250г
+1
+=229.00
+4: 8360 Молоко МОЖАЙСКОЕ 3.2% 0.45л
+1
+=71.00
+5: 3334545 Продукт ДАНОН 3,6% 170г
+1
+=227.9
+6: 3334541 Продукт ДАНОН 3,6% 170г
+1
+=296,9
+7: 3334541 Продукт ДАНОН 3,6% 170г
+1
+=26.90
+8: 3274552 Творог ДОМИК В ДЕРЕВНЕ 9% 170
+1
+=170287
+9: 3305976 Пакет ПЕРЕКРЕСТОК майка 65x40
+1
+=6.00
+10: 63922 Сметана ДОМИК В ДЕРЕВНЕ 180г
+1
+=37.00
+11: 2083076 Камбала потрошеная 1кг
+1
+=185.00
+СУММА ЧЕКА =1000.70
+СКИДКА =0.70
+ИТОГ =1000.00`;
+document.getElementById('app').addEventListener('load',()=>{
+  const parsed=document.getElementById('app').contentWindow.parseReceiptText(fixture);
+  const badTotal=parsed.items.some(x=>/^итог$/i.test(x.name));
+  const prices=parsed.items.flatMap(x=>Array.from({length:Math.round(x.quantity||1)},()=>x.unitPrice)).sort((a,b)=>a-b);
+  const expected=[6,26.9,26.9,27.9,37,71,75,87,185,229,229].sort((a,b)=>a-b);
+  const pricesOk=prices.length===expected.length&&prices.every((x,i)=>Math.abs(x-expected[i])<.01);
+  const pass=parsed.total===1000&&!badTotal&&Math.abs(parsed.audit.difference)<.01&&pricesOk;
+  document.getElementById('result').textContent=(pass?'PASS':'FAIL')+'\n'+JSON.stringify(parsed,null,2);
+});
+</script>

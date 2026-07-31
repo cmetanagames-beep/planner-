@@ -1,0 +1,581 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+<meta http-equiv="Pragma" content="no-cache">
+<meta http-equiv="Expires" content="0">
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
+<title>Lumo — освети свой день</title>
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="theme-color" content="#F6F6FA" id="meta-theme">
+<meta name="apple-mobile-web-app-title" content="Lumo">
+<meta name="mobile-web-app-capable" content="yes">
+<link rel="manifest" href="manifest.json">
+<link rel="apple-touch-icon" sizes="512x512" href="assets/icons/icon.png">
+<link rel="icon" type="image/svg+xml" href="assets/icons/icon.svg">
+<link rel="stylesheet" href="assets/css/app.css">
+</head>
+<body>
+  <svg width="0" height="0" style="position:absolute"><defs>
+<linearGradient id="ringGrad" x1="0" y1="0" x2="1" y2="1">
+<stop offset="0" stop-color="#6c5ce7"/><stop offset="1" stop-color="#a29bfe"/>
+</linearGradient></defs></svg>
+<!-- КИНЕМАТОГРАФИЧНЫЙ ВХОД LUMO -->
+<div id="cinematic" aria-hidden="true">
+  <div class="cin-glow"></div>
+  <div class="cin-logo">
+    <svg class="cin-drop" width="72" height="72" viewBox="0 0 512 512">
+      <path d="M256 104C324 200 357 258 357 319C357 377 312 420 256 420C200 420 155 377 155 319C155 258 188 200 256 104Z" fill="#fff"/>
+      <path d="M273 172C314 232 329 274 329 317C329 351 306 380 270 390C291 359 297 322 293 283C290 242 280 203 273 172Z" fill="#8f82fb"/>
+      <path d="M371 122L378 140L396 147L378 154L371 172L364 154L346 147L364 140L371 122Z" fill="#fff"/>
+    </svg>
+  </div>
+  <div class="cin-title">Lumo</div>
+  <div class="cin-tagline">освети свой день</div>
+  <div class="cin-progress"><i></i></div><div class="cin-status">готовим ваш день</div>
+</div>
+<div class="hero">
+    <div class="hero-top">
+    <div id="hero-textblock">
+     <h1 id="hero-title">Lumo</h1>
+      <div class="date" id="hero-date"></div>
+<div id="hero-chips-row" style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-top:8px">
+  <div id="streakBox" class="streak-chip" style="display:none;margin-top:0" onclick="openAchievements()"></div>
+  <div id="weatherChip" class="weather-chip" style="display:none;margin-top:0" onclick="refreshWeather(true)"></div>
+</div>
+<div class="quote-chip" id="quoteChip"></div>
+    </div>
+<div class="hero-btns">
+  <button onclick="openGlobalSearch()" title="Поиск по приложению"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="10.8" cy="10.8" r="6.8"/><path d="M16 16l4.2 4.2"/></svg></button>
+  <button class="hero-notify" onclick="openNotificationCenter()" title="Уведомления"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8a6 6 0 00-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9M10 21h4"/></svg><span class="notify-dot" id="notify-dot"></span></button>
+  <button onclick="openHelp()" title="Возможности"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M9.5 9a2.5 2.5 0 015 .2c0 1.7-2.5 2-2.5 3.8"/><circle cx="12" cy="17" r=".6" fill="currentColor"/></svg></button>
+  <button onclick="openSettings()" title="Настройки"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.6 1.6 0 00.3 1.8 2 2 0 11-2.8 2.8 1.6 1.6 0 00-2.7.7 1.6 1.6 0 01-3.2 0 1.6 1.6 0 00-2.7-.7 2 2 0 11-2.8-2.8 1.6 1.6 0 000-2.7 1.6 1.6 0 01.9-2.9 1.6 1.6 0 00.9-2.7 2 2 0 112.8-2.8 1.6 1.6 0 002.7-.7 1.6 1.6 0 013.2 0 1.6 1.6 0 002.7.7 2 2 0 112.8 2.8 1.6 1.6 0 000 2.7z"/></svg></button>
+  <button onclick="toggleTheme()" title="Тема"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.8A8 8 0 1111.2 3 6.5 6.5 0 0021 12.8z"/></svg></button>
+</div>
+  </div>
+  <div class="hero-stats" id="hero-stats"></div>
+</div>
+
+<div class="filters" id="filters"></div>
+
+<div class="search-wrap" id="search-wrap">
+  <input id="search" placeholder="🔍 Поиск по всему приложению..." oninput="debouncedRender()">
+</div>
+
+<div id="view"></div>
+
+<div id="ai-view" style="display:none">
+  <div id="ai-chat"></div>
+  <div id="ai-suggest" class="ai-suggest"></div>
+</div>
+<div class="ai-input-bar" id="ai-bar" style="display:none">
+  <button class="mic-btn" id="mic" onclick="toggleMic()" aria-label="Голосовой ввод" title="Голосовой ввод"><svg viewBox="0 0 24 24" fill="none" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="3" width="6" height="12" rx="3"/><path d="M5 11a7 7 0 0014 0M12 18v3M8 21h8"/></svg></button>
+  <button class="receipt-ai-btn" onclick="openAIReceipt()" title="Добавить чек"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M7 3h10a2 2 0 012 2v16l-3-2-4 2-4-2-3 2V5a2 2 0 012-2z"/><path d="M8 8h8M8 12h6M8 16h4"/></svg></button>
+  <input id="ai-input" placeholder="Напиши или надиктуй...">
+  <button class="send-btn" onclick="aiSend()">➤</button>
+</div>
+
+<button class="fab" id="fab" onclick="fabRipple(event);fabAction()" oncontextmenu="event.preventDefault();openQuickCreate()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg><span id="fab-label">Новое дело</span></button>
+
+<div class="nav" id="nav"></div>
+<div class="modal" id="modal-quick-create">
+  <div class="sheet quick-create-sheet">
+    <div class="sheet-handle"></div><h3>Быстро добавить</h3>
+    <div class="quick-create-grid">
+      <button onclick="quickCreate('task')"><svg viewBox="0 0 24 24" fill="none"><path d="M12 5v14M5 12h14"/></svg><span><b>Дело</b><small>Запланировать задачу</small></span></button>
+      <button onclick="quickCreate('expense')"><svg viewBox="0 0 24 24" fill="none"><rect x="3" y="6" width="18" height="13" rx="3"/><path d="M3 10h18M16 15h2"/></svg><span><b>Расход</b><small>Записать операцию</small></span></button>
+      <button onclick="quickCreate('note')"><svg viewBox="0 0 24 24" fill="none"><path d="M6 3h9l4 4v14H6zM9 12h6M9 16h6"/></svg><span><b>Заметка</b><small>Сохранить мысль</small></span></button>
+      <button onclick="quickCreate('habit')"><svg viewBox="0 0 24 24" fill="none"><path d="M5 12l4 4L19 6"/></svg><span><b>Привычка</b><small>Начать новый ритм</small></span></button>
+      <button onclick="quickCreate('receipt')"><svg viewBox="0 0 24 24" fill="none"><path d="M7 3h10a2 2 0 012 2v16l-3-2-4 2-4-2-3 2V5a2 2 0 012-2zM8 9h8M8 13h6"/></svg><span><b>Чек</b><small>Сканировать покупку</small></span></button>
+      <button onclick="quickCreate('voice')"><svg viewBox="0 0 24 24" fill="none"><rect x="9" y="3" width="6" height="12" rx="3"/><path d="M5 11a7 7 0 0014 0M12 18v3"/></svg><span><b>Продиктовать</b><small>Разобрать одной фразой</small></span></button>
+    </div>
+    <button class="btn ghost" onclick="closeQuickCreate()">Отмена</button>
+  </div>
+</div>
+<div class="bulk-bar" id="bulk-bar"><b id="bulk-count">0</b><button onclick="bulkMoveDate(0)">Сегодня</button><button onclick="openBulkEdit()">Изменить</button><button onclick="bulkComplete()">Готово</button><button class="danger" onclick="bulkDelete()">Удалить</button><button onclick="toggleBulkMode()">×</button></div>
+<div class="modal" id="modal-note">
+  <div class="sheet">
+    <h3>📝 Новая заметка</h3>
+    <div class="field"><label>Заголовок</label><input id="note-title" placeholder="Например: Идея для сада"></div>
+    <div class="field"><label>Текст</label><textarea id="note-text" placeholder="Пиши что угодно..." style="min-height:100px"></textarea></div>
+    <div class="field"><label>📅 Дата (для календаря)</label><input id="note-date" type="date"></div>
+    <div class="field"><label>Цвет</label><div class="note-color-row" id="note-color-row"></div></div>
+    <div class="chk-toggle" onclick="toggleNotePinned()"><div class="box" id="note-pin-box"></div><div class="lbl">📌 Закрепить сверху</div></div>
+    <button class="btn" onclick="saveNote()">Сохранить</button>
+    <button class="btn ghost" onclick="closeNoteModal()">Отмена</button>
+  </div>
+</div>
+<div class="modal" id="modal">
+  <div class="sheet task-sheet">
+    <div class="sheet-handle"></div>
+    <div class="task-form-head"><div class="task-form-icon"><svg viewBox="0 0 24 24" fill="none" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12l4 4L19 6"/></svg></div><div><h3 id="modal-title">Новое дело</h3><small>Главное, срок и приоритет — остальное необязательно</small></div></div>
+    <div class="task-form-section">
+      <div class="field"><label>Что нужно сделать?</label><input id="f-title" placeholder="Например: заменить масло"></div>
+      <div class="field"><label>Категория</label><select id="f-module"></select></div>
+      <div class="field" id="assign-field" style="display:none"><label>Поручить участнику семьи</label><select id="f-assign"><option value="">Себе</option></select></div>
+    </div>
+    <div class="task-form-section">
+      <div class="two-col">
+        <div class="field"><label>Дата</label><input id="f-date" type="date" onchange="syncTaskTimeConstraints()"></div>
+        <div class="field"><label>Время</label><input id="f-time" type="time" oninput="syncTaskTimeConstraints()" onchange="rejectPastTaskTime()"><small class="task-time-hint" id="task-time-hint"></small></div>
+      </div>
+      <div class="field"><label>Повтор</label><select id="f-repeat"><option value="">Без повтора</option><option value="daily">Каждый день</option><option value="weekly">Каждую неделю</option><option value="monthly">Каждый месяц</option></select></div>
+      <div class="field task-priority"><label>Приоритет</label><div class="seg"><button type="button" class="pri-r" data-pri="R" onclick="pickPri('R')">● Важно</button><button type="button" class="pri-y on" data-pri="Y" onclick="pickPri('Y')">● Обычно</button><button type="button" class="pri-b" data-pri="B" onclick="pickPri('B')">● Потом</button></div></div>
+      <div class="two-col">
+        <div class="field"><label>Оценка времени</label><select id="f-duration"><option value="15">15 минут</option><option value="30" selected>30 минут</option><option value="45">45 минут</option><option value="60">1 час</option><option value="90">1,5 часа</option><option value="120">2 часа</option></select></div>
+        <div class="field"><label>Энергия</label><select id="f-energy"><option value="low">Низкая</option><option value="medium" selected>Средняя</option><option value="high">Высокая</option></select></div>
+      </div>
+    </div>
+    <details class="task-extra" id="task-extra"><summary><span>Дополнительно<small>Заметка, фото и чек-лист</small></span></summary><div class="task-extra-body">
+      <div class="field"><label>Заметка</label><textarea id="f-desc" placeholder="Детали..."></textarea></div>
+      <div class="field"><label>Фото</label><div id="photo-list" class="task-photos"></div><input type="file" id="photo-input" accept="image/*" multiple style="display:none" onchange="addPhotos(event)"></div>
+      <div class="field"><label>Подзадачи</label><div id="sub-list" class="subtasks"></div><div class="sub-add"><input id="sub-input" placeholder="Добавить пункт..."><button onclick="addSubtask()">+</button></div></div>
+    </div></details>
+    <div class="task-form-actions"><button class="btn" id="task-save-btn" onclick="saveTask()">Сохранить</button><button class="btn ghost" onclick="closeModal()">Отмена</button></div>
+  </div>
+</div>
+<div class="modal" id="modal-habit-stats">
+  <div class="sheet">
+    <h3 id="habit-stats-title">📊 История привычки</h3>
+    <div class="seg"><button class="pri-b on" id="habit-stats-month-btn" onclick="setHabitStatsMode('month')">Месяц</button><button class="pri-b" id="habit-stats-year-btn" onclick="setHabitStatsMode('year')">Год</button></div>
+    <div id="habit-stats-body"></div>
+    <button class="btn ghost" onclick="closeHabitStats()">Закрыть</button>
+  </div>
+</div>
+
+<div class="modal" id="modal-postpone">
+  <div class="sheet">
+    <h3>Отложить задачу</h3>
+    <div class="postpone-grid">
+      <button onclick="postponeTask('hour')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg><span><b>Через час</b><small>На 1 час позже</small></span></button>
+      <button onclick="postponeTask('evening')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4 12H2M22 12h-2M5 5l1.5 1.5M19 19l-1.5-1.5M5 19l1.5-1.5M19 5l-1.5 1.5"/></svg><span><b>Сегодня вечером</b><small>На 19:00</small></span></button>
+      <button onclick="postponeTask('tomorrow')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 9h18M8 3v4M16 3v4"/></svg><span><b>Завтра</b><small>В то же время</small></span></button>
+      <button onclick="postponeTask('monday')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 9h18M8 3v4M16 3v4M8 14h8"/></svg><span><b>В понедельник</b><small>На следующую неделю</small></span></button>
+    </div>
+    <button class="btn ghost" onclick="closePostpone()">Отмена</button>
+  </div>
+</div>
+
+<div class="modal" id="modal-focus">
+  <div class="sheet">
+    <div class="sheet-handle"></div>
+    <h3>Фокус на деле</h3>
+    <p class="ai-hint" id="focus-task-title">Выбери, сколько времени работать без отвлечений.</p>
+    <div class="focus-presets">
+      <button onclick="startFocusTimer(15)">15<span>быстро</span></button>
+      <button onclick="startFocusTimer(25)">25<span>помодоро</span></button>
+      <button onclick="startFocusTimer(45)">45<span>глубоко</span></button>
+      <button onclick="startFocusTimer(60)">60<span>час</span></button>
+    </div>
+    <div class="field"><label>Своё время, минут</label><input id="focus-custom-minutes" type="number" inputmode="numeric" min="1" max="180" placeholder="Например, 30"></div>
+    <div class="focus-note">Когда время закончится, Lumo подаст сигнал. На заблокированном устройстве это делает системный push — PWA должна быть установлена, а уведомления разрешены.</div>
+    <button class="btn" onclick="startFocusTimer()">Запустить своё время</button>
+    <button class="btn ghost" onclick="closeFocusTimerModal()">Не сейчас</button>
+  </div>
+</div>
+
+<div class="modal" id="modal-exp">
+  <div class="sheet">
+    <h3>💰 Добавить</h3>
+    <div class="field"><label>Тип</label>
+      <div class="seg">
+        <button type="button" class="pri-b on" id="type-exp" onclick="pickType('exp')">📉 Расход</button>
+        <button type="button" class="pri-b" id="type-inc" onclick="pickType('inc')">📈 Доход</button>
+      </div>
+    </div>
+    <div class="field"><label>Сумма ₽</label><input id="e-amount" type="number" inputmode="decimal" placeholder="0"></div>
+    <div class="field" id="e-cat-field"><label>Категория</label><select id="e-cat"></select></div>
+    <div class="field" id="e-src-field" style="display:none"><label>Источник</label>
+      <select id="e-src"><option>Зарплата</option><option>Аванс</option><option>Премия</option><option>Подработка</option><option>Продажа</option><option>Прочее</option></select>
+    </div>
+    <div class="chk-toggle" id="e-shared-toggle" onclick="toggleExpShared()">
+      <div class="box" id="e-shared-box"></div>
+      <div class="lbl">👨‍👩‍👦 Семейная (общая) трата</div>
+    </div>
+    <div class="field"><label>Дата</label><input id="e-date" type="date"></div>
+    <div class="field"><label>Комментарий</label><input id="e-desc" placeholder="Необязательно"></div>
+    <button class="btn" onclick="saveExpModal()">Сохранить</button>
+    <button class="btn ghost" onclick="closeExpModal()">Отмена</button>
+  </div>
+</div>
+<div class="modal" id="modal-receipt">
+  <div class="sheet">
+    <h3>Сканировать чек</h3>
+    <div class="local-edit-note">Распознавание выполняется на устройстве. При первом запуске потребуется интернет для загрузки OCR и русского словаря.</div>
+    <div class="receipt-drop">
+      <img id="receipt-preview" alt="Фото чека">
+      <input id="receipt-camera" type="file" accept="image/*" capture="environment" onchange="receiptFilePicked(event)" style="display:none">
+      <input id="receipt-file" type="file" accept="image/*" onchange="receiptFilePicked(event)" style="display:none">
+      <div class="receipt-source-grid">
+        <button type="button" onclick="document.getElementById('receipt-camera').click()"><svg viewBox="0 0 24 24" fill="none"><path d="M4 8h4l2-3h4l2 3h4v11H4z"/><circle cx="12" cy="13" r="4"/></svg><span><b>Сфотографировать</b><small>Открыть камеру</small></span></button>
+        <button type="button" onclick="document.getElementById('receipt-file').click()"><svg viewBox="0 0 24 24" fill="none"><rect x="3" y="4" width="18" height="16" rx="3"/><path d="M3 16l5-5 4 4 3-3 6 6"/><circle cx="16.5" cy="8.5" r="1.5"/></svg><span><b>Выбрать фото</b><small>Галерея устройства</small></span></button>
+      </div>
+    </div>
+    <div class="receipt-progress"><i id="receipt-progress-bar"></i></div>
+    <div class="receipt-status" id="receipt-status">Выбери чёткое фото чека</div>
+    <button class="btn" id="receipt-scan-btn" onclick="scanReceipt()" disabled>Распознать чек</button>
+    <div id="receipt-review" style="display:none">
+      <div class="field"><label>Магазин</label><input id="receipt-merchant"></div>
+      <div class="two-col"><div class="field"><label>Итого ₽</label><input id="receipt-total" type="number" inputmode="decimal" oninput="refreshReceiptAudit()"></div><div class="field"><label>Дата</label><input id="receipt-date" type="date"></div></div>
+      <div class="field"><label>Категория</label><select id="receipt-category"></select></div><div id="receipt-audit" class="receipt-audit" style="display:none"></div>
+      <div class="field"><label>Позиции чека</label><div class="receipt-edit-hint"><svg viewBox="0 0 24 24" fill="none" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20h4l11-11-4-4L4 16v4zM13.5 6.5l4 4"/></svg><span><b>Всё с цветной рамкой можно исправить.</b><br>Нажми на название, количество, цену или категорию.</span></div><div id="receipt-items-editor" class="receipt-items-editor"></div>
+        <button class="btn ghost" onclick="addReceiptItem()">＋ Добавить позицию</button></div>
+      <details><summary style="font-size:.72rem;color:var(--muted);margin-bottom:8px">Текст OCR</summary><textarea id="receipt-raw" style="min-height:110px"></textarea><button class="btn ghost" onclick="reviewReceiptText()">Разобрать исправленный текст</button></details>
+      <button class="btn" id="receipt-save-btn" onclick="saveReceiptExpense()">Записать расход</button>
+    </div>
+    <button class="btn ghost" onclick="closeReceiptScanner()">Закрыть</button>
+  </div>
+</div>
+<div class="modal" id="modal-receipt-details">
+  <div class="sheet">
+    <h3 id="receipt-details-title">Чек</h3>
+    <div id="receipt-details-body"></div>
+    <button class="btn ghost" onclick="document.getElementById('modal-receipt-details').classList.remove('on')">Закрыть</button>
+  </div>
+</div>
+
+<div class="modal" id="modal-cat">
+  <div class="sheet">
+    <h3>⚙️ Категории</h3>
+    <div class="sub-h">📋 Категории дел</div>
+    <div id="cat-list"></div>
+    <button class="btn" onclick="openCatEdit()">➕ Новая категория дел</button>
+    <div class="sub-h">💰 Категории трат</div>
+    <div id="expcat-list"></div>
+    <button class="btn" onclick="openExpCatEdit()">➕ Новая категория трат</button>
+    <button class="btn ghost" onclick="closeCatModal()">Закрыть</button>
+  </div>
+</div>
+
+<div class="modal" id="modal-cat-edit">
+  <div class="sheet">
+    <h3 id="cat-edit-title">Новая категория</h3>
+    <div class="field"><label>Название</label><input id="cat-name" placeholder="Например: Спортзал"></div>
+    <div class="field"><label>Эмодзи</label>
+      <input id="cat-emoji" placeholder="🏋️" maxlength="4" oninput="renderEmojiPick()">
+      <div class="emoji-pick" id="emoji-pick"></div>
+    </div>
+    <button class="btn" onclick="saveCat()">Сохранить</button>
+    <button class="btn ghost" onclick="closeCatEdit()">Отмена</button>
+  </div>
+</div>
+
+<div class="modal" id="modal-expcat-edit">
+  <div class="sheet">
+    <h3 id="expcat-edit-title">Новая категория трат</h3>
+    <div class="field"><label>Название</label><input id="expcat-name" placeholder="Например: Питомцы"></div>
+    <div class="field"><label>Эмодзи</label>
+      <input id="expcat-emoji" placeholder="🐶" maxlength="4" oninput="renderExpEmojiPick()">
+      <div class="emoji-pick" id="expemoji-pick"></div>
+    </div>
+    <button class="btn" onclick="saveExpCat()">Сохранить</button>
+    <button class="btn ghost" onclick="closeExpCatEdit()">Отмена</button>
+  </div>
+</div>
+
+<div class="modal" id="modal-budget">
+  <div class="sheet">
+    <h3>🎯 Лимиты по категориям</h3>
+    <p style="font-size:.82rem;color:var(--muted);margin-bottom:14px">Ставь месячный лимит — покажу прогресс и предупрежу.</p>
+    <div id="limit-list"></div>
+    <button class="btn" onclick="saveBudgets()">Сохранить</button>
+    <button class="btn ghost" onclick="closeBudget()">Отмена</button>
+  </div>
+</div>
+
+<div class="modal" id="modal-goal">
+  <div class="sheet">
+    <h3>🎯 Новая цель-копилка</h3>
+    <div class="field"><label>Название</label><input id="goal-name" placeholder="Например: Отпуск"></div>
+    <div class="field"><label>Эмодзи</label><input id="goal-emoji" placeholder="✈️" maxlength="4"></div>
+    <div class="field"><label>Сколько накопить ₽</label><input id="goal-target" type="number" inputmode="numeric" placeholder="100000"></div>
+    <div class="field"><label>Уже есть ₽ (необязательно)</label><input id="goal-start" type="number" inputmode="numeric" placeholder="0"></div>
+    <button class="btn" onclick="saveGoal()">Создать</button>
+    <button class="btn ghost" onclick="closeGoal()">Отмена</button>
+  </div>
+</div>
+
+<div class="modal" id="modal-settings">
+  <div class="sheet settings-sheet">
+    <div class="sheet-handle"></div><h3>Настройки</h3>
+    <details class="settings-group" open><summary><span class="settings-icon"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 3a9 9 0 000 18V3z"/></svg></span><span><b>Оформление</b><small>Тема, цвет и нижнее меню</small></span></summary><div class="settings-content">
+      <label class="settings-label">Акцентный цвет</label><div class="color-pick" id="color-pick"></div>
+      <label class="settings-label">Тема</label><div class="seg"><button type="button" class="pri-b" id="th-auto" onclick="setThemeMode('auto')">Авто</button><button type="button" class="pri-b" id="th-light" onclick="setThemeMode('light')">Светлая</button><button type="button" class="pri-b" id="th-dark" onclick="setThemeMode('dark')">Тёмная</button></div>
+      <div class="settings-inline"><button onclick="openMenuEditor();closeSettings()">Настроить меню</button><button onclick="openCatModal();closeSettings()">Категории</button></div>
+    </div></details>
+    <details class="settings-group"><summary><span class="settings-icon"><svg viewBox="0 0 24 24"><path d="M18 8a6 6 0 00-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9M10 21h4"/></svg></span><span><b>Напоминания</b><small>Дела, привычки, покупки и тишина</small></span></summary><div class="settings-content">
+      <div class="field"><label>Напоминание о делах</label><input id="notify-hour" type="time" value="09:00" onchange="saveNotifyHour()"></div>
+      <div class="two-col"><div class="field"><label>Тихо с</label><input id="quiet-from" type="time" value="22:00" onchange="saveQuietHours()"></div><div class="field"><label>До</label><input id="quiet-to" type="time" value="08:00" onchange="saveQuietHours()"></div></div>
+      <div class="chk-toggle" onclick="toggleQuietEnabled()"><div class="box" id="quiet-box"></div><div class="lbl">Включить тихие часы</div></div>
+      <div class="chk-toggle" onclick="toggleHabitReminder()"><div class="box" id="habit-reminder-box"></div><div class="lbl">Напоминать о невыполненных привычках</div></div>
+      <div class="field"><label>Время привычек</label><input id="habit-reminder-time" type="time" value="09:00" onchange="saveHabitReminderTime()"></div>
+      <div class="chk-toggle" onclick="toggleShoppingReminder()"><div class="box" id="shopping-reminder-box"></div><div class="lbl">Напоминать о незакрытых покупках</div></div>
+      <div class="field"><label>Время списка покупок</label><input id="shopping-reminder-time" type="time" value="18:00" onchange="saveShoppingReminderTime()"></div>
+      <div class="chk-toggle" onclick="toggleInsightReminder()"><div class="box" id="insight-reminder-box"></div><div class="lbl">Умные предложения Lumo</div></div>
+      <div class="field"><label>Время предложений</label><input id="insight-reminder-time" type="time" value="18:30" onchange="saveInsightReminderTime()"></div>
+      <div class="ai-hint">Lumo напомнит только о полезном: просрочках, превышениях бюджета, платежах, покупках и незавершённых привычках.</div>
+    </div></details>
+    <details class="settings-group"><summary><span class="settings-icon"><svg viewBox="0 0 24 24"><path d="M12 3v3"/><rect x="5" y="6" width="14" height="12" rx="3"/><circle cx="9" cy="12" r="1"/><circle cx="15" cy="12" r="1"/></svg></span><span><b>Помощник</b><small>Память и необязательный Groq</small></span></summary><div class="settings-content">
+      <div class="ai-hint">Основные команды работают локально. Groq используется только как резерв.</div>
+      <div class="ai-hint" id="local-memory-info"></div><button class="btn" onclick="openAssistantRules()">Редактировать правила помощника</button><button class="btn ghost" onclick="clearLocalAssistantMemory()">Очистить изученные правила</button>
+      <button class="btn ghost" onclick="setupApiKey()">Настроить резервный Groq</button><button class="btn danger-soft" onclick="resetApiKey()">Отключить Groq</button><button class="btn ghost" onclick="clearAIChatHistory()">Очистить историю помощника</button>
+    </div></details>
+    <details class="settings-group"><summary><span class="settings-icon"><svg viewBox="0 0 24 24"><path d="M20 7h-6V1M4 17h6v6M20 7a9 9 0 00-15-2M4 17a9 9 0 0015 2"/></svg></span><span><b>Синхронизация</b><small>Одинаковые данные на всех устройствах</small></span></summary><div class="settings-content">
+      <div class="sync-status" id="cloud-sync-status">Синхронизация не подключена</div>
+      <button class="btn" id="cloud-create-btn" onclick="createCloudSync()">Создать код синхронизации</button>
+      <div class="field"><label>Код с другого устройства</label><input id="cloud-code-input" maxlength="14" placeholder="Например: AB12CD34EF56" autocapitalize="characters"></div>
+      <button class="btn ghost" onclick="connectCloudSync()">Подключиться по коду</button><button class="btn ghost" onclick="cloudSyncNow(true)">Синхронизировать сейчас</button><button class="btn danger-soft" onclick="disconnectCloudSync()">Отключить это устройство</button>
+      <div class="ai-hint">Код является ключом к копии. Храни его как пароль. При одновременных изменениях Lumo предложит выбрать или объединить версии.</div>
+    </div></details>
+    <details class="settings-group"><summary><span class="settings-icon"><svg viewBox="0 0 24 24"><path d="M14 5h5v5M19 5l-8 8"/><path d="M19 13v6H5V5h6"/></svg></span><span><b>Уведомления PWA</b><small>Разрешения и диагностика</small></span></summary><div class="settings-content">
+      <div class="local-edit-note" id="push-health">Проверяю состояние…</div><button class="btn ghost" onclick="subscribePush()">Включить фоновые push</button><button class="btn ghost" onclick="requestNotify()">Разрешить уведомления</button><button class="btn ghost" onclick="checkPushHealth(true)">Проверить состояние</button><button class="btn ghost" onclick="testPush()">Отправить тестовый push</button>
+    </div></details>
+    <details class="settings-group"><summary><span class="settings-icon"><svg viewBox="0 0 24 24"><path d="M12 3v12M8 11l4 4 4-4"/><path d="M5 17v3h14v-3"/></svg></span><span><b>Данные</b><small>Резервная копия и восстановление</small></span></summary><div class="settings-content"><button class="btn" onclick="exportData()">Скачать резервную копию</button><button class="btn ghost" onclick="document.getElementById('import-file').click()">Загрузить копию</button></div></details>
+    <input type="file" id="import-file" accept="application/json" style="display:none" onchange="importData(event)">
+    <button class="btn ghost" onclick="closeSettings()" style="margin-top:12px">Готово</button>
+  </div>
+</div>
+
+<div class="modal" id="modal-ach">
+  <div class="sheet">
+    <h3>🏆 Достижения</h3>
+    <div id="ach-body"></div>
+    <button class="btn ghost" onclick="closeAchievements()">Закрыть</button>
+  </div>
+</div>
+
+<div class="modal" id="modal-family">
+  <div class="sheet">
+    <h3>👨‍👩‍👦 Семья</h3>
+    <div id="family-body"></div>
+  </div>
+</div>
+
+<div class="modal" id="modal-assign">
+  <div class="sheet">
+    <h3>📋 Кому поручить?</h3>
+    <div id="assign-body"></div>
+    <button class="btn ghost" onclick="closeAssign()">Отмена</button>
+  </div>
+</div>
+
+<div class="modal" id="modal-shopping">
+  <div class="sheet">
+    <h3>🛒 Список покупок</h3>
+    <div class="sub-add" style="margin-bottom:14px">
+      <input id="shop-input" placeholder="Добавить товар..." onkeydown="if(event.key==='Enter')addShopItem()">
+      <button onclick="addShopItem()">+</button>
+    </div>
+    <div id="shopping-body"></div>
+    <button class="btn ghost" onclick="closeShopping()" style="margin-top:16px">Закрыть</button>
+  </div>
+</div>
+
+<div class="modal" id="modal-rating">
+  <div class="sheet">
+    <h3>📊 Рейтинг семьи</h3>
+    <p style="font-size:.82rem;color:var(--muted);margin-bottom:14px">Кто сколько дел выполнил за 7 дней 💪</p>
+    <div id="rating-body"></div>
+    <button class="btn ghost" onclick="closeRating()" style="margin-top:16px">Закрыть</button>
+  </div>
+</div>
+<div class="modal" id="modal-menu-editor">
+  <div class="sheet">
+    <h3>🧩 Настройка меню</h3>
+    <p style="font-size:.82rem;color:var(--muted);margin-bottom:14px">
+      Выбери до 5 разделов для нижней панели. Остальные будут в «Ещё».
+      «Ещё» всегда на месте.
+    </p>
+    <div class="sub-h">В нижней панели</div>
+    <div id="menu-editor-active"></div>
+    <div class="sub-h">В разделе «Ещё»</div>
+    <div id="menu-editor-hidden"></div>
+    <button class="btn" onclick="closeMenuEditor()" style="margin-top:16px">Готово 👍</button>
+  </div>
+</div>
+<div class="modal" id="modal-help">
+  <div class="sheet">
+    <h3 id="help-title">Знакомство с Lumo</h3>
+    <div class="guide-progress" id="help-progress"></div>
+    <div id="help-body"></div>
+    <div class="guide-actions">
+      <button class="btn ghost" id="help-back" onclick="helpBack()">Назад</button>
+      <button class="btn" id="help-next" onclick="helpNext()">Далее</button>
+    </div>
+    <button class="guide-skip" id="help-skip" onclick="skipOnboarding()">Пропустить обучение</button>
+  </div>
+</div>
+<div class="modal" id="modal-notifications"><div class="sheet"><h3>Уведомления</h3><div id="notification-body" class="feed-list"></div><button class="btn ghost" onclick="markAllNotificationsRead()">Отметить всё прочитанным</button><button class="btn ghost" onclick="document.getElementById('modal-notifications').classList.remove('on')">Закрыть</button></div></div>
+<div class="modal" id="modal-inbox"><div class="sheet"><h3>Входящие поручения</h3><div id="inbox-body"></div><button class="btn ghost" onclick="document.getElementById('modal-inbox').classList.remove('on')">Закрыть</button></div></div>
+<div class="modal" id="modal-rules"><div class="sheet"><h3>Правила помощника</h3><p class="ai-hint">Свяжи слово с категорией. Например, «аптека» → «Здоровье», «клиент» → «Работа».</p><div id="rules-body"></div><button class="btn ghost" onclick="addAssistantRule()">Добавить правило</button><button class="btn" onclick="saveAssistantRules()">Сохранить правила</button><button class="btn ghost" onclick="document.getElementById('modal-rules').classList.remove('on')">Отмена</button></div></div>
+<div class="modal" id="modal-sync-conflict"><div class="sheet"><h3>Данные изменены на двух устройствах</h3><p class="ai-hint" id="sync-conflict-info">Выбери, какую версию оставить. Ничего не будет удалено без твоего решения.</p><button class="btn" onclick="resolveCloudConflict('merge')">Объединить версии</button><button class="btn ghost" onclick="resolveCloudConflict('local')">Оставить это устройство</button><button class="btn ghost" onclick="resolveCloudConflict('server')">Загрузить версию с сервера</button></div></div>
+<div class="modal" id="modal-bulk-edit"><div class="sheet"><h3>Изменить выбранные дела</h3><div class="field"><label>Дата</label><input id="bulk-date" type="date"></div><div class="field"><label>Категория</label><select id="bulk-category"></select></div><div class="field"><label>Приоритет</label><select id="bulk-priority"><option value="">Не менять</option><option value="R">Важно</option><option value="Y">Средне</option><option value="B">Потом</option></select></div><button class="btn" onclick="applyBulkEdit()">Применить</button><button class="btn ghost" onclick="document.getElementById('modal-bulk-edit').classList.remove('on')">Отмена</button></div></div>
+<div class="modal" id="modal-local-edit">
+  <div class="sheet">
+    <h3>Исправить распознавание</h3>
+    <div class="local-edit-note">После общего сохранения Lumo запомнит исправленную категорию и применит её к похожим фразам.</div>
+    <div id="local-edit-body"></div>
+    <button class="btn" onclick="saveLocalPlanEdit()">Применить исправление</button>
+    <button class="btn ghost" onclick="closeLocalPlanEdit()">Отмена</button>
+  </div>
+</div>
+<div class="modal" id="modal-links">
+  <div class="sheet link-sheet">
+    <div class="sheet-handle"></div><h3 id="link-title">Связи</h3>
+    <div class="link-current" id="link-current"></div>
+    <div class="field"><label>Связать с</label><select id="link-target"></select></div>
+    <button class="btn" onclick="saveDataLink()">Добавить связь</button>
+    <button class="btn ghost" onclick="closeDataLinks()">Готово</button>
+  </div>
+</div>
+<div class="modal" id="modal-dialog">
+  <div class="sheet dialog-sheet">
+    <h3 id="dialog-title">Подтверждение</h3>
+    <p class="dialog-message" id="dialog-message"></p>
+    <div class="field" id="dialog-input-wrap" hidden><label id="dialog-input-label">Значение</label><input id="dialog-input" autocomplete="off"></div>
+    <button class="btn ghost" id="dialog-cancel" onclick="finishLumoDialog(false)">Отмена</button>
+    <button class="btn" id="dialog-confirm" onclick="finishLumoDialog(true)">Продолжить</button>
+  </div>
+</div>
+<div class="modal" id="modal-voice-fallback">
+  <div class="sheet voice-fallback-sheet">
+    <h3>Голосовой ввод</h3>
+    <div class="voice-status"><svg viewBox="0 0 24 24" fill="none" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="3" width="6" height="12" rx="3"/><path d="M5 11a7 7 0 0014 0M12 18v3"/></svg><span id="voice-fallback-reason">Используется системная диктовка устройства</span></div>
+    <p class="voice-fallback-copy">Нажми поле ниже, затем <b>микрофон на экранной клавиатуре</b> и продиктуй всю фразу. Запятые не нужны — Lumo сам разделит её на действия.<br><br>Это универсальный запасной режим. Обычная кнопка Lumo записывает голос напрямую и расшифровывает его собственным Whisper.</p>
+    <div class="field"><label>Продиктованная фраза</label><textarea class="voice-native-input" id="voice-native-input" placeholder="Здесь появится текст диктовки…" enterkeyhint="done"></textarea></div>
+    <div class="voice-keyboard-action"><button type="button" onclick="focusNativeDictation()">Открыть клавиатуру</button><button type="button" class="voice-retry" onclick="retryWebSpeech()">Попробовать микрофон Lumo ещё раз</button></div>
+    <button class="btn ghost" onclick="closeNativeDictation()">Отмена</button>
+    <button class="btn" onclick="submitNativeDictation()">Разобрать фразу</button>
+  </div>
+</div>
+<div id="tour-layer" style="display:none"></div>
+
+<div class="toast" id="toast"></div>
+<script src="assets/js/app.js"></script>
+
+  <!-- МОДАЛКА АВТО-ПЛАТЕЖЕЙ -->
+<div class="modal" id="modal-autopay">
+  <div class="sheet">
+    <h3>🔁 Регулярный платёж</h3>
+    <div class="field">
+      <label>Название</label>
+      <input id="ap-name" placeholder="Например: Аренда квартиры">
+    </div>
+    <div class="field">
+      <label>Сумма ₽</label>
+      <input id="ap-amount" type="number" inputmode="numeric" placeholder="0">
+    </div>
+    <div class="field">
+      <label>Категория</label>
+      <select id="ap-cat"></select>
+    </div>
+    <div class="field">
+      <label>🔁 Частота</label>
+      <select id="ap-freq">
+        <option value="monthly">Каждый месяц</option>
+        <option value="weekly">Каждую неделю</option>
+      </select>
+    </div>
+    <div class="field" id="ap-day-field">
+      <label>День месяца (1-31)</label>
+      <input id="ap-day" type="number" inputmode="numeric" 
+             min="1" max="31" placeholder="1">
+    </div>
+    <div class="field" id="ap-dow-field" style="display:none">
+      <label>День недели</label>
+      <select id="ap-dow">
+        <option value="1">Понедельник</option>
+        <option value="2">Вторник</option>
+        <option value="3">Среда</option>
+        <option value="4">Четверг</option>
+        <option value="5">Пятница</option>
+        <option value="6">Суббота</option>
+        <option value="0">Воскресенье</option>
+      </select>
+    </div>
+    <div class="chk-toggle" onclick="toggleApRemind()">
+      <div class="box" id="ap-remind-box"></div>
+      <div class="lbl">🔔 Напоминать за день до списания</div>
+    </div>
+    <button class="btn" onclick="saveAutoPay()">Сохранить</button>
+    <button class="btn ghost" onclick="closeAutoPay()">Отмена</button>
+  </div>
+</div>
+
+<!-- МОДАЛКА ДОЛГОВ -->
+<div class="modal" id="modal-debt">
+  <div class="sheet">
+    <h3>💸 Новый долг</h3>
+    <div class="field">
+      <label>Тип</label>
+      <div class="seg">
+        <button type="button" class="pri-b on" 
+                id="debt-type-tome" 
+                onclick="pickDebtType('tome')">
+          💚 Мне должны
+        </button>
+        <button type="button" class="pri-b" 
+                id="debt-type-iowe" 
+                onclick="pickDebtType('iowe')">
+          ❤️ Я должен
+        </button>
+      </div>
+    </div>
+    <div class="field">
+      <label>Имя</label>
+      <input id="debt-name" placeholder="Например: Вася">
+    </div>
+    <div class="field">
+      <label>Сумма ₽</label>
+      <input id="debt-amount" type="number" 
+             inputmode="numeric" placeholder="0">
+    </div>
+    <div class="field">
+      <label>За что</label>
+      <input id="debt-desc" placeholder="Например: за бензин">
+    </div>
+    <div class="field">
+      <label>Дата</label>
+      <input id="debt-date" type="date">
+    </div>
+    <div class="chk-toggle" onclick="toggleDebtRemind()">
+      <div class="box" id="debt-remind-box">✓</div>
+      <div class="lbl">🔔 Напомнить через 7 дней</div>
+    </div>
+    <button class="btn" onclick="saveDebt()">Сохранить</button>
+    <button class="btn ghost" onclick="closeDebtModal()">Отмена</button>
+  </div>
+</div>
+
+<!-- МОДАЛКА ПРОСМОТРА ДОЛГОВ -->
+<div class="modal" id="modal-debts-list">
+  <div class="sheet">
+    <h3>💸 Долги</h3>
+    <div id="debts-body"></div>
+    <button class="btn" onclick="openDebtModal()">
+      ➕ Добавить долг
+    </button>
+    <button class="btn ghost" 
+            onclick="closeDebtsList()">
+      Закрыть
+    </button>
+  </div>
+</div>
+
+<!-- МОДАЛКА ПРОСМОТРА АВТО-ПЛАТЕЖЕЙ -->
+<div class="modal" id="modal-autopays-list">
+  <div class="sheet">
+    <h3>🔁 Регулярные платежи</h3>
+    <div id="autopays-body"></div>
+    <button class="btn" onclick="closeAutoPaysList();openAutoPay()">
+      ➕ Новый платёж
+    </button>
+    <button class="btn ghost" onclick="closeAutoPaysList()">
+      Закрыть
+    </button>
+  </div>
+</div>
+</body>
+</html>

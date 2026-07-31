@@ -1,0 +1,18 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>Assistant auto-submit regression</title>
+<style>body{font:14px/1.45 system-ui;margin:18px}iframe{position:fixed;left:-10000px;width:390px;height:844px;border:0}pre{white-space:pre-wrap}</style>
+<pre id="result">Checking assistant auto-submit…</pre>
+<iframe id="app" src="../app/index.html?assistant-autosubmit=82"></iframe>
+<script>
+const wait=ms=>new Promise(r=>setTimeout(r,ms));
+document.getElementById('app').addEventListener('load',async()=>{
+  const w=document.getElementById('app').contentWindow,d=w.document,prompt='Покажи мои дела на сегодня';
+  w.clearAIChatHistory();w.openInsightConversation(prompt,'Тестовый контекст');await wait(450);
+  const input=d.getElementById('ai-input'),users=[...d.querySelectorAll('.ai-msg.user')],context=[...d.querySelectorAll('.ai-msg')].some(x=>x.textContent.includes('Контекст от Lumo'));
+  w.openInsightConversation(prompt,'Тестовый контекст');await wait(180);
+  const usersAfter=d.querySelectorAll('.ai-msg.user').length;
+  const pass=input.value===''&&users.length===1&&usersAfter===1&&!context&&d.querySelectorAll('.ai-msg.ai').length>=1;
+  document.getElementById('result').textContent=(pass?'PASS':'FAIL')+` input=${JSON.stringify(input.value)} user=${users.length}/${usersAfter} context=${context}`;
+});
+</script>

@@ -1,0 +1,27 @@
+<svg width="512" height="512" viewBox="0 0 512 512" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="lumoBg" x1="64" y1="48" x2="448" y2="464" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#5B4BE1"/>
+      <stop offset="0.52" stop-color="#7868F2"/>
+      <stop offset="1" stop-color="#A293FF"/>
+    </linearGradient>
+    <radialGradient id="lumoLight" cx="0" cy="0" r="1" gradientTransform="translate(182 116) rotate(48) scale(392)" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#FFFFFF" stop-opacity="0.34"/>
+      <stop offset="0.55" stop-color="#FFFFFF" stop-opacity="0.08"/>
+      <stop offset="1" stop-color="#FFFFFF" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="dropCut" x1="242" y1="172" x2="304" y2="374" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#AFA5FF"/>
+      <stop offset="1" stop-color="#6C5CE7"/>
+    </linearGradient>
+  </defs>
+  <rect width="512" height="512" fill="url(#lumoBg)"/>
+  <rect x="14" y="14" width="484" height="484" rx="104" fill="none" stroke="#FFFFFF" stroke-opacity="0.15" stroke-width="3"/>
+  <rect width="512" height="512" fill="url(#lumoLight)"/>
+  <circle cx="256" cy="264" r="146" fill="#FFFFFF" fill-opacity="0.055" stroke="#FFFFFF" stroke-opacity="0.1" stroke-width="2"/>
+  <path d="M256 104C324 200 357 258 357 319C357 377 312 420 256 420C200 420 155 377 155 319C155 258 188 200 256 104Z" fill="#FFFFFF"/>
+  <path d="M273 172C314 232 329 274 329 317C329 351 306 380 270 390C291 359 297 322 293 283C290 242 280 203 273 172Z" fill="url(#dropCut)"/>
+  <path d="M207 307C207 343 226 367 254 376C221 377 190 354 190 319C190 292 202 258 222 221C211 259 207 286 207 307Z" fill="#FFFFFF" fill-opacity="0.48"/>
+  <path d="M371 122L378 140L396 147L378 154L371 172L364 154L346 147L364 140L371 122Z" fill="#FFFFFF"/>
+  <circle cx="405" cy="188" r="8" fill="#FFFFFF" fill-opacity="0.72"/>
+</svg>

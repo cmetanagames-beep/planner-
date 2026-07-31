@@ -1,0 +1,22 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>UI behavior regression</title>
+<pre id="result">Loading…</pre>
+<iframe id="app" src="../app/index.html?ui-suite=83" hidden></iframe>
+<script>
+document.getElementById('app').addEventListener('load',()=>{
+ const w=document.getElementById('app').contentWindow,d=w.document,original=w.getTasks(),rows=[];
+ const check=(name,pass,detail='')=>rows.push({name,pass,detail});
+ try{
+  w.switchTab('all');w.setTasks([]);w.setFilter('active');
+  check('Выбрать скрыто в пустом списке',!d.querySelector('.bulk-toggle'));
+  w.setTasks([{id:991,title:'Готовое',done:true,date:w.todayKey(),module:'personal',pri:'Y'}]);w.setFilter('active');
+  check('Выбрать скрыто без активных дел',!d.querySelector('.bulk-toggle'));
+  w.setFilter('done');check('Выбрать видно для выполненных дел',!!d.querySelector('.bulk-toggle'));
+  w.setTasks([{id:992,title:'Активное',done:false,date:w.todayKey(),module:'personal',pri:'Y'}]);w.setFilter('active');check('Выбрать видно для активных дел',!!d.querySelector('.bulk-toggle'));
+  w.openReceiptScanner();check('Галерея названа нейтрально',/Галерея устройства/.test(d.getElementById('modal-receipt').innerText)&&!/iPhone|iOS/i.test(d.getElementById('modal-receipt').innerText));w.closeReceiptScanner();
+  w.openNativeDictation('Запасной режим');check('Голосовой fallback нейтрален',!/iPhone|iOS|Android/i.test(d.getElementById('modal-voice-fallback').innerText));w.closeNativeDictation();
+ }catch(e){check('suite exception',false,e.stack||e.message)}finally{w.setTasks(original);}
+ const failed=rows.filter(x=>!x.pass);document.getElementById('result').textContent=(failed.length?'FAIL':'PASS')+` · ${rows.length-failed.length}/${rows.length}\n`+rows.map(x=>`${x.pass?'✓':'✗'} ${x.name}${x.detail?' — '+x.detail:''}`).join('\n');
+});
+</script>

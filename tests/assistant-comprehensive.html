@@ -1,0 +1,27 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>Assistant comprehensive regression</title>
+<pre id="result">Loading…</pre>
+<iframe id="app" src="../app/index.html?assistant-suite=82" hidden></iframe>
+<script>
+document.getElementById('app').addEventListener('load',()=>{
+  const w=document.getElementById('app').contentWindow,rows=[];
+  const test=(name,text,check)=>{let plan,error='';try{plan=w.parseLocalPlan(text);if(!check(plan))error=JSON.stringify(plan);}catch(e){error=e.stack||e.message;}rows.push({name,pass:!error,error});};
+  test('дело + покупка','завтра в 18 позвонить маме купить молоко',p=>p.actions.some(x=>x.type==='task'&&x.time==='18:00')&&p.actions.some(x=>x.type==='shopping'&&/молоко/i.test(x.title)));
+  test('две рабочие задачи','в понедельник в 9 встретиться с сотрудниками в 11 подготовить отчет клиенту',p=>p.actions.filter(x=>x.type==='task').length===2&&p.actions.every(x=>x.type!=='task'||x.module==='work'));
+  test('доход и расход','пришла зарплата 90000 рублей из них 50000 потратил на квартиру',p=>p.actions.some(x=>x.type==='income'&&x.amount===90000)&&p.actions.some(x=>x.type==='expense'&&x.amount===50000));
+  test('премия и питомцы','получил премию 18000 и потратил 2300 на корм собаке',p=>p.actions.some(x=>x.type==='income'&&x.amount===18000)&&p.actions.some(x=>x.type==='expense'&&x.amount===2300));
+  test('заметка с датой','добавь в заметки 5 августа показания счетчика 4512',p=>p.actions.length===1&&p.actions[0].type==='note'&&p.actions[0].date==='2026-08-05');
+  test('ежедневная привычка','каждый день в 7 пить воду',p=>p.actions.length===1&&p.actions[0].type==='habit'&&p.actions[0].repeat==='daily'&&p.actions[0].time==='07:00');
+  test('длительность и энергия','завтра подготовить сложный отчет на 90 минут с высокой энергией',p=>p.actions.length===1&&p.actions[0].duration===90&&p.actions[0].energy==='high');
+  test('несколько покупок','купить молоко хлеб яйца масло',p=>p.actions.length===1&&p.actions[0].type==='shopping'&&p.actions[0].items.length===4);
+  test('срочный приоритет','завтра срочно отправить договор клиенту',p=>p.actions.length===1&&p.actions[0].pri==='R'&&p.actions[0].module==='work');
+  test('разные дни','в понедельник в 10 встреча с клиентом во вторник в 12 позвонить маме',p=>p.actions.filter(x=>x.type==='task').length===2&&p.actions[0].date!==p.actions[1].date);
+  test('три расхода','потратил 500 рублей на продукты заплатил 1200 рублей за такси оплатил 3500 рублей лекарства',p=>p.actions.filter(x=>x.type==='expense').length===3);
+  test('прошедшее явное время','сегодня в 01 позвонить врачу',p=>p.actions.length===1&&p.actions[0].type==='task'&&p.actions[0].time==='');
+  test('пользовательская длинная фраза','в пн у меня 3 дела 1 в 15-00 встретить сотрудников в 16 заказать им столик проводить до ресторана в 17 проводить до ресторана после в 11 часов вызвать такси сотрудникам так-же пришла зп 100т рублей из них 2300 потратил на собаку',p=>p.actions.filter(x=>x.type==='task').length===4&&p.actions.some(x=>x.type==='income'&&x.amount===100000)&&p.actions.some(x=>x.type==='expense'&&x.amount===2300));
+  const many=Array.from({length:50},(_,i)=>`завтра в ${String(8+(i%12)).padStart(2,'0')}:00 позвонить контакту номер ${i+1}`).join(' ');
+  test('50 дел одной фразой',many,p=>p.actions.filter(x=>x.type==='task').length===50&&p.unknown.length===0);
+  const failed=rows.filter(x=>!x.pass);document.getElementById('result').textContent=(failed.length?'FAIL':'PASS')+` · ${rows.length-failed.length}/${rows.length}\n`+rows.map(x=>`${x.pass?'✓':'✗'} ${x.name}${x.error?'\n  '+x.error:''}`).join('\n');
+});
+</script>

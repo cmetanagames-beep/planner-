@@ -1,0 +1,23 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>Ten receipt formats regression</title>
+<pre id="result">Loading…</pre>
+<iframe id="app" src="../app/index.html?receipt-suite=83" hidden></iframe>
+<script>
+const cases=[
+ {name:'структурный чек Перекрёсток',total:304,date:'2026-07-31',items:2,text:`ЗАО ПЕРЕКРЕСТОК\n31.07.2026 18:30\n1: 123456 Молоко 3.2% 1л\n1\n=75.00\n2: 234567 Хлеб бородинский\n1\n=229.00\nИТОГ =304.00`},
+ {name:'строки с ценой',total:189.7,items:3,text:`ПЯТЁРОЧКА\nМолоко 79,90\nХлеб 45,00\nЯйца 64,80\nК ОПЛАТЕ 189,70`},
+ {name:'весовой товар',total:113.4,items:1,text:`МАГНИТ\nЯблоки сезонные 74,90 *1,514 =113,40\nИТОГО 113,40`},
+ {name:'одинаковые позиции',total:100,items:1,quantity:2,text:`ЛЕНТА\nВода питьевая 50,00\nВода питьевая 50,00\nИТОГ 100,00`},
+ {name:'скидка',total:180,discount:20,items:2,text:`ДИКСИ\nСыр 120,00\nМасло 80,00\nСКИДКА 20,00\nИТОГО 180,00`},
+ {name:'разделитель пробелом',total:124.5,items:2,text:`АШАН\nСок яблочный 53 50\nМолоко 71 00\nИТОГО 124 50`},
+ {name:'короткий год',total:250,date:'2026-08-01',items:2,text:`ВКУСВИЛЛ\n01.08.26\nТворог 87,00\nКефир 163,00\nК ОПЛАТЕ 250,00`},
+ {name:'английские названия',total:318,items:2,text:`METRO CASH CARRY\nBARILLA Pasta 189.00\nFAIRY средство для посуды 129.00\nTOTAL\nИТОГ 318.00`},
+ {name:'структурные коды товаров',total:300,items:3,text:`ООО МАГАЗИН\n1: 111111 Кофе молотый\n1\n=150.00\n2: 222222 Чай черный\n1\n=90.00\n3: 333333 Сахар 1кг\n1\n=60.00\nСУММА ЧЕКА =300.00`},
+ {name:'OCR лишние цифры',total:1000,items:3,text:`ПЕРЕКРЕСТОК\n1: 3414666 Кантуччи PAN DUCALE 250г\n1\n=2299\n2: 8360 Молоко МОЖАЙСКОЕ 3.2%\n1\n=71.00\n3: 2083076 Камбала потрошеная 1кг\n1\n=185.00\nИТОГ =1000.00`}
+];
+document.getElementById('app').addEventListener('load',()=>{
+ const w=document.getElementById('app').contentWindow,rows=cases.map(c=>{let p,error='';try{p=w.parseReceiptText(c.text);if(Math.abs(p.total-c.total)>.011)error+=`итог ${p.total}; `;if(c.date&&p.date!==c.date)error+=`дата ${p.date}; `;if(p.items.length!==c.items)error+=`позиций ${p.items.length}; `;if(c.quantity&&Math.abs((p.items[0]?.quantity||0)-c.quantity)>.001)error+=`количество ${p.items[0]?.quantity}; `;if(c.discount&&Math.abs(p.audit.discount-c.discount)>.01)error+=`скидка ${p.audit.discount}; `;if(p.items.some(x=>/^итог/i.test(x.name)))error+='ИТОГ попал в товары; ';}catch(e){error=e.stack||e.message;}return {name:c.name,pass:!error,error,p};});
+ const failed=rows.filter(x=>!x.pass);document.getElementById('result').textContent=(failed.length?'FAIL':'PASS')+` · ${rows.length-failed.length}/${rows.length}\n`+rows.map(x=>`${x.pass?'✓':'✗'} ${x.name}${x.error?' — '+x.error:''}`).join('\n')+(failed.length?'\n\nDETAILS\n'+failed.map(x=>x.name+'\n'+JSON.stringify(x.p,null,2)).join('\n'): '');
+});
+</script>

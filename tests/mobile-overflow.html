@@ -1,0 +1,24 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>Mobile modal overflow regression</title>
+<pre id="result">Loading…</pre>
+<iframe id="app" src="../app/index.html?overflow-test=82" style="width:390px;height:844px;border:0"></iframe>
+<script>
+document.getElementById('app').addEventListener('load',()=>{
+  const w=document.getElementById('app').contentWindow,d=w.document;
+  w.openReceiptScanner();
+  d.getElementById('receipt-raw').value=`Очень длинное название магазина для проверки ширины
+1: 123456789 Очень_длинное_название_товара_без_переноса_12345678901234567890
+1
+=1000.00
+ИТОГ =1000.00`;
+  w.reviewReceiptText();
+  w.addReceiptItem();
+  d.querySelector('.ri-name').value='Очень_длинное_название_товара_без_переноса_12345678901234567890';
+  requestAnimationFrame(()=>requestAnimationFrame(()=>{
+    const sheet=d.querySelector('#modal-receipt .sheet'),root=d.documentElement;
+    const pass=sheet.scrollWidth<=sheet.clientWidth+1&&root.scrollWidth<=root.clientWidth+1;
+    document.getElementById('result').textContent=(pass?'PASS':'FAIL')+` sheet ${sheet.clientWidth}/${sheet.scrollWidth} root ${root.clientWidth}/${root.scrollWidth}`;
+  }));
+});
+</script>

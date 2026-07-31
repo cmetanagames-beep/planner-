@@ -1,0 +1,18 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>Smart suggestions regression</title>
+<pre id="result">Loading…</pre>
+<iframe id="app" src="../app/index.html?smart-suite=83" hidden></iframe>
+<script>
+document.getElementById('app').addEventListener('load',()=>{
+ const w=document.getElementById('app').contentWindow,old=w.load(),tk=w.todayKey(),rows=[];
+ const check=(name,pass,detail='')=>rows.push({name,pass,detail});
+ try{
+  const base={...old,tasks:[{id:1,title:'Дело 1',date:tk,done:true,module:'personal',pri:'Y'},{id:2,title:'Дело 2',date:tk,done:true,module:'personal',pri:'Y'}],habits:[{id:'a',name:'Вода',icon:'💧',log:{[tk]:true}},{id:'b',name:'Чтение',icon:'📖',log:{}}],finance:[],income:[],shopping:[],budgets:{},autopays:[],debts:[]};w.save(base);
+  let s=w.getSmartSuggestions();check('При незавершённой привычке одна главная подсказка',s.length===1&&s[0].id==='habits',JSON.stringify(s));check('На экране показывается только одна карточка',(w.renderSmartSuggestions().match(/smart-card/g)||[]).length===1);const answer=w.tryLocalAnswer('подведи итог дня');check('Итог не объявляет всё закрытым',/остались привычки/i.test(answer)&&!/всё действительно закрыто/i.test(answer),answer);
+  base.habits[1].log[tk]=true;w.save(base);s=w.getSmartSuggestions();check('Если всё закрыто, подсказок нет',s.length===0,JSON.stringify(s));
+  base.tasks.push({id:3,title:'Остаток',date:tk,done:false,module:'personal',pri:'Y'});w.save(base);s=w.getSmartSuggestions();check('Вечером предлагается разобрать реальный остаток',new Date().getHours()<18||s[0]?.id==='evening-review',JSON.stringify(s));
+ }catch(e){check('suite exception',false,e.stack||e.message)}finally{w.save(old);}
+ const failed=rows.filter(x=>!x.pass);document.getElementById('result').textContent=(failed.length?'FAIL':'PASS')+` · ${rows.length-failed.length}/${rows.length}\n`+rows.map(x=>`${x.pass?'✓':'✗'} ${x.name}${x.detail?' — '+x.detail:''}`).join('\n');
+});
+</script>
