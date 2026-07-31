@@ -502,7 +502,7 @@ body.dark .fin-hero::after{background:radial-gradient(circle,color-mix(in srgb,v
 .habit-stats-summary{display:grid;grid-template-columns:repeat(3,1fr);gap:7px;margin:10px 0}.habit-stats-summary div{text-align:center;padding:10px 5px;border-radius:13px;background:var(--card2)}.habit-stats-summary b{display:block}.habit-stats-summary small{font-size:.6rem;color:var(--muted)}
 
 /* ---------- ЗАМЕТКИ ---------- */
-.notes-page{padding:14px 16px 120px}.notes-tools{display:grid;grid-template-columns:1fr auto;gap:8px;margin-bottom:13px}.notes-tools input{min-width:0;border:1px solid var(--line);border-radius:15px;background:var(--card);color:var(--text);padding:12px 14px;font-size:.82rem}.notes-tools button{border:0;border-radius:15px;background:linear-gradient(135deg,var(--brand),var(--brand2));color:#fff;padding:0 15px;font-weight:850}
+.notes-page{padding:14px 16px 120px}.notes-tools{display:grid;grid-template-columns:1fr auto;gap:8px;margin-bottom:13px}.notes-tools input{min-width:0;border:1px solid var(--line);border-radius:15px;background:var(--card);color:var(--text);padding:12px 14px;font-size:.82rem}.notes-tools button{border:0;border-radius:15px;background:linear-gradient(135deg,var(--brand),var(--brand2));color:#fff;padding:0 15px;font-weight:850;display:flex;align-items:center;gap:5px}.notes-tools button svg{width:17px;height:17px;stroke:currentColor}
 .notes-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}.note-modern{position:relative;min-height:150px;padding:14px;border:1px solid var(--line);border-radius:19px;background:var(--card);box-shadow:var(--shadow);overflow:hidden}.note-modern::before{content:"";position:absolute;inset:0 auto 0 0;width:5px;background:var(--note-color,var(--brand))}.note-modern.pinned{box-shadow:0 8px 24px color-mix(in srgb,var(--note-color,var(--brand)) 18%,transparent)}.note-modern h3{font-size:.86rem;margin:0 22px 8px 0;line-height:1.25}.note-modern p{font-size:.72rem;line-height:1.45;color:var(--muted);display:-webkit-box;-webkit-line-clamp:5;-webkit-box-orient:vertical;overflow:hidden}.note-modern .note-date{font-size:.61rem;color:var(--muted);margin-top:10px}.note-pin{position:absolute;right:10px;top:9px;border:0;background:transparent;color:var(--note-color,var(--brand));font-size:.9rem}.note-actions{position:absolute;right:8px;bottom:7px;display:flex}.note-actions button{border:0;background:transparent;color:var(--muted);width:29px;height:29px}.note-actions svg{width:15px;height:15px}.note-color-row{display:flex;gap:9px}.note-color-dot{width:31px;height:31px;border-radius:50%;border:3px solid transparent}.note-color-dot.on{border-color:var(--text);box-shadow:0 0 0 2px var(--card)}
 @media(max-width:360px){.notes-grid{grid-template-columns:1fr}}
 
@@ -2011,7 +2011,7 @@ function toggleHabit(id,key){
     if(key===todayKey()){_habitJustDone=id;confetti();}
   }
   saveHabits(habits);
-  scheduleHabitReminderLocal();syncPushData();
+  scheduleHabitReminderLocal();syncPushData();scheduleHabitPushServer();
   renderHabits();
 }
 function toggleHabitComposer(force){
@@ -2498,7 +2498,7 @@ function renderNotes(){
     if(db<da)return -1;
     return 0;
   });
-  let html=`<div class="notes-page"><div class="notes-tools"><input id="notes-search" placeholder="🔍 Поиск по заметкам..." oninput="filterNotes(this.value)"><button onclick="openNoteModal()">+ Новая</button></div>`;
+  let html=`<div class="notes-page"><div class="notes-tools"><input id="notes-search" placeholder="🔍 Поиск по заметкам..." oninput="filterNotes(this.value)"><button onclick="openNoteModal()">${ICONS.plus}<span>Новая</span></button></div>`;
   if(!notes.length){
     html+=`<div class="empty"><div>📝</div>Заметок пока нет</div>`;
   }else{
@@ -3335,7 +3335,7 @@ function incompleteHabits(){const tk=todayKey();return getHabits().filter(h=>!h.
 function scheduleHabitReminderLocal(){
   if(habitReminderTimeout){clearTimeout(habitReminderTimeout);habitReminderTimeout=null;}const r=getHabitReminder();if(!r.enabled||!('Notification'in window)||Notification.permission!=='granted')return;
   const [hh,mm]=(r.time||'09:00').split(':').map(Number),at=new Date();at.setHours(hh||0,mm||0,0,0);if(at.getTime()<=Date.now())at.setDate(at.getDate()+1);
-  habitReminderTimeout=setTimeout(()=>{if(inQuietHours())return;const left=incompleteHabits();if(!left.length)return;const key='habit-local:'+todayKey();notifyOnce(key,()=>{try{new Notification('🌱 Не забудь о привычках',{body:left.slice(0,4).map(h=>h.icon+' '+h.name).join(' · '),tag:key,renotify:false,icon:'./icon.png'});}catch(e){}});scheduleHabitReminderLocal();},at.getTime()-Date.now());
+  habitReminderTimeout=setTimeout(()=>{if(!inQuietHours()){const left=incompleteHabits();if(left.length){const key='habit-local:'+todayKey();notifyOnce(key,()=>{try{new Notification('🌱 Не забудь о привычках',{body:left.slice(0,4).map(h=>h.icon+' '+h.name).join(' · '),tag:key,renotify:false,icon:'./icon.png'});}catch(e){}});}}scheduleHabitReminderLocal();},at.getTime()-Date.now());
 }
 function snoozeTaskOneHour(taskId){
   const tasks=getTasks();
@@ -3473,6 +3473,18 @@ async function checkPushHealth(showToast=false){
   lines.push(next?`🕒 Ближайшее: ${esc(next.title)} — ${fmtDate(next.date)}, ${esc(next.time)}`:'ℹ️ Нет будущих дел с точным временем');
   el.innerHTML=lines.join('<br>');if(showToast)toast(ok?'✅ Push-цепочка готова':'Есть проблема в push-настройках');
 }
+async function scheduleHabitPushServer(force=false){
+  const r=getHabitReminder();if(!r.enabled||!('serviceWorker'in navigator))return;
+  const left=incompleteHabits();if(!left.length)return;
+  const key=`habit_push_scheduled_v1:${todayKey()}:${r.time}`;
+  if(!force&&localStorage.getItem('habit_push_last_key')===key)return;
+  try{
+    const reg=await navigator.serviceWorker.ready,sub=await reg.pushManager.getSubscription();if(!sub)return;
+    const [hour,minute]=(r.time||'09:00').split(':').map(Number);
+    const response=await fetch(FAMILY_SERVER+'/schedule-morning',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({userId:PUSH_USER_ID,subscription:sub,type:'habit',scheduleId:'habit:'+PUSH_USER_ID,reminderTime:r.time,title:'🌱 Не забудь о привычках',body:left.slice(0,5).map(h=>h.icon+' '+h.name).join(' · '),hour:hour||0,minute:minute||0,date:todayKey()})});
+    if(response.ok)localStorage.setItem('habit_push_last_key',key);
+  }catch(e){}
+}
 function syncPushData(){
   if(!PUSH_USER_ID)return;
   const now=Date.now(),notifyHour=load().notifyHour||'09:00';
@@ -3480,8 +3492,9 @@ function syncPushData(){
     const time=t.time||notifyHour,scheduledAt=new Date(t.date+'T'+time).getTime();
     return {id:String(t.id),title:t.title,date:t.date,time:t.time||'',module:t.module,scheduledAt:Number.isFinite(scheduledAt)?scheduledAt:null};
   }).filter(t=>!t.scheduledAt||t.scheduledAt>now-60000);
-  const payload={userId:PUSH_USER_ID,name:getMyName(),role:getMyRole(),notifyHour,quiet:getQuiet(),syncVersion:Date.now(),tasks};
-  const snapshot={type:'TASK_SNAPSHOT',tasks,notifyHour};
+  const habits=getHabits().map(h=>({id:String(h.id),name:h.name,icon:h.icon||'⭐',doneToday:!!h.log?.[todayKey()]})),habitReminder=getHabitReminder();
+  const payload={userId:PUSH_USER_ID,name:getMyName(),role:getMyRole(),notifyHour,quiet:getQuiet(),habitReminder:{...habitReminder,habits},syncVersion:Date.now(),tasks};
+  const snapshot={type:'TASK_SNAPSHOT',tasks,notifyHour,habits,habitReminder,day:todayKey()};
   if(navigator.serviceWorker?.controller)navigator.serviceWorker.controller.postMessage(snapshot);
   else navigator.serviceWorker?.ready?.then(reg=>reg.active?.postMessage(snapshot)).catch(()=>{});
   sendOrQueue('/sync',payload,'sync');
@@ -4777,7 +4790,7 @@ function globalOpen(type,id){
   else if(type==='expense'){const x=(load().finance||[]).find(r=>r.id===id);switchTab('finance');setTimeout(()=>x?.receiptItems?openReceiptDetails(id):editExpense(id),80);}
   else if(type==='income'){switchTab('finance');setTimeout(()=>editIncome(id),80);}
   else if(type==='shopping'){openShopping();}
-  else if(type==='note'){switchTab('notes');}
+  else if(type==='note'){switchTab('notes');setTimeout(()=>openNoteModal(id),80);}
 }
 function openGlobalSearch(){
   switchTab('all');
@@ -5093,7 +5106,7 @@ function showTourStep(){
   }
   if(tourStep===4){
     switchTab('habits');setTimeout(()=>focusTourElement('.habit-summary'),100);
-    renderTourCoach({title:'Привычки и серии',text:'Кольцо показывает прогресс дня. Круглая кнопка выполняет привычку, недельные точки сохраняют историю, а огонёк показывает серию.',example:'Кнопка «Новая» добавляет привычку, например «Читать 10 минут».'});return;
+    renderTourCoach({title:'Привычки и серии',text:'Кольцо показывает прогресс дня. Кнопка «История» открывает весь месяц и год с процентом регулярности.',example:'В настройках можно отдельно включить утреннее напоминание только о невыполненных привычках.'});return;
   }
   if(tourStep===5){
     switchTab('more');setTimeout(()=>{renderShopping();document.getElementById('modal-shopping').classList.add('on');},80);
@@ -5139,7 +5152,7 @@ function showTourStep(){
   }
   if(tourStep===12){
     switchTab('more');setTimeout(()=>focusTourElement('#view .assign-btn'),100);
-    renderTourCoach({title:'Остальные разделы',text:'В «Ещё» находятся заметки, матрица приоритетов, покупки, семья, награды и разделы, которые не помещаются снизу.',example:'Состав этого экрана зависит от выбранного нижнего меню.'});return;
+    renderTourCoach({title:'Заметки и другие разделы',text:'Заметки можно закреплять, выделять цветом, искать по тексту и привязывать к дате в календаре. В «Ещё» также находятся матрица, покупки, семья и награды.',example:'Закреплённые заметки всегда остаются сверху.'});return;
   }
   if(tourStep===13){
     switchTab('more');setTimeout(()=>openMenuEditor(),80);
@@ -5371,6 +5384,7 @@ function resumeForegroundServices(force){
   if(!force&&now-_lastForegroundSync<30000)return;
   _lastForegroundSync=now;
   scheduleAllTimeouts();
+  scheduleHabitReminderLocal();scheduleHabitPushServer();
   processAutoPays();
   scheduleAutoPayReminders();
   scheduleDebtReminders();
@@ -5392,6 +5406,7 @@ function initApp(){
   processAutoPays();
 scheduleAutoPayReminders();
 scheduleDebtReminders();
+scheduleHabitReminderLocal();
 
 if('serviceWorker' in navigator){
   navigator.serviceWorker.register('sw.js').then(reg => {
@@ -5429,6 +5444,7 @@ if('serviceWorker' in navigator){
   flushOfflineQueue().then(()=>syncPushData());
   pullAssignedTasks();
   scheduleMorningPush()
+  scheduleHabitPushServer();
 
   // периодические проверки
   setInterval(pullAssignedTasks,60000);

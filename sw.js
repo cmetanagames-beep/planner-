@@ -1,4 +1,4 @@
-const CACHE = 'planner-v41';
+const CACHE = 'planner-v42';
 const PUSH_STATE_CACHE = 'lumo-push-state-v1';
 
 const ASSETS = [
@@ -14,7 +14,7 @@ self.addEventListener('message', e => {
     self.skipWaiting();
   }
   if(e.data && e.data.type === 'TASK_SNAPSHOT'){
-    const body=JSON.stringify({tasks:Array.isArray(e.data.tasks)?e.data.tasks:[],savedAt:Date.now()});
+    const body=JSON.stringify({tasks:Array.isArray(e.data.tasks)?e.data.tasks:[],habits:Array.isArray(e.data.habits)?e.data.habits:[],habitReminder:e.data.habitReminder||{enabled:false},day:e.data.day||'',savedAt:Date.now()});
     e.waitUntil(caches.open(PUSH_STATE_CACHE).then(c=>c.put('./__task_snapshot__',new Response(body,{headers:{'Content-Type':'application/json'}}))));
   }
 });
@@ -52,6 +52,13 @@ self.addEventListener('fetch', e => {
 
 async function pushAllowed(d){
   if(d.type==='morning')return true;
+  if(d.type==='habit'){
+    try{
+      const cache=await caches.open(PUSH_STATE_CACHE),response=await cache.match('./__task_snapshot__');if(!response)return false;
+      const snapshot=await response.json(),pushDay=d.date||new Date().toISOString().slice(0,10),left=(snapshot.habits||[]).filter(h=>snapshot.day!==pushDay||!h.doneToday);if(!snapshot.habitReminder?.enabled||!left.length)return false;
+      const key='./__push_seen__/habit:'+pushDay;if(await cache.match(key))return false;await cache.put(key,new Response(String(Date.now())));return true;
+    }catch(_){return false;}
+  }
   const looksReminder=!!d.taskId||/напоминани|повторное/i.test(String(d.title||''));
   if(!looksReminder)return true;
   try{
@@ -71,6 +78,9 @@ async function pushAllowed(d){
     }
   }catch(_){return false;}
   return true;
+}
+async function currentHabitBody(fallback,pushDay){
+  try{const cache=await caches.open(PUSH_STATE_CACHE),r=await cache.match('./__task_snapshot__');if(!r)return fallback;const s=await r.json(),day=pushDay||s.day,left=(s.habits||[]).filter(h=>s.day!==day||!h.doneToday);return left.slice(0,5).map(h=>(h.icon||'⭐')+' '+h.name).join(' · ')||fallback;}catch(_){return fallback;}
 }
 
 async function showPush(d){
@@ -95,6 +105,9 @@ async function showPush(d){
         ]
       });
     return;
+  }
+  if(d.type === 'habit'){
+    const body=await currentHabitBody(d.body||'Отметь сегодняшний ритм',d.date);await self.registration.showNotification(d.title || '🌱 Не забудь о привычках',{body,icon:'./icon.png',badge:'./icon.png',tag:'habit-reminder',data:{type:'habit'}});return;
   }
 
   // ── Обычное напоминание ──
