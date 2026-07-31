@@ -487,6 +487,24 @@ body.dark .fin-hero::after{background:radial-gradient(circle,color-mix(in srgb,v
 .habit-delete svg{width:16px;height:16px;stroke:currentColor}
 .habit-empty{text-align:center;padding:36px 20px;color:var(--muted);background:var(--card);border:1px solid var(--line);border-radius:21px}
 .habit-empty div{font-size:2rem;margin-bottom:8px}
+.habit-stats-btn{border:0;background:var(--card2);color:var(--brand);border-radius:10px;padding:7px 10px;font-size:.68rem;font-weight:800}
+.habit-stats-head{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:10px}
+.habit-stats-head button{border:0;background:var(--card2);color:var(--text);width:36px;height:36px;border-radius:11px;font-size:1.2rem}
+.habit-month-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:6px;margin:10px 0}
+.habit-month-grid .hm-label{text-align:center;color:var(--muted);font-size:.61rem;padding:3px}
+.habit-month-grid .hm-day{aspect-ratio:1;border-radius:9px;background:var(--card2);border:1px solid var(--line);display:grid;place-items:center;font-size:.62rem;color:var(--muted)}
+.habit-month-grid .hm-day.on{background:linear-gradient(135deg,var(--brand),var(--brand2));border-color:transparent;color:#fff;font-weight:850}
+.habit-month-grid .hm-day.today{box-shadow:inset 0 0 0 2px var(--brand)}
+.habit-year-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:8px}
+.habit-year-month{padding:11px;border:1px solid var(--line);border-radius:14px;background:var(--card2)}
+.habit-year-month b{font-size:.76rem}.habit-year-month small{display:block;color:var(--muted);font-size:.63rem;margin-top:4px}
+.habit-year-bar{height:6px;background:var(--line);border-radius:6px;overflow:hidden;margin-top:8px}.habit-year-bar i{display:block;height:100%;background:linear-gradient(90deg,var(--brand),var(--brand2))}
+.habit-stats-summary{display:grid;grid-template-columns:repeat(3,1fr);gap:7px;margin:10px 0}.habit-stats-summary div{text-align:center;padding:10px 5px;border-radius:13px;background:var(--card2)}.habit-stats-summary b{display:block}.habit-stats-summary small{font-size:.6rem;color:var(--muted)}
+
+/* ---------- ЗАМЕТКИ ---------- */
+.notes-page{padding:14px 16px 120px}.notes-tools{display:grid;grid-template-columns:1fr auto;gap:8px;margin-bottom:13px}.notes-tools input{min-width:0;border:1px solid var(--line);border-radius:15px;background:var(--card);color:var(--text);padding:12px 14px;font-size:.82rem}.notes-tools button{border:0;border-radius:15px;background:linear-gradient(135deg,var(--brand),var(--brand2));color:#fff;padding:0 15px;font-weight:850}
+.notes-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}.note-modern{position:relative;min-height:150px;padding:14px;border:1px solid var(--line);border-radius:19px;background:var(--card);box-shadow:var(--shadow);overflow:hidden}.note-modern::before{content:"";position:absolute;inset:0 auto 0 0;width:5px;background:var(--note-color,var(--brand))}.note-modern.pinned{box-shadow:0 8px 24px color-mix(in srgb,var(--note-color,var(--brand)) 18%,transparent)}.note-modern h3{font-size:.86rem;margin:0 22px 8px 0;line-height:1.25}.note-modern p{font-size:.72rem;line-height:1.45;color:var(--muted);display:-webkit-box;-webkit-line-clamp:5;-webkit-box-orient:vertical;overflow:hidden}.note-modern .note-date{font-size:.61rem;color:var(--muted);margin-top:10px}.note-pin{position:absolute;right:10px;top:9px;border:0;background:transparent;color:var(--note-color,var(--brand));font-size:.9rem}.note-actions{position:absolute;right:8px;bottom:7px;display:flex}.note-actions button{border:0;background:transparent;color:var(--muted);width:29px;height:29px}.note-actions svg{width:15px;height:15px}.note-color-row{display:flex;gap:9px}.note-color-dot{width:31px;height:31px;border-radius:50%;border:3px solid transparent}.note-color-dot.on{border-color:var(--text);box-shadow:0 0 0 2px var(--card)}
+@media(max-width:360px){.notes-grid{grid-template-columns:1fr}}
 
 /* ---------- ОБУЧЕНИЕ / СПРАВКА ---------- */
 .guide-progress{display:flex;gap:6px;margin:4px 0 18px}
@@ -1114,6 +1132,8 @@ input,textarea{-webkit-user-select:text;user-select:text}
     <div class="field"><label>Заголовок</label><input id="note-title" placeholder="Например: Идея для сада"></div>
     <div class="field"><label>Текст</label><textarea id="note-text" placeholder="Пиши что угодно..." style="min-height:100px"></textarea></div>
     <div class="field"><label>📅 Дата (для календаря)</label><input id="note-date" type="date"></div>
+    <div class="field"><label>Цвет</label><div class="note-color-row" id="note-color-row"></div></div>
+    <div class="chk-toggle" onclick="toggleNotePinned()"><div class="box" id="note-pin-box"></div><div class="lbl">📌 Закрепить сверху</div></div>
     <button class="btn" onclick="saveNote()">Сохранить</button>
     <button class="btn ghost" onclick="closeNoteModal()">Отмена</button>
   </div>
@@ -1154,6 +1174,14 @@ input,textarea{-webkit-user-select:text;user-select:text}
     </div>
     <button class="btn" onclick="saveTask()">Сохранить</button>
     <button class="btn ghost" onclick="closeModal()">Отмена</button>
+  </div>
+</div>
+<div class="modal" id="modal-habit-stats">
+  <div class="sheet">
+    <h3 id="habit-stats-title">📊 История привычки</h3>
+    <div class="seg"><button class="pri-b on" id="habit-stats-month-btn" onclick="setHabitStatsMode('month')">Месяц</button><button class="pri-b" id="habit-stats-year-btn" onclick="setHabitStatsMode('year')">Год</button></div>
+    <div id="habit-stats-body"></div>
+    <button class="btn ghost" onclick="closeHabitStats()">Закрыть</button>
   </div>
 </div>
 
@@ -1316,6 +1344,11 @@ input,textarea{-webkit-user-select:text;user-select:text}
     <div class="sub-h">Память помощника</div>
     <div class="ai-hint" id="local-memory-info" style="padding:0 0 8px;text-align:left"></div>
     <button class="btn ghost" onclick="clearLocalAssistantMemory()">Очистить изученные правила</button>
+
+    <div class="sub-h">🌱 Напоминание о привычках</div>
+    <div class="chk-toggle" onclick="toggleHabitReminder()"><div class="box" id="habit-reminder-box"></div><div class="lbl">Напоминать, если не всё выполнено</div></div>
+    <div class="field"><label>Время</label><input id="habit-reminder-time" type="time" value="09:00" onchange="saveHabitReminderTime()"></div>
+    <div class="ai-hint" style="padding:0 0 8px;text-align:left">Эта настройка не зависит от напоминаний о делах.</div>
 
     <div class="sub-h">📲 Пуши и напоминания</div>
     <div class="local-edit-note" id="push-health">Проверяю состояние…</div>
@@ -1978,6 +2011,7 @@ function toggleHabit(id,key){
     if(key===todayKey()){_habitJustDone=id;confetti();}
   }
   saveHabits(habits);
+  scheduleHabitReminderLocal();syncPushData();
   renderHabits();
 }
 function toggleHabitComposer(force){
@@ -1993,6 +2027,7 @@ function addHabit(){
   const habits=getHabits();
   habits.push({id:'h'+Date.now(),name,icon,log:{}});
   saveHabits(habits);
+  scheduleHabitReminderLocal();syncPushData();scheduleHabitPushServer(true);
   toast('Привычка добавлена 💪');
   renderHabits();
   setTimeout(()=>toggleHabitComposer(false),0);
@@ -2000,6 +2035,7 @@ function addHabit(){
 function deleteHabit(id){
   if(!confirm('Удалить привычку?'))return;
   saveHabits(getHabits().filter(h=>h.id!==id));
+  scheduleHabitReminderLocal();syncPushData();scheduleHabitPushServer(true);
   renderHabits();
 }
 function renderHabits(){
@@ -2038,7 +2074,7 @@ function renderHabits(){
       <div class="habit-week">${week}</div>
       <div class="habit-card-foot">
         <div class="habit-streak">🔥 Серия: <b>${st} ${st===1?'день':'дн.'}</b></div>
-        <button class="habit-delete" onclick="deleteHabit(${jsArg(h.id)})" aria-label="Удалить привычку">${ICONS.trash}</button>
+        <div style="display:flex;align-items:center;gap:5px"><button class="habit-stats-btn" onclick="openHabitStats(${jsArg(h.id)})">📊 История</button><button class="habit-delete" onclick="deleteHabit(${jsArg(h.id)})" aria-label="Удалить привычку">${ICONS.trash}</button></div>
       </div>
     </article>`;
   });
@@ -2062,6 +2098,27 @@ function renderHabits(){
     </div>
     <div class="habit-list">${cards||'<div class="habit-empty"><div>✨</div><b>Здесь появится твой ритм</b><br><small>Добавь одну привычку, с которой легко начать</small></div>'}</div>
   </div>`;
+}
+let habitStatsId=null,habitStatsMode='month',habitStatsDate=new Date();
+function openHabitStats(id){habitStatsId=id;habitStatsMode='month';habitStatsDate=new Date();document.getElementById('modal-habit-stats').classList.add('on');renderHabitStats();}
+function closeHabitStats(){document.getElementById('modal-habit-stats').classList.remove('on');habitStatsId=null;}
+function setHabitStatsMode(mode){habitStatsMode=mode;document.getElementById('habit-stats-month-btn').classList.toggle('on',mode==='month');document.getElementById('habit-stats-year-btn').classList.toggle('on',mode==='year');renderHabitStats();}
+function habitStatsNav(dir){if(habitStatsMode==='month')habitStatsDate.setMonth(habitStatsDate.getMonth()+dir);else habitStatsDate.setFullYear(habitStatsDate.getFullYear()+dir);renderHabitStats();}
+function habitKey(y,m,d){return y+'-'+String(m+1).padStart(2,'0')+'-'+String(d).padStart(2,'0');}
+function renderHabitStats(){
+  const h=getHabits().find(x=>x.id===habitStatsId),body=document.getElementById('habit-stats-body');if(!h||!body)return;
+  document.getElementById('habit-stats-title').textContent=`${h.icon||'⭐'} ${h.name}`;
+  const y=habitStatsDate.getFullYear(),m=habitStatsDate.getMonth(),now=new Date(),tk=todayKey();
+  if(habitStatsMode==='month'){
+    const days=new Date(y,m+1,0).getDate(),first=new Date(y,m,1),offset=(first.getDay()+6)%7;let done=0,cells='';
+    ['Пн','Вт','Ср','Чт','Пт','Сб','Вс'].forEach(x=>cells+=`<div class="hm-label">${x}</div>`);for(let i=0;i<offset;i++)cells+='<div></div>';
+    for(let d=1;d<=days;d++){const k=habitKey(y,m,d),on=!!h.log?.[k];if(on)done++;cells+=`<div class="hm-day ${on?'on':''} ${k===tk?'today':''}">${on?'✓':d}</div>`;}
+    const elapsed=(y===now.getFullYear()&&m===now.getMonth())?now.getDate():new Date(y,m+1,0)<now?days:0,pct=elapsed?Math.round(done/elapsed*100):0;
+    body.innerHTML=`<div class="habit-stats-head"><button onclick="habitStatsNav(-1)">‹</button><b>${monthFull[m]} ${y}</b><button onclick="habitStatsNav(1)">›</button></div><div class="habit-stats-summary"><div><b>${done}</b><small>выполнено</small></div><div><b>${pct}%</b><small>регулярность</small></div><div><b>${habitStreak(h)}</b><small>серия</small></div></div><div class="habit-month-grid">${cells}</div>`;
+  }else{
+    let total=0,possible=0,cards='';for(let month=0;month<12;month++){const days=new Date(y,month+1,0).getDate();let done=0;for(let d=1;d<=days;d++)if(h.log?.[habitKey(y,month,d)])done++;const elapsed=y===now.getFullYear()?month<now.getMonth()?days:month===now.getMonth()?now.getDate():0:y<now.getFullYear()?days:0,pct=elapsed?Math.round(done/elapsed*100):0;total+=done;possible+=elapsed;cards+=`<div class="habit-year-month"><b>${monthFull[month]}</b><small>${done} из ${elapsed||days} дн. · ${pct}%</small><div class="habit-year-bar"><i style="width:${Math.min(100,pct)}%"></i></div></div>`;}
+    body.innerHTML=`<div class="habit-stats-head"><button onclick="habitStatsNav(-1)">‹</button><b>${y} год</b><button onclick="habitStatsNav(1)">›</button></div><div class="habit-stats-summary"><div><b>${total}</b><small>выполнений</small></div><div><b>${possible?Math.round(total/possible*100):0}%</b><small>за год</small></div><div><b>${habitStreak(h)}</b><small>серия</small></div></div><div class="habit-year-grid">${cards}</div>`;
+  }
 }
 function renderSmartHint(){
   const box=document.getElementById('quoteChip');
@@ -2380,21 +2437,18 @@ function attachSwipes(){
 function getNotes(){const d=load();return d.notes||[];}
 function setNotes(n){const d=load();d.notes=n;save(d);}
 let editNoteId=null;
+const NOTE_COLORS=['#7c6cf0','#ffb347','#36b37e','#ff6b7a','#4aa8ff','#b66cf0'];
+let noteDraftColor=NOTE_COLORS[0],noteDraftPinned=false;
+function renderNoteColorPicker(){const el=document.getElementById('note-color-row');if(el)el.innerHTML=NOTE_COLORS.map(c=>`<button type="button" class="note-color-dot ${c===noteDraftColor?'on':''}" style="background:${c}" onclick="pickNoteColor(${jsArg(c)})" aria-label="Цвет"></button>`).join('');}
+function pickNoteColor(c){noteDraftColor=c;renderNoteColorPicker();}
+function toggleNotePinned(){noteDraftPinned=!noteDraftPinned;const b=document.getElementById('note-pin-box');b.classList.toggle('on',noteDraftPinned);b.textContent=noteDraftPinned?'✓':'';}
 function openNoteModal(id){
-  editNoteId=id||null;
-  if(id){
-    const n=getNotes().find(x=>x.id===id);
-    if(!n)return;
-    document.getElementById('note-title').value=n.title||'';
-    document.getElementById('note-text').value=n.text||'';
-    document.getElementById('note-date').value=n.date||'';
-    document.querySelector('#modal-note h3').textContent='✏️ Изменить заметку';
-  }else{
-    document.getElementById('note-title').value='';
-    document.getElementById('note-text').value='';
-    document.getElementById('note-date').value=(currentTab==='calendar'&&calSel)?calSel:todayKey();
-    document.querySelector('#modal-note h3').textContent='📝 Новая заметка';
-  }
+  editNoteId=id||null;const n=id?getNotes().find(x=>x.id===id):null;if(id&&!n)return;
+  document.getElementById('note-title').value=n?.title||'';document.getElementById('note-text').value=n?.text||'';
+  document.getElementById('note-date').value=n?.date||((currentTab==='calendar'&&calSel)?calSel:todayKey());
+  noteDraftColor=n?.color||NOTE_COLORS[0];noteDraftPinned=!!n?.pinned;
+  document.querySelector('#modal-note h3').textContent=n?'✏️ Изменить заметку':'📝 Новая заметка';renderNoteColorPicker();
+  const pin=document.getElementById('note-pin-box');pin.classList.toggle('on',noteDraftPinned);pin.textContent=noteDraftPinned?'✓':'';
   document.getElementById('modal-note').classList.add('on');
 }
 function closeNoteModal(){document.getElementById('modal-note').classList.remove('on');}
@@ -2406,9 +2460,9 @@ function saveNote(){
   const notes=getNotes();
   if(editNoteId){
     const n=notes.find(x=>x.id===editNoteId);
-    if(n){n.title=title;n.text=text;n.date=date;}
+    if(n){n.title=title;n.text=text;n.date=date;n.color=noteDraftColor;n.pinned=noteDraftPinned;n.updatedAt=Date.now();}
   }else{
-    notes.push({id:Date.now()+Math.floor(Math.random()*1000),title,text,date});
+    notes.push({id:Date.now()+Math.floor(Math.random()*1000),title,text,date,color:noteDraftColor,pinned:noteDraftPinned,updatedAt:Date.now()});
   }
   setNotes(notes);
   closeNoteModal();vibrate(20);confetti();toast('Заметка сохранена 📝');
@@ -2436,19 +2490,20 @@ function noteCardHTML(n){
 function renderNotes(){
   const view=document.getElementById('view');
   const notes=getNotes().slice().sort((a,b)=>{
+    if(!!a.pinned!==!!b.pinned)return a.pinned?-1:1;
+    if((b.updatedAt||0)!==(a.updatedAt||0))return (b.updatedAt||0)-(a.updatedAt||0);
     const da=a.date||'';
     const db=b.date||'';
     if(db>da)return 1;
     if(db<da)return -1;
     return 0;
   });
-  let html=`<div style="padding:14px 16px">
-    <button class="btn" onclick="openNoteModal()" style="margin-bottom:14px">➕ Новая заметка</button>`;
+  let html=`<div class="notes-page"><div class="notes-tools"><input id="notes-search" placeholder="🔍 Поиск по заметкам..." oninput="filterNotes(this.value)"><button onclick="openNoteModal()">+ Новая</button></div>`;
   if(!notes.length){
     html+=`<div class="empty"><div>📝</div>Заметок пока нет</div>`;
   }else{
-    html+='<div class="list" style="padding:0">';
-    notes.forEach(n=>html+=noteCardHTML(n));
+    html+='<div class="notes-grid" id="notes-grid">';
+    notes.forEach(n=>html+=modernNoteHTML(n));
     html+='</div>';
   }
   html+='</div>';
@@ -2831,6 +2886,9 @@ html+=renderDebtBlock();
   if(!incLog.length&&!expLog.length)html+=`<div class="empty"><div>💸</div>Нет записей за этот месяц</div>`;
   view.innerHTML=html;
 }
+function modernNoteHTML(n){const color=n.color||NOTE_COLORS[0],search=esc(((n.title||'')+' '+(n.text||'')).toLowerCase());return `<article class="note-modern ${n.pinned?'pinned':''}" style="--note-color:${color}" data-search="${search}" onclick="openNoteModal(${n.id})"><button class="note-pin" onclick="event.stopPropagation();toggleNotePin(${n.id})" aria-label="Закрепить">${n.pinned?'📌':'○'}</button><h3>${esc(n.title||'Без заголовка')}</h3><p>${esc(n.text||'').replace(/\n/g,'<br>')}</p><div class="note-date">${n.date?'📅 '+fmtDate(n.date):''}</div><div class="note-actions"><button onclick="event.stopPropagation();openNoteModal(${n.id})">${ICONS.edit}</button><button onclick="event.stopPropagation();delNote(${n.id})">${ICONS.trash}</button></div></article>`;}
+function toggleNotePin(id){const notes=getNotes(),n=notes.find(x=>x.id===id);if(!n)return;n.pinned=!n.pinned;n.updatedAt=Date.now();setNotes(notes);renderNotes();vibrate(10);}
+function filterNotes(q){const s=String(q||'').toLowerCase();document.querySelectorAll('#notes-grid .note-modern').forEach(x=>x.style.display=!s||x.dataset.search.includes(s)?'block':'none');}
 function normalizeReceiptItem(raw,receipt){
   if(typeof raw==='string')return {name:raw,price:0,category:receipt.category||'Прочее'};
   return {name:String(raw?.name||'').trim(),price:Number(raw?.price)||0,category:raw?.category||receipt.category||'Прочее'};
@@ -3233,7 +3291,7 @@ function toggleTheme(){
   setThemeMode(m==='dark'?'light':'dark');
   toast(getThemeMode()==='dark'?'🌙 Тёмная тема':'☀️ Светлая тема');
 }
-function openSettings(){renderColorPick();updateThemeButtons();loadNotifyHour();loadQuietHours();renderLocalMemoryInfo();document.getElementById('modal-settings').classList.add('on');checkPushHealth(false);}
+function openSettings(){renderColorPick();updateThemeButtons();loadNotifyHour();loadQuietHours();loadHabitReminder();renderLocalMemoryInfo();document.getElementById('modal-settings').classList.add('on');checkPushHealth(false);}
 function closeSettings(){document.getElementById('modal-settings').classList.remove('on');}
 
 /* НАПОМИНАНИЯ / ТИХИЕ ЧАСЫ */
@@ -3267,6 +3325,17 @@ function scheduleLocalTimeout(t){
     notifyOnce(key,()=>{try{new Notification('⏰ '+t.title,{body:catLabel(t.module)+(t.desc?' · '+t.desc:''),tag:key,renotify:false,icon:'data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><text y="80" font-size="80">📋</text></svg>'});vibrate([50,30,50]);}catch(e){}});
   },when);
   localTimeouts.push(id);
+}
+function getHabitReminder(){return load().habitReminder||{enabled:false,time:'09:00'};}
+function loadHabitReminder(){const r=getHabitReminder(),box=document.getElementById('habit-reminder-box'),time=document.getElementById('habit-reminder-time');if(box){box.classList.toggle('on',r.enabled);box.textContent=r.enabled?'✓':'';}if(time)time.value=r.time||'09:00';}
+function toggleHabitReminder(){const d=load(),r=getHabitReminder();r.enabled=!r.enabled;d.habitReminder=r;save(d);loadHabitReminder();scheduleHabitReminderLocal();syncPushData();scheduleHabitPushServer();toast(r.enabled?'🌱 Напоминания о привычках включены':'Напоминания о привычках выключены');}
+function saveHabitReminderTime(){const d=load(),r=getHabitReminder();r.time=document.getElementById('habit-reminder-time').value||'09:00';d.habitReminder=r;save(d);scheduleHabitReminderLocal();syncPushData();scheduleHabitPushServer(true);toast('🌱 Время привычек сохранено');}
+let habitReminderTimeout=null;
+function incompleteHabits(){const tk=todayKey();return getHabits().filter(h=>!h.log?.[tk]);}
+function scheduleHabitReminderLocal(){
+  if(habitReminderTimeout){clearTimeout(habitReminderTimeout);habitReminderTimeout=null;}const r=getHabitReminder();if(!r.enabled||!('Notification'in window)||Notification.permission!=='granted')return;
+  const [hh,mm]=(r.time||'09:00').split(':').map(Number),at=new Date();at.setHours(hh||0,mm||0,0,0);if(at.getTime()<=Date.now())at.setDate(at.getDate()+1);
+  habitReminderTimeout=setTimeout(()=>{if(inQuietHours())return;const left=incompleteHabits();if(!left.length)return;const key='habit-local:'+todayKey();notifyOnce(key,()=>{try{new Notification('🌱 Не забудь о привычках',{body:left.slice(0,4).map(h=>h.icon+' '+h.name).join(' · '),tag:key,renotify:false,icon:'./icon.png'});}catch(e){}});scheduleHabitReminderLocal();},at.getTime()-Date.now());
 }
 function snoozeTaskOneHour(taskId){
   const tasks=getTasks();
