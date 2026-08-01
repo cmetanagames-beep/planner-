@@ -33,7 +33,10 @@ db.exec(`CREATE TABLE IF NOT EXISTS notificationTrace (id INTEGER PRIMARY KEY AU
 db.exec(`CREATE INDEX IF NOT EXISTS notificationTraceKeyIdx ON notificationTrace(traceKey,ts)`);
 db.exec(`CREATE TABLE IF NOT EXISTS deviceHealth (deviceId TEXT PRIMARY KEY, userId TEXT NOT NULL, platform TEXT, appVersion TEXT, swVersion TEXT, displayMode TEXT, pushPermission TEXT, pushSubscribed INTEGER, lastSeen INTEGER NOT NULL)`);
 db.exec(`CREATE TABLE IF NOT EXISTS clientErrors (id INTEGER PRIMARY KEY AUTOINCREMENT, userId TEXT, deviceId TEXT, kind TEXT, message TEXT, stack TEXT, path TEXT, appVersion TEXT, ts INTEGER NOT NULL)`);
+try { db.exec(`ALTER TABLE clientErrors ADD COLUMN resolvedAt INTEGER`); } catch (_) {}
 db.exec(`CREATE TABLE IF NOT EXISTS systemState (key TEXT PRIMARY KEY, value TEXT, updatedAt INTEGER NOT NULL)`);
+db.exec(`CREATE TABLE IF NOT EXISTS developerAccess (id INTEGER PRIMARY KEY AUTOINCREMENT, ip TEXT, ok INTEGER NOT NULL, path TEXT, ts INTEGER NOT NULL)`);
+db.exec(`CREATE TABLE IF NOT EXISTS telegramLog (id INTEGER PRIMARY KEY AUTOINCREMENT, ok INTEGER NOT NULL, message TEXT, error TEXT, ts INTEGER NOT NULL)`);
 db.exec(`CREATE TABLE IF NOT EXISTS cloudData (code TEXT PRIMARY KEY, data TEXT NOT NULL, revision INTEGER NOT NULL DEFAULT 1, updatedAt INTEGER NOT NULL, updatedBy TEXT)`);
 db.exec(`CREATE TABLE IF NOT EXISTS cloudDevices (userId TEXT PRIMARY KEY, code TEXT NOT NULL)`);
 db.exec(`CREATE TABLE IF NOT EXISTS eventFeed (id TEXT PRIMARY KEY, targetUserId TEXT NOT NULL, familyCode TEXT, type TEXT, title TEXT, body TEXT, data TEXT, ts INTEGER, readAt INTEGER)`);
@@ -45,6 +48,8 @@ db.prepare('DELETE FROM eventFeed WHERE ts < ?').run(Date.now() - 120 * 24 * 60 
 db.prepare('DELETE FROM pushLog WHERE ts < ?').run(Date.now() - 30 * 24 * 60 * 60 * 1000);
 db.prepare('DELETE FROM notificationTrace WHERE ts < ?').run(Date.now() - 30 * 24 * 60 * 60 * 1000);
 db.prepare('DELETE FROM clientErrors WHERE ts < ?').run(Date.now() - 30 * 24 * 60 * 60 * 1000);
+db.prepare('DELETE FROM developerAccess WHERE ts < ?').run(Date.now() - 30 * 24 * 60 * 60 * 1000);
+db.prepare('DELETE FROM telegramLog WHERE ts < ?').run(Date.now() - 30 * 24 * 60 * 60 * 1000);
 
 function getSystemState(key, fallback = '') {
   const row = db.prepare('SELECT value FROM systemState WHERE key = ?').get(key);
@@ -156,9 +161,19 @@ let telegramBot = null;
 function telegramChatId() { return String(process.env.TELEGRAM_CHAT_ID || getSystemState('telegramChatId', '')); }
 async function telegramSend(text) {
   const chatId = telegramChatId();
-  if (!telegramBot || !chatId) return false;
-  try { await telegramBot.sendMessage(chatId, String(text).slice(0, 3900), { disable_web_page_preview: true }); return true; }
-  catch (error) { console.error('telegram alert failed:', error.message); return false; }
+  const message = String(text).slice(0, 3900);
+  if (!telegramBot || !chatId) {
+    db.prepare('INSERT INTO telegramLog (ok,message,error,ts) VALUES (0,?,?,?)').run(message.slice(0, 240), 'not linked', Date.now());
+    return false;
+  }
+  try {
+    await telegramBot.sendMessage(chatId, message, { disable_web_page_preview: true });
+    db.prepare('INSERT INTO telegramLog (ok,message,error,ts) VALUES (1,?,?,?)').run(message.slice(0, 240), '', Date.now());
+    return true;
+  } catch (error) {
+    db.prepare('INSERT INTO telegramLog (ok,message,error,ts) VALUES (0,?,?,?)').run(message.slice(0, 240), String(error.message || '').slice(0, 300), Date.now());
+    console.error('telegram alert failed:', error.message); return false;
+  }
 }
 async function raiseAlert(key, text, cooldownMs = 60 * 60 * 1000) {
   const stateKey = `alert:${key}`, last = Number(getSystemState(stateKey, '0'));
@@ -686,6 +701,14 @@ app.get('/voice/status', (req, res) => {
 });
 
 const DEVELOPER_TOKEN = String(process.env.DEVELOPER_TOKEN || '');
+const developerAttempts = new Map();
+const developerSuccessSeen = new Map();
+function developerIp(req) { return String(req.headers['x-forwarded-for'] || req.ip || 'unknown').split(',')[0].trim().slice(0, 80); }
+function developerBlocked(req) {
+  const now = Date.now(), ip = developerIp(req), recent = (developerAttempts.get(ip) || []).filter(ts => now - ts < 15 * 60 * 1000);
+  developerAttempts.set(ip, recent);
+  return recent.length >= 8;
+}
 function developerAuthorized(req) {
   if (!DEVELOPER_TOKEN) return false;
   const bearer = String(req.headers.authorization || '').replace(/^Bearer\s+/i, '');
@@ -694,7 +717,18 @@ function developerAuthorized(req) {
   return expected.length === actual.length && timingSafeEqual(expected, actual);
 }
 function requireDeveloper(req, res, next) {
-  if (!developerAuthorized(req)) return res.status(401).json({ ok: false, error: 'developer access required' });
+  const ip = developerIp(req), now = Date.now();
+  if (developerBlocked(req)) return res.status(429).json({ ok: false, error: 'too many attempts', retryAfter: 900 });
+  if (!developerAuthorized(req)) {
+    const attempts = developerAttempts.get(ip) || []; attempts.push(now); developerAttempts.set(ip, attempts);
+    db.prepare('INSERT INTO developerAccess (ip,ok,path,ts) VALUES (?,0,?,?)').run(ip, String(req.path).slice(0, 160), now);
+    return res.status(401).json({ ok: false, error: 'developer access required' });
+  }
+  developerAttempts.delete(ip);
+  if (now - Number(developerSuccessSeen.get(ip) || 0) > 10 * 60 * 1000) {
+    developerSuccessSeen.set(ip, now);
+    db.prepare('INSERT INTO developerAccess (ip,ok,path,ts) VALUES (?,1,?,?)').run(ip, String(req.path).slice(0, 160), now);
+  }
   res.set('Cache-Control', 'no-store');
   next();
 }
@@ -760,8 +794,10 @@ app.get('/developer/status', requireDeveloper, (req, res) => {
   }));
   const devices = db.prepare('SELECT * FROM deviceHealth ORDER BY lastSeen DESC LIMIT 100').all().map(row => ({ ...row, userId: maskedUser(row.userId), pushSubscribed: !!row.pushSubscribed }));
   const versions = db.prepare('SELECT appVersion version,COUNT(*) count,MAX(lastSeen) lastSeen FROM deviceHealth GROUP BY appVersion ORDER BY count DESC').all();
-  const errors = db.prepare('SELECT id,userId,deviceId,kind,message,path,appVersion,ts FROM clientErrors ORDER BY ts DESC LIMIT 60').all().map(row => ({ ...row, userId: maskedUser(row.userId) }));
+  const errors = db.prepare('SELECT id,userId,deviceId,kind,message,path,appVersion,ts,resolvedAt FROM clientErrors ORDER BY ts DESC LIMIT 60').all().map(row => ({ ...row, userId: maskedUser(row.userId) }));
   const recentTrace = db.prepare('SELECT traceKey,userId,type,stage,detail,ts FROM notificationTrace ORDER BY ts DESC LIMIT 80').all().map(row => ({ ...row, userId: maskedUser(row.userId) }));
+  const telegramLog = db.prepare('SELECT id,ok,message,error,ts FROM telegramLog ORDER BY ts DESC LIMIT 30').all().map(row => ({ ...row, ok: !!row.ok }));
+  const accessLog = db.prepare('SELECT id,ip,ok,path,ts FROM developerAccess ORDER BY ts DESC LIMIT 30').all().map(row => ({ ...row, ok: !!row.ok, ip: maskedUser(row.ip) }));
   let databaseBytes = 0;
   try { databaseBytes = statSync('planner.db').size; } catch (_) {}
   const memory = process.memoryUsage();
@@ -782,7 +818,7 @@ app.get('/developer/status', requireDeveloper, (req, res) => {
       activeSchedules: scalar('SELECT COUNT(*) count FROM scheduledPush WHERE enabled=1')
     },
     delivery24h: { total: Number(delivery?.count || 0), sent: Number(delivery?.sent || 0), failed: Number(delivery?.failed || 0) },
-    schedules, recentPush, devices, versions, errors, recentTrace,
+    schedules, recentPush, devices, versions, errors, recentTrace, telegramLog, accessLog,
     upcoming: upcomingNotifications(24),
     backups: backupList().slice(0, 30),
     maintenance: getMaintenance(),
@@ -805,6 +841,12 @@ app.post('/developer/test-push', requireDeveloper, async (req, res) => {
 app.post('/developer/telegram/test', requireDeveloper, async (req, res) => {
   const sent = await telegramSend('✅ Тест Lumo Console: связь с сервером работает.');
   res.status(sent ? 200 : 503).json({ ok: sent, error: sent ? '' : (telegramBot ? 'Открой бота и нажми /start' : 'Не задан TELEGRAM_BOT_TOKEN') });
+});
+app.post('/developer/errors/:id/resolve', requireDeveloper, (req, res) => {
+  const id = Number(req.params.id), resolved = req.body?.resolved !== false;
+  if (!Number.isInteger(id) || id < 1) return res.status(400).json({ ok: false, error: 'invalid id' });
+  const result = db.prepare('UPDATE clientErrors SET resolvedAt=? WHERE id=?').run(resolved ? Date.now() : null, id);
+  res.status(result.changes ? 200 : 404).json({ ok: !!result.changes });
 });
 app.post('/developer/maintenance', requireDeveloper, (req, res) => {
   const b = req.body || {}, features = {};

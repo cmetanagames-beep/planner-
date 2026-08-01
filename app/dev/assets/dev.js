@@ -1,43 +1,69 @@
 const API = 'https://pushevgen.duckdns.org';
 const $ = id => document.getElementById(id);
 let token = sessionStorage.getItem('lumoDeveloperToken') || '';
-let timer = 0;
+let timer = 0, latest = null, showAllErrors = false;
 const formatBytes = value => { const mb = Number(value || 0) / 1048576; return `${mb.toFixed(mb >= 10 ? 0 : 1)} МБ`; };
 const formatTime = value => value ? new Intl.DateTimeFormat('ru-RU',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit',second:'2-digit'}).format(new Date(value)) : '—';
 const escapeHtml = value => String(value ?? '').replace(/[&<>'"]/g, char => ({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[char]));
 
-function showLogin(message='') {
-  clearInterval(timer); $('dashboard').hidden = true; $('loginView').hidden = false; $('logoutBtn').hidden = true; $('loginError').textContent = message;
-}
+function showLogin(message='') { clearInterval(timer); $('dashboard').hidden=true; $('loginView').hidden=false; $('logoutBtn').hidden=true; $('loginError').textContent=message; }
 function metric(label,value,detail=''){ return `<article class="metric"><strong>${escapeHtml(value)}</strong><small>${escapeHtml(label)}${detail?` · ${escapeHtml(detail)}`:''}</small></article>`; }
 function service(label,ok,detail){ return `<article class="service"><span class="service-icon">${ok?'✓':'!'}</span><div><strong>${escapeHtml(label)}</strong><span class="state ${ok?'':'bad'}">${ok?'работает':'недоступен'}</span><small>${escapeHtml(detail||'')}</small></div></article>`; }
+function empty(list,text){ list.className='table-list empty'; list.textContent=text; }
+function headers(){ return {'x-developer-token':token,'Content-Type':'application/json'}; }
+async function action(path,body={}) { const response=await fetch(`${API}${path}`,{method:'POST',headers:headers(),body:JSON.stringify(body)}); const data=await response.json().catch(()=>({})); if(!response.ok) throw new Error(data.error||`Сервер ответил ${response.status}`); return data; }
+function toast(message,bad=false){ const panel=$('alertPanel'); panel.hidden=false; panel.className=`panel alert-panel ${bad?'bad':''}`; panel.textContent=message; clearTimeout(panel._timer); panel._timer=setTimeout(()=>panel.hidden=true,5000); }
 
+function duplicateGroups(rows) {
+  const groups=new Map();
+  for(const row of rows||[]){ const key=`${row.userId}|${row.type}|${row.title}`; const list=groups.get(key)||[]; list.push(row); groups.set(key,list); }
+  return [...groups.values()].filter(list=>list.length>1&&Math.max(...list.map(x=>x.ts))-Math.min(...list.map(x=>x.ts))<10*60*1000).sort((a,b)=>b.length-a.length);
+}
+function renderErrors(){
+  const rows=(latest?.errors||[]).filter(row=>showAllErrors||!row.resolvedAt), list=$('errorList');
+  $('errorsOpen').classList.toggle('active',!showAllErrors); $('errorsAll').classList.toggle('active',showAllErrors);
+  if(!rows.length)return empty(list,showAllErrors?'Ошибок нет':'Новых ошибок нет');
+  list.className='table-list'; list.innerHTML=rows.map(row=>`<div class="row error-row ${row.resolvedAt?'resolved':''}"><div class="truncate"><strong>${escapeHtml(row.kind||'Ошибка')}</strong><br><small>${escapeHtml(row.message)}</small></div><small>${escapeHtml(row.appVersion||'—')} · ${escapeHtml(row.path||'')}</small><small>${formatTime(row.ts)}</small><button class="chip resolve-error" data-error-id="${row.id}" data-resolved="${row.resolvedAt?'1':'0'}">${row.resolvedAt?'Вернуть':'Исправлено'}</button></div>`).join('');
+}
 function render(data) {
-  const allOk = Object.entries(data.services).filter(([key])=>key!=='whisperBusy').every(([,value])=>value);
-  $('overallDot').className = `dot ${allOk?'ok':'bad'}`; $('overallText').textContent = allOk ? 'Все основные сервисы работают' : 'Есть сервис, требующий внимания'; $('updatedAt').textContent = `Обновлено ${formatTime(data.generatedAt)} · uptime ${Math.floor(data.server.uptimeSec/3600)} ч`;
-  $('serviceGrid').innerHTML = service('Push',data.services.push,`${data.database.subscriptions} подписок`) + service('Whisper',data.services.whisper,data.services.whisperBusy?'сейчас распознаёт аудио':'свободен') + service('SQLite',data.services.database,formatBytes(data.database.bytes));
-  $('metricGrid').innerHTML = metric('Пользователи',data.database.users) + metric('Семьи',data.database.families,`${data.database.familyMembers} участников`) + metric('Облачные копии',data.database.cloudCopies) + metric('Активные расписания',data.database.activeSchedules,`из ${data.database.schedules}`);
+  latest=data;
+  const allOk=Object.entries(data.services).filter(([key])=>!['whisperBusy','telegramLinked'].includes(key)).every(([,value])=>value!==false);
+  $('overallDot').className=`dot ${allOk?'ok':'bad'}`; $('overallText').textContent=allOk?'Все основные сервисы работают':'Есть сервис, требующий внимания'; $('updatedAt').textContent=`Обновлено ${formatTime(data.generatedAt)} · uptime ${Math.floor(data.server.uptimeSec/3600)} ч`;
+  $('serviceGrid').innerHTML=service('Push',data.services.push,`${data.database.subscriptions} подписок`)+service('Whisper',data.services.whisper,data.services.whisperBusy?'распознаёт аудио':'свободен')+service('SQLite',data.services.database,formatBytes(data.database.bytes))+service('Telegram',data.services.telegram,data.services.telegramLinked?'чат подключён':'нажмите /start');
+  $('metricGrid').innerHTML=metric('Пользователи',data.database.users)+metric('Семьи',data.database.families,`${data.database.familyMembers} участников`)+metric('Облачные копии',data.database.cloudCopies)+metric('Активные расписания',data.database.activeSchedules,`из ${data.database.schedules}`);
+
+  const devices=data.devices||[]; $('deviceCount').textContent=String(devices.length); const deviceList=$('deviceList');
+  if(!devices.length)empty(deviceList,'Устройства ещё не передавали диагностику'); else { deviceList.className='table-list'; deviceList.innerHTML=devices.map(row=>`<div class="row device-row"><div><strong>${escapeHtml(row.platform||'Устройство')}</strong><br><small>${escapeHtml(row.userId)} · ${escapeHtml(row.displayMode||'')}</small></div><span class="mono">${escapeHtml(row.appVersion||'—')}</span><span class="${row.pushSubscribed?'good':'fail'}">${row.pushSubscribed?'push готов':'нет push'}</span><div class="row-action"><small>${formatTime(row.lastSeen)}</small><button class="chip test-push" data-device-id="${escapeHtml(row.deviceId)}">Тест</button></div></div>`).join(''); }
+  const versions=data.versions||[], total=versions.reduce((sum,x)=>sum+Number(x.count||0),0), versionList=$('versionList');
+  versionList.className=`version-list${versions.length?'':' empty'}`; versionList.innerHTML=versions.length?versions.map(row=>`<div class="version"><div><strong>${escapeHtml(row.version||'без версии')}</strong><small>${row.count} устройств · ${formatTime(row.lastSeen)}</small></div><span style="--w:${total?Math.round(row.count/total*100):0}%"></span></div>`).join(''):'Нет данных';
+  renderErrors();
+
+  const upcoming=data.upcoming||[]; $('upcomingCount').textContent=String(upcoming.length); const upcomingList=$('upcomingList'); upcomingList.className=`timeline${upcoming.length?'':' empty'}`; upcomingList.innerHTML=upcoming.length?upcoming.map(row=>`<div class="timeline-item ${row.important?'important':''}"><time>${formatTime(row.at)}</time><div><strong>${escapeHtml(row.ref)}</strong><small>${escapeHtml(row.kind)} · ${escapeHtml(row.stage)} · ${escapeHtml(row.userId)}</small></div></div>`).join(''):'Нет запланированных уведомлений';
+  const duplicates=duplicateGroups(data.recentPush); $('duplicateBadge').textContent=String(duplicates.length); $('duplicateBadge').className=`badge ${duplicates.length?'danger':''}`; const duplicateList=$('duplicateList'); if(!duplicates.length)empty(duplicateList,'Повторов не обнаружено'); else {duplicateList.className='table-list'; duplicateList.innerHTML=duplicates.map(group=>`<div class="row"><div><strong>${escapeHtml(group[0].title)}</strong><br><small>${escapeHtml(group[0].type)} · ${escapeHtml(group[0].userId)}</small></div><span class="fail">${group.length} раз</span><small>${formatTime(group[group.length-1].ts)}</small><small>за 10 минут</small></div>`).join('');}
+
   const d=data.delivery24h, rate=d.total?Math.round(d.sent/d.total*100):100; $('deliveryRate').textContent=`${rate}%`; $('deliveryStats').innerHTML=metric('Всего',d.total)+metric('Доставлено',d.sent)+metric('Ошибки',d.failed);
   $('scheduleCount').textContent=String(data.schedules.length); $('scheduleList').className=`table-list${data.schedules.length?'':' empty'}`; $('scheduleList').innerHTML=data.schedules.length?data.schedules.map(row=>`<div class="row"><div class="truncate"><strong>${escapeHtml(row.title||row.type)}</strong><br><small>${escapeHtml(row.type)} · ${escapeHtml(row.userId)}</small></div><span class="mono">${String(row.hour).padStart(2,'0')}:${String(row.minute).padStart(2,'0')}</span><span class="${row.enabled?'good':'fail'}">${row.enabled?'включено':'выключено'}</span><small>последний: ${escapeHtml(row.lastSentDay||'—')}</small></div>`).join(''):'Расписаний пока нет';
   $('pushList').className=`table-list${data.recentPush.length?'':' empty'}`; $('pushList').innerHTML=data.recentPush.length?data.recentPush.map(row=>`<div class="row"><div class="truncate"><strong>${escapeHtml(row.title||row.type)}</strong><br><small>${escapeHtml(row.type)} · ${escapeHtml(row.userId)}</small></div><span class="${row.ok?'good':'fail'}">${row.ok?'доставлено':'ошибка'}</span><small>${formatTime(row.ts)}</small><small class="truncate">${escapeHtml(row.error||String(row.statusCode||''))}</small></div>`).join(''):'Журнал пока пуст';
+
+  const maintenance=data.maintenance||{enabled:false,features:{}}; $('maintenanceEnabled').checked=!!maintenance.enabled; $('maintenanceMessage').value=maintenance.message||''; $('maintenanceState').textContent=maintenance.enabled?'включён':'выключен'; $('maintenanceState').className=`badge ${maintenance.enabled?'danger':''}`; document.querySelectorAll('.feature-toggle').forEach(input=>input.checked=maintenance.features?.[input.dataset.feature]!==false);
+  $('telegramState').innerHTML=`<span class="${data.telegram?.linked?'good':'fail'}">${data.telegram?.linked?'● чат подключён':'● ожидается /start'}</span> <small>${escapeHtml(data.telegram?.username||'')}</small>`; const telegramList=$('telegramList'), telegramRows=data.telegramLog||[]; telegramList.className=`table-list${telegramRows.length?'':' empty'}`; telegramList.innerHTML=telegramRows.length?telegramRows.map(row=>`<div class="compact-row"><span class="${row.ok?'good':'fail'}">${row.ok?'✓':'!'}</span><div class="truncate">${escapeHtml(row.message)}</div><small>${formatTime(row.ts)}</small></div>`).join(''):'История пуста';
+  const backups=data.backups||[], backupList=$('backupList'); backupList.className=`table-list${backups.length?'':' empty'}`; backupList.innerHTML=backups.length?backups.map(row=>`<div class="compact-row"><span>◫</span><div><strong>${escapeHtml(row.name)}</strong><br><small>${formatBytes(row.bytes)}</small></div><small>${formatTime(row.createdAt)}</small></div>`).join(''):'Копий пока нет';
+  const access=data.accessLog||[], accessList=$('accessList'); accessList.className=`table-list${access.length?'':' empty'}`; accessList.innerHTML=access.length?access.map(row=>`<div class="compact-row"><span class="${row.ok?'good':'fail'}">${row.ok?'✓':'!'}</span><div><strong>${escapeHtml(row.ip)}</strong><br><small>${escapeHtml(row.path)}</small></div><small>${formatTime(row.ts)}</small></div>`).join(''):'Журнал пуст';
 }
 
 async function refresh() {
-  if(!token) return showLogin();
-  $('refreshBtn').disabled=true;
-  try {
-    const response=await fetch(`${API}/developer/status`,{headers:{'x-developer-token':token},cache:'no-store'});
-    if(response.status===401){ sessionStorage.removeItem('lumoDeveloperToken'); token=''; return showLogin('Неверный или устаревший ключ'); }
-    if(!response.ok) throw new Error(`Сервер ответил ${response.status}`);
-    const data=await response.json(); $('loginView').hidden=true; $('dashboard').hidden=false; $('logoutBtn').hidden=false; render(data);
-  } catch(error) { if(!$('dashboard').hidden){ $('overallDot').className='dot bad'; $('overallText').textContent='Нет связи с сервером'; $('updatedAt').textContent=error.message; } else showLogin(`Не удалось подключиться: ${error.message}`); }
-  finally { $('refreshBtn').disabled=false; }
+  if(!token)return showLogin(); $('refreshBtn').disabled=true;
+  try { const response=await fetch(`${API}/developer/status`,{headers:{'x-developer-token':token},cache:'no-store'}); if(response.status===401){sessionStorage.removeItem('lumoDeveloperToken');token='';return showLogin('Неверный или устаревший ключ');} if(response.status===429)return showLogin('Слишком много попыток. Подождите 15 минут.'); if(!response.ok)throw new Error(`Сервер ответил ${response.status}`); const data=await response.json(); $('loginView').hidden=true;$('dashboard').hidden=false;$('logoutBtn').hidden=false;render(data); }
+  catch(error){if(!$('dashboard').hidden){$('overallDot').className='dot bad';$('overallText').textContent='Нет связи с сервером';$('updatedAt').textContent=error.message;}else showLogin(`Не удалось подключиться: ${error.message}`);} finally{$('refreshBtn').disabled=false;}
 }
-function scheduleRefresh(){ clearInterval(timer); if($('autoRefresh').checked) timer=setInterval(refresh,30000); }
+function scheduleRefresh(){clearInterval(timer);if($('autoRefresh').checked)timer=setInterval(refresh,30000);}
 $('loginForm').addEventListener('submit',event=>{event.preventDefault();token=$('tokenInput').value.trim();sessionStorage.setItem('lumoDeveloperToken',token);refresh().then(scheduleRefresh);});
-$('showToken').addEventListener('click',()=>{$('tokenInput').type=$('tokenInput').type==='password'?'text':'password';});
-$('refreshBtn').addEventListener('click',refresh); $('autoRefresh').addEventListener('change',scheduleRefresh);
+$('showToken').addEventListener('click',()=>{$('tokenInput').type=$('tokenInput').type==='password'?'text':'password';}); $('refreshBtn').addEventListener('click',refresh); $('autoRefresh').addEventListener('change',scheduleRefresh);
 $('logoutBtn').addEventListener('click',()=>{token='';sessionStorage.removeItem('lumoDeveloperToken');$('tokenInput').value='';showLogin();});
-document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible'&&token)refresh();});
-if('serviceWorker' in navigator) navigator.serviceWorker.register('./sw.js').catch(()=>{});
-if(token){refresh();scheduleRefresh();}else showLogin();
+$('errorsOpen').addEventListener('click',()=>{showAllErrors=false;renderErrors();}); $('errorsAll').addEventListener('click',()=>{showAllErrors=true;renderErrors();});
+$('deviceList').addEventListener('click',async event=>{const button=event.target.closest('.test-push');if(!button)return;button.disabled=true;try{await action('/developer/test-push',{deviceId:button.dataset.deviceId});toast('Тестовый push отправлен');await refresh();}catch(error){toast(error.message,true);}finally{button.disabled=false;}});
+$('errorList').addEventListener('click',async event=>{const button=event.target.closest('.resolve-error');if(!button)return;try{await action(`/developer/errors/${button.dataset.errorId}/resolve`,{resolved:button.dataset.resolved!=='1'});await refresh();}catch(error){toast(error.message,true);}});
+$('testTelegram').addEventListener('click',async()=>{try{await action('/developer/telegram/test');toast('Тест отправлен в Telegram');await refresh();}catch(error){toast(error.message,true);}});
+$('createBackup').addEventListener('click',async()=>{try{await action('/developer/backups');toast('Резервная копия создана');await refresh();}catch(error){toast(error.message,true);}});
+$('saveMaintenance').addEventListener('click',async()=>{const features={};document.querySelectorAll('.feature-toggle').forEach(input=>features[input.dataset.feature]=input.checked);try{await action('/developer/maintenance',{enabled:$('maintenanceEnabled').checked,message:$('maintenanceMessage').value,features});toast('Режим обслуживания сохранён');await refresh();}catch(error){toast(error.message,true);}});
+document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible'&&token)refresh();}); if('serviceWorker'in navigator)navigator.serviceWorker.register('./sw.js').catch(()=>{}); if(token){refresh();scheduleRefresh();}else showLogin();
