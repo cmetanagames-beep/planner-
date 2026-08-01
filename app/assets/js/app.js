@@ -2221,6 +2221,8 @@ function snoozeTaskOneHour(taskId){
   refreshCurrentTab();
   toast('⏰ Отложено на 1 час');
 }
+function snoozeTaskFifteenMinutes(taskId){const tasks=getTasks(),task=tasks.find(t=>String(t.id)===String(taskId));if(!task)return toast('Не удалось найти задачу');const at=new Date(Date.now()+15*60000);task.date=dateKeyOf(at);task.time=String(at.getHours()).padStart(2,'0')+':'+String(at.getMinutes()).padStart(2,'0');task.done=false;setTasks(tasks);scheduleAllTimeouts();refreshCurrentTab();toast('⏰ Напомним через 15 минут');}
+function completeTaskFromPush(taskId){const tasks=getTasks(),task=tasks.find(t=>String(t.id)===String(taskId));if(!task)return toast('Не удалось найти задачу');task.done=true;task.doneAt=Date.now();setTasks(tasks);scheduleAllTimeouts();refreshCurrentTab();toast('✅ Дело выполнено');}
 async function openFamilyTaskFromPush(taskId){
   await pullAssignedTasks();openAssignmentsInbox();toast('📥 Открыты входящие поручения');
 }
@@ -2233,6 +2235,8 @@ function handleLaunchActions(){
     url.searchParams.delete('snoozeTask');
     history.replaceState(null,'',url.pathname+url.search+url.hash);
   }
+  const task15=url.searchParams.get('snoozeTask15');if(task15){snoozeTaskFifteenMinutes(task15);url.searchParams.delete('snoozeTask15');history.replaceState(null,'',url.pathname+url.search+url.hash)}
+  const completeTask=url.searchParams.get('completeTask');if(completeTask){completeTaskFromPush(completeTask);url.searchParams.delete('completeTask');history.replaceState(null,'',url.pathname+url.search+url.hash)}
   const insight=url.searchParams.get('assistantInsight');
   if(insight){try{const data=JSON.parse(insight);setTimeout(()=>openInsightConversation(data.prompt||'',data.summary||data.body||''),180)}catch(e){}url.searchParams.delete('assistantInsight');history.replaceState(null,'',url.pathname+url.search+url.hash)}
   const familyTask=url.searchParams.get('familyTask');if(familyTask!==null){setTimeout(()=>openFamilyTaskFromPush(familyTask),180);url.searchParams.delete('familyTask');history.replaceState(null,'',url.pathname+url.search+url.hash)}
@@ -2241,6 +2245,7 @@ function handleLaunchActions(){
   if(url.searchParams.get('notifications')==='1'){setTimeout(openNotificationCenter,220);url.searchParams.delete('notifications');history.replaceState(null,'',url.pathname+url.search+url.hash)}
   const focusDone=url.searchParams.get('focusDone');if(focusDone!==null){acknowledgeFocusPush();setTimeout(()=>{switchTab('matrix');toast('⏱ Фокус завершён')},180);url.searchParams.delete('focusDone');history.replaceState(null,'',url.pathname+url.search+url.hash)}
   const cloudInvite=url.searchParams.get('cloudInvite');if(cloudInvite){setTimeout(()=>acceptCloudInvite(cloudInvite),500);url.searchParams.delete('cloudInvite');history.replaceState(null,'',url.pathname+url.search+url.hash)}
+  if(url.searchParams.get('forceUpdate')==='1'){url.searchParams.delete('forceUpdate');history.replaceState(null,'',url.pathname+url.search+url.hash);navigator.serviceWorker?.getRegistration()?.then(async reg=>{await reg?.update();reg?.waiting?.postMessage({type:'SKIP_WAITING'});toast('Lumo обновляется…');setTimeout(()=>location.reload(),1200)});}
 }
 
 /* ===== СИНХРОНИЗАЦИЯ УСТРОЙСТВ ===== */
@@ -2266,14 +2271,15 @@ async function resolveCloudConflict(choice){if(!cloudConflict)return;let data=ch
 
 /* ===== СЕМЬЯ + ПУШИ (сервер) ===== */
 const FAMILY_SERVER='https://pushevgen.duckdns.org'; // без слэша на конце, через https!
-const LUMO_APP_VERSION='v98';
+const LUMO_APP_VERSION='v99';
 const LUMO_DEVICE_ID=(()=>{let id=localStorage.getItem('lumo_device_id_v1');if(!id){id='dev_'+Date.now().toString(36)+'_'+Math.random().toString(36).slice(2,10);localStorage.setItem('lumo_device_id_v1',id)}return id})();
+const LUMO_SUPPORT_CODE=(()=>{let code=localStorage.getItem('lumo_support_code_v1');if(!code){const chars='ABCDEFGHJKLMNPQRSTUVWXYZ23456789';code='';for(let i=0;i<8;i++)code+=chars[Math.floor(Math.random()*chars.length)];localStorage.setItem('lumo_support_code_v1',code)}return code})();
 function diagnosticPlatform(){const ua=navigator.userAgent||'';if(/android/i.test(ua))return'Android';if(/iphone|ipad|ipod/i.test(ua))return'iOS';if(/windows/i.test(ua))return'Windows';if(/macintosh|mac os/i.test(ua))return'macOS';return'Web'}
 function diagnosticDisplayMode(){return window.matchMedia?.('(display-mode: standalone)').matches||navigator.standalone?'standalone':'browser'}
 async function reportDeviceHealth(force=false){
   const last=Number(localStorage.getItem('lumo_device_health_at')||0);if(!force&&Date.now()-last<6*60*60*1000)return;
   try{let subscribed=false,swVersion='none';if('serviceWorker'in navigator){const reg=await navigator.serviceWorker.ready.catch(()=>null);subscribed=!!(await reg?.pushManager?.getSubscription().catch(()=>null));swVersion=reg?.active?.scriptURL?.split('/').pop()||'none'}
-    await fetch(FAMILY_SERVER+'/telemetry/device',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({userId:PUSH_USER_ID,deviceId:LUMO_DEVICE_ID,platform:diagnosticPlatform(),appVersion:LUMO_APP_VERSION,swVersion,displayMode:diagnosticDisplayMode(),pushPermission:typeof Notification==='undefined'?'unsupported':Notification.permission,pushSubscribed:subscribed}),keepalive:true});localStorage.setItem('lumo_device_health_at',Date.now())
+    await fetch(FAMILY_SERVER+'/telemetry/device',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({userId:PUSH_USER_ID,deviceId:LUMO_DEVICE_ID,supportCode:LUMO_SUPPORT_CODE,platform:diagnosticPlatform(),appVersion:LUMO_APP_VERSION,swVersion,displayMode:diagnosticDisplayMode(),pushPermission:typeof Notification==='undefined'?'unsupported':Notification.permission,pushSubscribed:subscribed}),keepalive:true});localStorage.setItem('lumo_device_health_at',Date.now())
   }catch(_){}
 }
 let diagnosticErrorSending=false;
@@ -2382,6 +2388,7 @@ async function testPush(){
 async function checkPushHealth(showToast=false){
   const el=document.getElementById('push-health');if(!el)return;
   const lines=[];let ok=true;
+  lines.push(`🆔 Код поддержки: <b>${esc(LUMO_SUPPORT_CODE)}</b> · версия ${esc(LUMO_APP_VERSION)}`);
   const permission=('Notification'in window)?Notification.permission:'unsupported';
   lines.push(permission==='granted'?'✅ Уведомления разрешены':'❌ Уведомления не разрешены');if(permission!=='granted')ok=false;
   try{
@@ -4691,6 +4698,8 @@ if('serviceWorker' in navigator){
   }).catch(()=>{});
   navigator.serviceWorker.addEventListener('message',e=>{
     if(e.data&&e.data.type==='SNOOZE_TASK')snoozeTaskOneHour(e.data.taskId);
+    if(e.data&&e.data.type==='SNOOZE_TASK_15')snoozeTaskFifteenMinutes(e.data.taskId);
+    if(e.data&&e.data.type==='COMPLETE_TASK')completeTaskFromPush(e.data.taskId);
     if(e.data&&e.data.type==='OPEN_INSIGHT')openInsightConversation(e.data.prompt||'',e.data.summary||'');
     if(e.data&&e.data.type==='OPEN_FAMILY_TASK')openFamilyTaskFromPush(e.data.taskId||'');
     if(e.data&&e.data.type==='OPEN_SHOPPING')openShoppingFromPush();

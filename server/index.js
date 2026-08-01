@@ -5,11 +5,13 @@ import webpush from 'web-push';
 import Database from 'better-sqlite3';
 import TelegramBot from 'node-telegram-bot-api';
 import QRCode from 'qrcode';
+import { setDefaultResultOrder } from 'node:dns';
 import { spawn } from 'node:child_process';
 import { randomUUID, timingSafeEqual } from 'node:crypto';
 import { existsSync, mkdirSync, readFileSync, readdirSync, statfsSync, statSync, unlinkSync, writeFileSync } from 'node:fs';
 import { cpus, freemem, loadavg, tmpdir, totalmem } from 'node:os';
 import path from 'node:path';
+setDefaultResultOrder('ipv4first');
 
 const app = express();
 app.use(cors());
@@ -36,6 +38,7 @@ db.exec(`CREATE TABLE IF NOT EXISTS pushLog (id INTEGER PRIMARY KEY AUTOINCREMEN
 db.exec(`CREATE TABLE IF NOT EXISTS notificationTrace (id INTEGER PRIMARY KEY AUTOINCREMENT, traceKey TEXT NOT NULL, userId TEXT, type TEXT, stage TEXT NOT NULL, detail TEXT, ts INTEGER NOT NULL)`);
 db.exec(`CREATE INDEX IF NOT EXISTS notificationTraceKeyIdx ON notificationTrace(traceKey,ts)`);
 db.exec(`CREATE TABLE IF NOT EXISTS deviceHealth (deviceId TEXT PRIMARY KEY, userId TEXT NOT NULL, platform TEXT, appVersion TEXT, swVersion TEXT, displayMode TEXT, pushPermission TEXT, pushSubscribed INTEGER, lastSeen INTEGER NOT NULL)`);
+try { db.exec(`ALTER TABLE deviceHealth ADD COLUMN supportCode TEXT`); } catch (_) {}
 db.exec(`CREATE TABLE IF NOT EXISTS clientErrors (id INTEGER PRIMARY KEY AUTOINCREMENT, userId TEXT, deviceId TEXT, kind TEXT, message TEXT, stack TEXT, path TEXT, appVersion TEXT, ts INTEGER NOT NULL)`);
 try { db.exec(`ALTER TABLE clientErrors ADD COLUMN resolvedAt INTEGER`); } catch (_) {}
 db.exec(`CREATE TABLE IF NOT EXISTS systemState (key TEXT PRIMARY KEY, value TEXT, updatedAt INTEGER NOT NULL)`);
@@ -43,6 +46,7 @@ db.exec(`CREATE TABLE IF NOT EXISTS developerAccess (id INTEGER PRIMARY KEY AUTO
 db.exec(`CREATE TABLE IF NOT EXISTS telegramLog (id INTEGER PRIMARY KEY AUTOINCREMENT, ok INTEGER NOT NULL, message TEXT, error TEXT, ts INTEGER NOT NULL)`);
 db.exec(`CREATE TABLE IF NOT EXISTS cloudData (code TEXT PRIMARY KEY, data TEXT NOT NULL, revision INTEGER NOT NULL DEFAULT 1, updatedAt INTEGER NOT NULL, updatedBy TEXT)`);
 db.exec(`CREATE TABLE IF NOT EXISTS cloudDevices (userId TEXT PRIMARY KEY, code TEXT NOT NULL)`);
+db.exec(`CREATE TABLE IF NOT EXISTS cloudHistory (id INTEGER PRIMARY KEY AUTOINCREMENT, code TEXT NOT NULL, revision INTEGER NOT NULL, data TEXT NOT NULL, createdAt INTEGER NOT NULL, reason TEXT)`);
 db.exec(`CREATE TABLE IF NOT EXISTS cloudInvites (token TEXT PRIMARY KEY, code TEXT NOT NULL, createdBy TEXT, expiresAt INTEGER NOT NULL, usedAt INTEGER, usedBy TEXT)`);
 db.prepare('DELETE FROM cloudInvites WHERE expiresAt < ? OR usedAt IS NOT NULL').run(Date.now() - 24 * 60 * 60 * 1000);
 db.exec(`CREATE TABLE IF NOT EXISTS eventFeed (id TEXT PRIMARY KEY, targetUserId TEXT NOT NULL, familyCode TEXT, type TEXT, title TEXT, body TEXT, data TEXT, ts INTEGER, readAt INTEGER)`);
@@ -262,9 +266,10 @@ app.post('/telemetry/device', (req, res) => {
   if (!telemetryAllowed(req)) return res.status(429).json({ ok: false });
   const b = req.body || {}, userId = String(b.userId || '').slice(0, 160), deviceId = String(b.deviceId || '').slice(0, 160);
   if (!userId || !deviceId) return res.status(400).json({ ok: false });
-  db.prepare(`INSERT INTO deviceHealth (deviceId,userId,platform,appVersion,swVersion,displayMode,pushPermission,pushSubscribed,lastSeen)
-    VALUES (?,?,?,?,?,?,?,?,?) ON CONFLICT(deviceId) DO UPDATE SET userId=excluded.userId,platform=excluded.platform,appVersion=excluded.appVersion,swVersion=excluded.swVersion,displayMode=excluded.displayMode,pushPermission=excluded.pushPermission,pushSubscribed=excluded.pushSubscribed,lastSeen=excluded.lastSeen`)
-    .run(deviceId, userId, cleanDiagnosticText(b.platform, 40), cleanDiagnosticText(b.appVersion, 30), cleanDiagnosticText(b.swVersion, 60), cleanDiagnosticText(b.displayMode, 30), cleanDiagnosticText(b.pushPermission, 30), b.pushSubscribed ? 1 : 0, Date.now());
+  const supportCode=String(b.supportCode||'').toUpperCase().replace(/[^A-Z0-9]/g,'').slice(0,10);
+  db.prepare(`INSERT INTO deviceHealth (deviceId,userId,platform,appVersion,swVersion,displayMode,pushPermission,pushSubscribed,lastSeen,supportCode)
+    VALUES (?,?,?,?,?,?,?,?,?,?) ON CONFLICT(deviceId) DO UPDATE SET userId=excluded.userId,platform=excluded.platform,appVersion=excluded.appVersion,swVersion=excluded.swVersion,displayMode=excluded.displayMode,pushPermission=excluded.pushPermission,pushSubscribed=excluded.pushSubscribed,lastSeen=excluded.lastSeen,supportCode=excluded.supportCode`)
+    .run(deviceId, userId, cleanDiagnosticText(b.platform, 40), cleanDiagnosticText(b.appVersion, 30), cleanDiagnosticText(b.swVersion, 60), cleanDiagnosticText(b.displayMode, 30), cleanDiagnosticText(b.pushPermission, 30), b.pushSubscribed ? 1 : 0, Date.now(),supportCode);
   res.json({ ok: true });
 });
 app.post('/telemetry/error', (req, res) => {
@@ -279,7 +284,7 @@ app.post('/telemetry/error', (req, res) => {
 app.post('/telemetry/push-state', (req, res) => {
   if (!telemetryAllowed(req)) return res.status(429).json({ ok: false });
   const b = req.body || {}, stage = String(b.stage || '');
-  if (!['displayed', 'opened', 'suppressed'].includes(stage) || !b.traceKey) return res.status(400).json({ ok: false });
+  if (!['displayed', 'opened', 'suppressed','action'].includes(stage) || !b.traceKey) return res.status(400).json({ ok: false });
   traceNotification(b.traceKey, '', b.type, stage, cleanDiagnosticText(b.detail, 100));
   res.json({ ok: true });
 });
@@ -354,7 +359,9 @@ app.post('/cloud/sync', (req, res) => {
   const current=JSON.parse(row.data||'{}'), incoming=data||{};
   if(action!=='force' && current?.planner && (!incoming?.planner || Object.keys(incoming.planner).length<2)) return res.status(409).json({ok:false,err:'Пустые данные не могут заменить облачную копию'});
   const revision = row.revision + 1, now = Date.now();
+  db.prepare('INSERT INTO cloudHistory (code,revision,data,createdAt,reason) VALUES (?,?,?,?,?)').run(row.code,row.revision,row.data,now,'sync');
   db.prepare('UPDATE cloudData SET data = ?, revision = ?, updatedAt = ?, updatedBy = ? WHERE code = ?').run(JSON.stringify(data), revision, now, userId, row.code);
+  db.prepare('DELETE FROM cloudHistory WHERE code=? AND id NOT IN (SELECT id FROM cloudHistory WHERE code=? ORDER BY createdAt DESC LIMIT 30)').run(row.code,row.code);
   res.json({ ok: true, code: row.code, revision, updatedAt: now });
 });
 
@@ -826,6 +833,8 @@ async function createDatabaseBackup(reason = 'manual') {
   const integrity = db.pragma('quick_check', { simple: true });
   if (String(integrity).toLowerCase() !== 'ok') throw new Error(`database integrity: ${integrity}`);
   await db.backup(destination);
+  const restored=new Database(destination,{readonly:true});
+  try{const check=restored.pragma('quick_check',{simple:true});if(String(check).toLowerCase()!=='ok')throw new Error(`backup restore check: ${check}`);}finally{restored.close();}
   setSystemState('lastBackup', JSON.stringify({ name, reason, createdAt: Date.now() }));
   return backupList().find(item => item.name === name);
 }
@@ -841,7 +850,7 @@ app.get('/developer/status', requireDeveloper, (req, res) => {
   const recentPush = db.prepare(`SELECT userId,type,title,ok,statusCode,error,ts FROM pushLog ORDER BY ts DESC LIMIT 40`).all().map(row => ({
     ...row, userId: maskedUser(row.userId), title: String(row.title || '').slice(0, 120), error: String(row.error || '').slice(0, 160), ok: !!row.ok
   }));
-  const devices = db.prepare('SELECT * FROM deviceHealth ORDER BY lastSeen DESC LIMIT 100').all().map(row => ({ ...row, userId: maskedUser(row.userId), pushSubscribed: !!row.pushSubscribed }));
+  const devices = db.prepare('SELECT * FROM deviceHealth ORDER BY lastSeen DESC LIMIT 100').all().map(row => ({ ...row, userId: maskedUser(row.userId), pushSubscribed: !!row.pushSubscribed, stale: now-row.lastSeen>7*24*60*60*1000 }));
   const versions = db.prepare('SELECT appVersion version,COUNT(*) count,MAX(lastSeen) lastSeen FROM deviceHealth GROUP BY appVersion ORDER BY count DESC').all();
   const errors = db.prepare('SELECT id,userId,deviceId,kind,message,path,appVersion,ts,resolvedAt FROM clientErrors ORDER BY ts DESC LIMIT 60').all().map(row => ({ ...row, userId: maskedUser(row.userId) }));
   const recentTrace = db.prepare('SELECT traceKey,userId,type,stage,detail,ts FROM notificationTrace ORDER BY ts DESC LIMIT 80').all().map(row => ({ ...row, userId: maskedUser(row.userId) }));
@@ -891,6 +900,8 @@ app.post('/developer/test-push', requireDeveloper, async (req, res) => {
   const sent = await sendPush(device.userId, { type: 'developer-test', traceKey, title: '🧪 Тест Lumo Console', body: `Push доставлен на ${device.platform || 'устройство'} в ${new Date().toLocaleTimeString('ru-RU')}` });
   res.json({ ok: sent, traceKey });
 });
+app.post('/developer/device/update',requireDeveloper,async(req,res)=>{const device=db.prepare('SELECT * FROM deviceHealth WHERE deviceId=?').get(String(req.body?.deviceId||''));if(!device)return res.status(404).json({ok:false,error:'device not found'});const sent=await sendPush(device.userId,{type:'system-update',eventKey:`update:${device.deviceId}:${Date.now()}`,title:'Доступно обновление Lumo',body:'Открой уведомление, чтобы установить свежую версию.'});res.status(sent?200:503).json({ok:sent});});
+app.post('/developer/cloud/restore-yesterday',requireDeveloper,(req,res)=>{const support=String(req.body?.supportCode||'').toUpperCase(),device=db.prepare('SELECT * FROM deviceHealth WHERE supportCode=?').get(support);if(!device)return res.status(404).json({ok:false,error:'device not found'});const cloud=db.prepare('SELECT c.* FROM cloudData c JOIN cloudDevices d ON d.code=c.code WHERE d.userId=?').get(device.userId);if(!cloud)return res.status(404).json({ok:false,error:'cloud not connected'});const target=db.prepare('SELECT * FROM cloudHistory WHERE code=? AND createdAt<=? ORDER BY createdAt DESC LIMIT 1').get(cloud.code,Date.now()-20*60*60*1000);if(!target)return res.status(404).json({ok:false,error:'yesterday copy not found'});const now=Date.now();db.prepare('INSERT INTO cloudHistory(code,revision,data,createdAt,reason) VALUES(?,?,?,?,?)').run(cloud.code,cloud.revision,cloud.data,now,'before-developer-restore');db.prepare('UPDATE cloudData SET data=?,revision=?,updatedAt=?,updatedBy=? WHERE code=?').run(target.data,cloud.revision+1,now,'developer-restore',cloud.code);res.json({ok:true,revision:cloud.revision+1,restoredAt:target.createdAt});});
 app.post('/developer/telegram/test', requireDeveloper, async (req, res) => {
   const sent = await telegramSend('✅ Тест Lumo Console: связь с сервером работает.');
   res.status(sent ? 200 : 503).json({ ok: sent, error: sent ? '' : (telegramBot ? 'Открой бота и нажми /start' : 'Не задан TELEGRAM_BOT_TOKEN') });
@@ -978,6 +989,11 @@ async function monitorSystemHealth() {
   if(hostFree/hostTotal<.1)raiseAlert('host-memory',`На VPS осталось ${Math.round(hostFree/1048576)} МБ RAM.`,60*60*1000);
   if(loads[0]>cores*2)raiseAlert('host-load',`Высокая нагрузка VPS: ${loads[0].toFixed(2)} при ${cores} CPU.`,30*60*1000);
   try{const s=statfsSync(process.cwd()),free=Number(s.bavail)*Number(s.bsize),total=Number(s.blocks)*Number(s.bsize);if(free/total<.1)raiseAlert('disk-space',`На диске осталось ${Math.round(free/1048576)} МБ.`,3*60*60*1000);}catch(_){}
+  const lastReport=Number(getSystemState('weeklyReportAt','0'));
+  if(telegramBot&&telegramChatId()&&Date.now()-lastReport>=7*24*60*60*1000){
+    const week=Date.now()-7*24*60*60*1000,push=db.prepare('SELECT COUNT(*) total,SUM(ok) sent FROM pushLog WHERE ts>=?').get(week),errors=db.prepare('SELECT COUNT(*) n FROM clientErrors WHERE ts>=?').get(week).n,active=db.prepare('SELECT COUNT(*) n FROM deviceHealth WHERE lastSeen>=?').get(week).n;
+    const ok=await telegramSend(`📊 Lumo за неделю\nАктивные устройства: ${active}\nPush: ${Number(push.sent||0)} из ${Number(push.total||0)}\nОшибки клиентов: ${errors}\nRAM Node: ${Math.round(memory.rss/1048576)} МБ\nСвободно на VPS: ${Math.round(hostFree/1048576)} МБ\nПоследняя копия: ${backupList()[0]?.name||'нет'}`);if(ok)setSystemState('weeklyReportAt',Date.now());
+  }
 }
 setInterval(monitorSystemHealth, 5 * 60 * 1000);
 setTimeout(monitorSystemHealth, 5000);

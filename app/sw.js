@@ -1,5 +1,7 @@
-const CACHE = 'planner-v98';
+const CACHE = 'planner-v99';
 const PUSH_STATE_CACHE = 'lumo-push-state-v1';
+const PUSH_TRACE_API='https://pushevgen.duckdns.org/telemetry/push-state';
+function tracePush(d,stage,detail=''){if(!d?.traceKey)return Promise.resolve();return fetch(PUSH_TRACE_API,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({traceKey:d.traceKey,type:d.type||'',stage,detail}),keepalive:true}).catch(()=>{});}
 
 const ASSETS = [
   './',
@@ -93,7 +95,7 @@ async function pushAllowed(d){
       if(!task)return false;
       const taskAt=Number(task.scheduledAt)||new Date(task.date+'T'+(task.time||'09:00')).getTime();
       const now=Date.now(),stage=String(d.stage||'start');
-      const windows={important2h:[-150,-45],h1:[-75,-20],m30:[-45,5],start:[-5,20],overdue:[10,24*60]};
+      const windows={important2h:[-150,-45],h1:[-75,-20],m30:[-45,0],start:[-5,10],overdue:[10,24*60]};
       const windowMin=windows[stage]||windows.start;
       const deltaMin=(now-taskAt)/60000;
       if(Number.isFinite(taskAt)&&(deltaMin<windowMin[0]||deltaMin>windowMin[1]))return false;
@@ -113,7 +115,8 @@ async function currentShoppingBody(fallback){
 
 async function showPush(d){
   d.type=familyPushKind(d);
-  if(!(await pushAllowed(d)))return;
+  if(!(await pushAllowed(d))){await tracePush(d,'suppressed','client policy');return;}
+  await tracePush(d,'displayed',d.stage||'');
   if(self.registration.setAppBadge){
     await self.registration.setAppBadge(d.badgeCount||undefined).catch(()=>{});
   }
@@ -147,6 +150,7 @@ async function showPush(d){
   if(d.type === 'focus'){
     await self.registration.showNotification(d.title||'⏱ Время вышло',{body:d.body||'Фокус завершён',icon:'./assets/icons/icon.png',badge:'./assets/icons/icon.png',vibrate:[100,80,100,80,180],requireInteraction:true,tag:'focus:'+String(d.taskId||'task')+':'+String(d.endAt||''),data:{type:'focus',taskId:String(d.taskId||'')}});try{const cache=await caches.open(PUSH_STATE_CACHE);await cache.put('./__focus_timer__',new Response(JSON.stringify({active:false,taskId:d.taskId,endAt:d.endAt,finishedAt:Date.now()}),{headers:{'Content-Type':'application/json'}}));}catch(_){}return;
   }
+  if(d.type==='system-update'){await self.registration.showNotification(d.title||'Обновление Lumo',{body:d.body||'',icon:'./assets/icons/icon.png',badge:'./assets/icons/icon.png',tag:d.eventKey||'system-update',data:{type:'system-update',traceKey:d.traceKey||''},actions:[{action:'update',title:'Обновить'}]});return;}
   if(d.type === 'family-task'){
     await self.registration.showNotification(d.title||'📥 Новое поручение',{body:d.body||d.taskTitle||'Тебе передали новое дело',icon:'./assets/icons/icon.png',badge:'./assets/icons/icon.png',tag:'family-task:'+(d.eventId||d.assignId||d.taskId||'new'),data:{type:'family-task',eventId:d.eventId||d.assignId||'',taskId:d.taskId||''},actions:[{action:'open',title:'Открыть дело'}]});return;
   }
@@ -168,10 +172,10 @@ async function showPush(d){
       vibrate: [50, 80, 50],
       requireInteraction: true,
       tag: d.eventKey || d.taskId || 'reminder',
-      data: { type:d.type||'task-reminder', taskId: d.taskId, stage:d.stage||'' },
+      data: { type:d.type||'task-reminder', taskId:d.taskId, stage:d.stage||'', traceKey:d.traceKey||'' },
       actions: [
         { action: 'done',   title: '✅ Выполнено'   },
-        { action: 'snooze', title: '⏰ Отложить 1ч'  }
+        { action: 'snooze', title: '⏰ Через 15 минут'  }
       ]
     });
 }
@@ -187,6 +191,7 @@ self.addEventListener('notificationclick', e => {
   e.notification.close();
   const action = e.action;
   const data   = e.notification.data || {};
+  e.waitUntil(tracePush(data,action?'action':'opened',action||'open'));
 
   if(data.type === 'insight'){
     if(action==='later')return;
@@ -196,6 +201,7 @@ self.addEventListener('notificationclick', e => {
       return clients.openWindow('./?assistantInsight='+encodeURIComponent(JSON.stringify(payload)));
     }));return;
   }
+  if(data.type==='system-update'){e.waitUntil(clients.openWindow('./?forceUpdate=1'));return;}
   if(data.type==='focus'){
     e.waitUntil(clients.matchAll({type:'window',includeUncontrolled:true}).then(cl=>{for(const c of cl){c.postMessage({type:'OPEN_FOCUS',taskId:data.taskId||''});if('focus'in c)return c.focus();}return clients.openWindow('./?focusDone='+encodeURIComponent(data.taskId||''));}));return;
   }
@@ -234,11 +240,7 @@ self.addEventListener('notificationclick', e => {
 
   if(action === 'done'){
     e.waitUntil(
-      fetch('https://pushevgen.duckdns.org/task-complete', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ taskId })
-      }).catch(() => {})
+      clients.matchAll({type:'window',includeUncontrolled:true}).then(cl=>{for(const c of cl){c.postMessage({type:'COMPLETE_TASK',taskId});if('focus'in c)return c.focus();}return clients.openWindow('./?completeTask='+encodeURIComponent(taskId||''));})
     );
     return;
   }
@@ -247,10 +249,10 @@ self.addEventListener('notificationclick', e => {
     e.waitUntil(
       clients.matchAll({ type: 'window', includeUncontrolled: true }).then(cl => {
         for(const c of cl){
-          c.postMessage({type:'SNOOZE_TASK',taskId});
+          c.postMessage({type:'SNOOZE_TASK_15',taskId});
           if('focus' in c)return c.focus();
         }
-        return clients.openWindow('./?snoozeTask='+encodeURIComponent(taskId||''));
+        return clients.openWindow('./?snoozeTask15='+encodeURIComponent(taskId||''));
       })
     );
     return;
