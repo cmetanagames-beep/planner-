@@ -1,0 +1,57 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <meta name="theme-color" content="#07111f">
+  <meta name="robots" content="noindex,nofollow,noarchive">
+  <title>Lumo Console</title>
+  <link rel="manifest" href="manifest.json">
+  <link rel="icon" href="assets/developer.svg" type="image/svg+xml">
+  <link rel="apple-touch-icon" href="assets/developer.png">
+  <link rel="stylesheet" href="assets/dev.css">
+</head>
+<body>
+  <main class="shell">
+    <header class="topbar">
+      <div class="brand"><img src="assets/developer.svg" alt=""><div><strong>Lumo Console</strong><span>закрытая диагностика</span></div></div>
+      <div class="actions"><button id="refreshBtn" class="icon-btn" aria-label="Обновить" title="Обновить">↻</button><button id="logoutBtn" class="quiet" hidden>Выйти</button></div>
+    </header>
+
+    <section id="loginView" class="login-card">
+      <div class="lock">⌁</div>
+      <p class="eyebrow">ДОСТУП РАЗРАБОТЧИКА</p>
+      <h1>Состояние Lumo</h1>
+      <p>Введите закрытый ключ. Он хранится только до закрытия этой вкладки.</p>
+      <form id="loginForm">
+        <label for="tokenInput">Ключ разработчика</label>
+        <div class="password-row"><input id="tokenInput" type="password" autocomplete="current-password" required><button type="button" id="showToken" class="icon-btn" aria-label="Показать ключ">◉</button></div>
+        <button class="primary" type="submit">Открыть консоль</button>
+        <output id="loginError" class="error"></output>
+      </form>
+    </section>
+
+    <section id="dashboard" hidden>
+      <div class="status-line"><span id="overallDot" class="dot"></span><div><strong id="overallText">Проверяю сервер…</strong><small id="updatedAt"></small></div><label class="auto"><input id="autoRefresh" type="checkbox" checked> авто 30 с</label></div>
+      <div id="serviceGrid" class="service-grid"></div>
+      <div id="metricGrid" class="metric-grid"></div>
+
+      <section class="panel">
+        <div class="panel-title"><div><p class="eyebrow">PUSH</p><h2>Доставка за 24 часа</h2></div><span id="deliveryRate" class="badge">—</span></div>
+        <div id="deliveryStats" class="delivery"></div>
+      </section>
+
+      <section class="panel">
+        <div class="panel-title"><div><p class="eyebrow">РАСПИСАНИЯ</p><h2>Автоматические уведомления</h2></div><span id="scheduleCount" class="badge">0</span></div>
+        <div id="scheduleList" class="table-list empty">Нет данных</div>
+      </section>
+
+      <section class="panel">
+        <div class="panel-title"><div><p class="eyebrow">ЖУРНАЛ</p><h2>Последние отправки</h2></div></div>
+        <div id="pushList" class="table-list empty">Журнал пока пуст</div>
+      </section>
+    </section>
+  </main>
+  <script src="assets/dev.js" type="module"></script>
+</body>
+</html>

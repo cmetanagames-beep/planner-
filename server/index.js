@@ -4,8 +4,8 @@ import cors from 'cors';
 import webpush from 'web-push';
 import Database from 'better-sqlite3';
 import { spawn } from 'node:child_process';
-import { randomUUID } from 'node:crypto';
-import { existsSync, readFileSync, unlinkSync, writeFileSync } from 'node:fs';
+import { randomUUID, timingSafeEqual } from 'node:crypto';
+import { existsSync, readFileSync, statSync, unlinkSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 
@@ -25,6 +25,7 @@ db.exec(`CREATE TABLE IF NOT EXISTS shopping (familyCode TEXT PRIMARY KEY, items
 db.exec(`CREATE TABLE IF NOT EXISTS doneStat (id INTEGER PRIMARY KEY AUTOINCREMENT, userId TEXT, name TEXT, date TEXT, ts INTEGER)`);
 db.exec(`CREATE TABLE IF NOT EXISTS pushEvents (eventId TEXT PRIMARY KEY, ts INTEGER)`);
 db.exec(`CREATE TABLE IF NOT EXISTS scheduledPush (scheduleId TEXT PRIMARY KEY, userId TEXT NOT NULL, type TEXT NOT NULL, title TEXT, body TEXT, prompt TEXT, hour INTEGER NOT NULL, minute INTEGER NOT NULL, tzOffset INTEGER NOT NULL DEFAULT 180, enabled INTEGER NOT NULL DEFAULT 1, lastSentDay TEXT DEFAULT '')`);
+db.exec(`CREATE TABLE IF NOT EXISTS pushLog (id INTEGER PRIMARY KEY AUTOINCREMENT, userId TEXT, type TEXT, title TEXT, ok INTEGER NOT NULL, statusCode INTEGER, error TEXT, ts INTEGER NOT NULL)`);
 db.exec(`CREATE TABLE IF NOT EXISTS cloudData (code TEXT PRIMARY KEY, data TEXT NOT NULL, revision INTEGER NOT NULL DEFAULT 1, updatedAt INTEGER NOT NULL, updatedBy TEXT)`);
 db.exec(`CREATE TABLE IF NOT EXISTS cloudDevices (userId TEXT PRIMARY KEY, code TEXT NOT NULL)`);
 db.exec(`CREATE TABLE IF NOT EXISTS eventFeed (id TEXT PRIMARY KEY, targetUserId TEXT NOT NULL, familyCode TEXT, type TEXT, title TEXT, body TEXT, data TEXT, ts INTEGER, readAt INTEGER)`);
@@ -33,6 +34,7 @@ try { db.exec(`ALTER TABLE inbox ADD COLUMN comment TEXT DEFAULT ''`); } catch (
 try { db.exec(`ALTER TABLE inbox ADD COLUMN respondedAt INTEGER`); } catch (e) {}
 db.prepare('DELETE FROM pushEvents WHERE ts < ?').run(Date.now() - 30 * 24 * 60 * 60 * 1000);
 db.prepare('DELETE FROM eventFeed WHERE ts < ?').run(Date.now() - 120 * 24 * 60 * 60 * 1000);
+db.prepare('DELETE FROM pushLog WHERE ts < ?').run(Date.now() - 30 * 24 * 60 * 60 * 1000);
 
 function saveSub(userId, subscription) {
   db.prepare(`INSERT INTO subs (userId, subscription) VALUES (?, ?) ON CONFLICT(userId) DO UPDATE SET subscription = excluded.subscription`).run(userId, JSON.stringify(subscription));
@@ -119,15 +121,23 @@ function claimPushEvent(eventId) {
 
 async function sendPush(userId, titleOrPayload, body, taskId) {
   const sub = getSub(userId);
-  if (!sub) return false;
   const payload = typeof titleOrPayload === 'object' && titleOrPayload
     ? titleOrPayload
     : { title: titleOrPayload, body, taskId };
+  const logPush = (ok, statusCode = null, error = '') => db.prepare(
+    'INSERT INTO pushLog (userId,type,title,ok,statusCode,error,ts) VALUES (?,?,?,?,?,?,?)'
+  ).run(String(userId || '').slice(0, 160), String(payload.type || 'generic').slice(0, 80), String(payload.title || '').slice(0, 240), ok ? 1 : 0, statusCode, String(error || '').slice(0, 500), Date.now());
+  if (!sub) { logPush(false, null, 'subscription missing'); return false; }
+  const eventKey = payload.eventKey ? String(payload.eventKey).slice(0, 200) : '';
+  if (eventKey && !claimPushEvent(eventKey)) return true;
   try {
     await webpush.sendNotification(sub, JSON.stringify(payload));
+    logPush(true, 201, '');
     console.log('Отправлено', userId, payload.title);
     return true;
   } catch (e) {
+    if (eventKey) db.prepare('DELETE FROM pushEvents WHERE eventId = ?').run(eventKey);
+    logPush(false, Number(e.statusCode) || null, e.message);
     console.log('Ошибка отправки', userId, e.message);
     if (e.statusCode === 404 || e.statusCode === 410) deleteSub(userId);
     return false;
@@ -557,6 +567,60 @@ function runWhisper(inputFile, outputBase) {
 
 app.get('/voice/status', (req, res) => {
   res.json({ ok: existsSync(WHISPER_BIN) && existsSync(WHISPER_MODEL), engine: 'whisper.cpp', busy: voiceBusy });
+});
+
+const DEVELOPER_TOKEN = String(process.env.DEVELOPER_TOKEN || '');
+function developerAuthorized(req) {
+  if (!DEVELOPER_TOKEN) return false;
+  const bearer = String(req.headers.authorization || '').replace(/^Bearer\s+/i, '');
+  const supplied = String(req.headers['x-developer-token'] || bearer);
+  const expected = Buffer.from(DEVELOPER_TOKEN), actual = Buffer.from(supplied);
+  return expected.length === actual.length && timingSafeEqual(expected, actual);
+}
+function requireDeveloper(req, res, next) {
+  if (!developerAuthorized(req)) return res.status(401).json({ ok: false, error: 'developer access required' });
+  res.set('Cache-Control', 'no-store');
+  next();
+}
+function maskedUser(value) {
+  const text = String(value || '');
+  return text.length <= 6 ? '••••••' : `••••${text.slice(-6)}`;
+}
+
+app.get('/health', (req, res) => res.json({ ok: true, service: 'lumo-push', time: Date.now() }));
+app.get('/developer/status', requireDeveloper, (req, res) => {
+  const now = Date.now(), dayAgo = now - 24 * 60 * 60 * 1000;
+  const scalar = (sql, field = 'count') => Number(db.prepare(sql).get()?.[field] || 0);
+  const delivery = db.prepare(`SELECT COUNT(*) count, SUM(CASE WHEN ok=1 THEN 1 ELSE 0 END) sent, SUM(CASE WHEN ok=0 THEN 1 ELSE 0 END) failed FROM pushLog WHERE ts >= ?`).get(dayAgo);
+  const schedules = db.prepare(`SELECT scheduleId,userId,type,title,hour,minute,tzOffset,enabled,lastSentDay FROM scheduledPush ORDER BY enabled DESC,type,title LIMIT 100`).all().map(row => ({
+    ...row, userId: maskedUser(row.userId), title: String(row.title || '').slice(0, 100)
+  }));
+  const recentPush = db.prepare(`SELECT userId,type,title,ok,statusCode,error,ts FROM pushLog ORDER BY ts DESC LIMIT 40`).all().map(row => ({
+    ...row, userId: maskedUser(row.userId), title: String(row.title || '').slice(0, 120), error: String(row.error || '').slice(0, 160), ok: !!row.ok
+  }));
+  let databaseBytes = 0;
+  try { databaseBytes = statSync('planner.db').size; } catch (_) {}
+  const memory = process.memoryUsage();
+  res.json({
+    ok: true,
+    generatedAt: now,
+    server: { uptimeSec: Math.floor(process.uptime()), node: process.version, pid: process.pid, memory: { rss: memory.rss, heapUsed: memory.heapUsed, heapTotal: memory.heapTotal } },
+    services: { push: !!(PUBLIC_KEY && PRIVATE_KEY), whisper: existsSync(WHISPER_BIN) && existsSync(WHISPER_MODEL), whisperBusy: voiceBusy, database: true },
+    database: {
+      bytes: databaseBytes,
+      subscriptions: scalar('SELECT COUNT(*) count FROM subs'),
+      users: scalar('SELECT COUNT(*) count FROM userData'),
+      families: scalar('SELECT COUNT(DISTINCT familyCode) count FROM familyMembers'),
+      familyMembers: scalar('SELECT COUNT(*) count FROM familyMembers'),
+      cloudCopies: scalar('SELECT COUNT(*) count FROM cloudData'),
+      unreadEvents: scalar('SELECT COUNT(*) count FROM eventFeed WHERE readAt IS NULL'),
+      schedules: scalar('SELECT COUNT(*) count FROM scheduledPush'),
+      activeSchedules: scalar('SELECT COUNT(*) count FROM scheduledPush WHERE enabled=1')
+    },
+    delivery24h: { total: Number(delivery?.count || 0), sent: Number(delivery?.sent || 0), failed: Number(delivery?.failed || 0) },
+    schedules,
+    recentPush
+  });
 });
 
 app.post('/voice/transcribe', express.raw({ type: ['audio/wav', 'audio/x-wav', 'application/octet-stream'], limit: VOICE_MAX_BYTES }), async (req, res) => {

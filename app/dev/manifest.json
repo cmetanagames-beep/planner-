@@ -1,0 +1,15 @@
+{
+  "name": "Lumo Console",
+  "short_name": "Lumo Dev",
+  "description": "Закрытая диагностика сервера Lumo",
+  "id": "./",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#07111f",
+  "theme_color": "#07111f",
+  "icons": [
+    {"src":"assets/developer.svg","sizes":"any","type":"image/svg+xml","purpose":"any maskable"},
+    {"src":"assets/developer.png","sizes":"512x512","type":"image/png","purpose":"any maskable"}
+  ]
+}
