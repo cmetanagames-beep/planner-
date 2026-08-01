@@ -1,0 +1,25 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>Assistant dialogue and habits regression</title>
+<pre id="result">Loading…</pre>
+<iframe id="app" src="../app/index.html?assistant-dialogue-habits=95" hidden></iframe>
+<script>
+document.getElementById('app').addEventListener('load',()=>{
+  const w=document.getElementById('app').contentWindow,rows=[];
+  const check=(name,pass,detail='')=>rows.push({name,pass,detail});
+  const habitCases=[
+    ['добавь привычку пить воду каждый день','Пить воду'],
+    ['хочу добавить привычку читать','Читать'],
+    ['каждое утро делать зарядку','Делать зарядку']
+  ];
+  habitCases.forEach(([phrase,title])=>{
+    const actions=w.parseLocalPlan(phrase).actions;
+    check(phrase,actions.length===1&&actions[0].type==='habit'&&actions[0].title===title&&actions[0].repeat==='daily',JSON.stringify(actions));
+  });
+  check('Приветствие — диалог, не обучение',/Привет/.test(w.tryLocalDialogue('Привет')||''));
+  check('Вопрос о делах понятен',typeof w.tryLocalAnswer('Что у нас сегодня по делам?')==='string');
+  check('Просьба объяснить даёт понятные примеры',/добавить привычку/i.test(w.tryLocalDialogue('Я не понял что ты сказал давай ты меня обучишь')||''));
+  const failed=rows.filter(x=>!x.pass);
+  document.getElementById('result').textContent=(failed.length?'FAIL':'PASS')+` · ${rows.length-failed.length}/${rows.length}\n`+rows.map(x=>`${x.pass?'✓':'✗'} ${x.name}${x.detail?' — '+x.detail:''}`).join('\n');
+});
+</script>

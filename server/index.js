@@ -24,6 +24,7 @@ try { db.exec(`ALTER TABLE inbox ADD COLUMN fromUserId TEXT`); } catch (e) {}
 db.exec(`CREATE TABLE IF NOT EXISTS shopping (familyCode TEXT PRIMARY KEY, items TEXT)`);
 db.exec(`CREATE TABLE IF NOT EXISTS doneStat (id INTEGER PRIMARY KEY AUTOINCREMENT, userId TEXT, name TEXT, date TEXT, ts INTEGER)`);
 db.exec(`CREATE TABLE IF NOT EXISTS pushEvents (eventId TEXT PRIMARY KEY, ts INTEGER)`);
+db.exec(`CREATE TABLE IF NOT EXISTS scheduledPush (scheduleId TEXT PRIMARY KEY, userId TEXT NOT NULL, type TEXT NOT NULL, title TEXT, body TEXT, prompt TEXT, hour INTEGER NOT NULL, minute INTEGER NOT NULL, tzOffset INTEGER NOT NULL DEFAULT 180, enabled INTEGER NOT NULL DEFAULT 1, lastSentDay TEXT DEFAULT '')`);
 db.exec(`CREATE TABLE IF NOT EXISTS cloudData (code TEXT PRIMARY KEY, data TEXT NOT NULL, revision INTEGER NOT NULL DEFAULT 1, updatedAt INTEGER NOT NULL, updatedBy TEXT)`);
 db.exec(`CREATE TABLE IF NOT EXISTS cloudDevices (userId TEXT PRIMARY KEY, code TEXT NOT NULL)`);
 db.exec(`CREATE TABLE IF NOT EXISTS eventFeed (id TEXT PRIMARY KEY, targetUserId TEXT NOT NULL, familyCode TEXT, type TEXT, title TEXT, body TEXT, data TEXT, ts INTEGER, readAt INTEGER)`);
@@ -60,7 +61,7 @@ function getUserData(userId) {
   return {
     tasks: JSON.parse(row.tasks || '[]'),
     notifyHour: row.notifyHour || '09:00',
-    tzOffset: row.tzOffset || 180,
+    tzOffset: typeof row.tzOffset === 'number' ? row.tzOffset : 180,
     sentKeys: JSON.parse(row.sentKeys || '{}'),
     reminders: JSON.parse(row.reminders || '{}')
   };
@@ -438,65 +439,57 @@ function taskDeadlineMs(t, tzOffsetMin) {
   return Date.UTC(y, m - 1, d, hh, mi, 0) - tzOffsetMin * 60000;
 }
 
-const REMINDER_INTERVAL_MIN = 20;
-const MAX_REMINDERS = 3;
-
 const PRE_REMINDERS = [
-  { key: 'd1',  minutes: 24 * 60, label: 'за сутки' },
-  { key: 'h1',  minutes: 60,      label: 'за час' },
-  { key: 'm15', minutes: 15,      label: 'за 15 минут' }
+  { key: 'important2h', minExclusive: 60, maxInclusive: 120, label: 'за 2 часа', importantOnly: true },
+  { key: 'h1', minExclusive: 30, maxInclusive: 60, label: 'за час' },
+  { key: 'm30', minExclusive: 0,  maxInclusive: 30, label: 'за 30 минут' }
 ];
 
-setInterval(() => {
+async function runReminderScheduler() {
   const userIds = getAllUserData();
-  userIds.forEach(userId => {
+  for (const userId of userIds) {
     const u = getUserData(userId);
-    if (!u || !getSub(userId)) return;
-    const tzOff = u.tzOffset || 180;
+    if (!u || !getSub(userId)) continue;
+    const tzOff = typeof u.tzOffset === 'number' ? u.tzOffset : 180;
     const { tk, hm } = localDateParts(tzOff);
     if (!u.reminders) u.reminders = {};
     let changed = false;
 
-    (u.tasks || []).forEach(t => {
-      if (!t.date || !t.time) return;
+    for (const t of (u.tasks || [])) {
+      if (!t.date || !t.time) continue;
       if (t.done) {
         if (u.reminders[t.id]) { delete u.reminders[t.id]; changed = true; }
-        return;
+        continue;
       }
 
-      const rem = u.reminders[t.id] || {};
+      const signature = t.date + 'T' + t.time + ':' + (t.pri || 'Y');
+      let rem = u.reminders[t.id] || {};
+      if (rem.signature !== signature) { rem = { signature }; changed = true; }
 
       // ИСПРАВЛЕНО: дедлайн и "сейчас" теперь в одной системе (реальный UTC)
       const deadline = taskDeadlineMs(t, tzOff);
       const minutesLeft = (deadline - Date.now()) / 60000;
 
-      PRE_REMINDERS.forEach(pr => {
-        if (!rem[pr.key] && minutesLeft <= pr.minutes && minutesLeft > pr.minutes - 1) {
-          rem[pr.key] = Date.now();
-          changed = true;
-          sendPush(userId, 'Скоро дедлайн (' + pr.label + ')', (t.title || 'Дело') + ' - ' + t.time, t.id);
-        }
-      });
+      const isImportant = t.pri === 'R' || t.priority === 'important';
+      const upcoming = PRE_REMINDERS.find(pr => (!pr.importantOnly || isImportant) && minutesLeft > pr.minExclusive && minutesLeft <= pr.maxInclusive);
+      if (upcoming && !rem[upcoming.key]) {
+        const sent=await sendPush(userId, { type:'task-reminder', stage:upcoming.key, eventKey:'task:'+t.id+':'+t.date+':'+t.time+':'+upcoming.key, title:(isImportant ? '🔴 Важное дело — ' : 'Скоро дело — ') + upcoming.label, body:(t.title || 'Дело') + ' · ' + t.time, taskId:t.id });
+        if(sent){rem[upcoming.key] = Date.now();changed = true;}
+      }
 
       // ИСПРАВЛЕНО: основное напоминание теперь по факту наступления дедлайна,
       // а не по совпадению строк даты/времени
-      if (!rem.count && minutesLeft <= 0 && minutesLeft > -2) {
-        rem.count = 1;
-        rem.lastSent = Date.now();
-        changed = true;
-        sendPush(userId, (t.title || 'Напоминание'), 'Пора выполнить дело', t.id);
-      } else if (rem.count && rem.count < MAX_REMINDERS) {
-        const minutesPassed = (Date.now() - rem.lastSent) / 60000;
-        if (minutesPassed >= REMINDER_INTERVAL_MIN) {
-          rem.count++;
-          rem.lastSent = Date.now();
-          changed = true;
-          sendPush(userId, 'Повторное напоминание (' + rem.count + '/' + MAX_REMINDERS + ')', t.title || 'Не забудь про дело', t.id);
-        }
+      if (!rem.start && minutesLeft <= 0 && minutesLeft > -15) {
+        const sent=await sendPush(userId, { type:'task-reminder', stage:'start', eventKey:'task:'+t.id+':'+t.date+':'+t.time+':start', title:isImportant ? '🔴 ВАЖНО: ' + (t.title || 'Дело') : (t.title || 'Напоминание'), body:isImportant ? 'Запланированное время наступило. Не откладывай это дело.' : 'Пора выполнить дело', taskId:t.id });
+        if(sent){rem.start = Date.now();changed = true;}
+      }
+      if (!rem.overdue && minutesLeft <= -15) {
+        const sent=await sendPush(userId, { type:'task-reminder', stage:'overdue', eventKey:'task:'+t.id+':'+t.date+':'+t.time+':overdue', title:isImportant ? '🚨 Важное дело просрочено' : '⚠️ Просроченное дело', body:(t.title || 'Дело') + ' должно было начаться в ' + t.time, taskId:t.id });
+        if(sent){rem.overdue = Date.now();changed = true;}
       }
 
       u.reminders[t.id] = rem;
-    });
+    }
 
     const nh = u.notifyHour || '09:00';
     if (hm === nh) {
@@ -509,8 +502,20 @@ setInterval(() => {
       }
     }
     if (changed) saveUserData(userId, u);
-  });
-}, 60000);
+  }
+
+  const schedules = db.prepare('SELECT * FROM scheduledPush WHERE enabled = 1').all();
+  for (const row of schedules) {
+    if (!getSub(row.userId)) continue;
+    const { tk, hm } = localDateParts(Number.isFinite(Number(row.tzOffset)) ? Number(row.tzOffset) : 180);
+    const due = Number(hm.replace(':', '')) >= (Number(row.hour) * 100 + Number(row.minute));
+    if (!due || row.lastSentDay === tk) continue;
+    const sent = await sendPush(row.userId, { type: row.type, title: row.title, body: row.body, prompt: row.prompt || '', date: tk });
+    if (sent) db.prepare('UPDATE scheduledPush SET lastSentDay = ? WHERE scheduleId = ?').run(tk, row.scheduleId);
+  }
+}
+setInterval(runReminderScheduler, 30000);
+setTimeout(runReminderScheduler, 1000);
 
 app.get('/', (req, res) => res.send('Push server работает'));
 
@@ -586,54 +591,20 @@ const PORT = process.env.PORT || 3000;
 // ═══════════════════════════════════════════
 // УТРЕННИЙ ПУШ — планировщик
 // ═══════════════════════════════════════════
-const morningTimers = new Map();
-
 app.post('/schedule-morning', express.json(), async (req, res) => {
-  const { userId, subscription, type, title, body, hour, minute } = req.body;
+  const { userId, subscription, type, title, body, prompt, hour, minute, scheduleId, enabled, tzOffset } = req.body;
 
   if(!userId || !subscription){
     return res.json({ ok: false, err: 'missing params' });
   }
 
-  if(morningTimers.has(userId)){
-    clearTimeout(morningTimers.get(userId));
-    morningTimers.delete(userId);
-    console.log(`⏰ Старый таймер для ${userId} отменён`);
-  }
-
-  const now   = new Date();
-  const next8 = new Date();
-  next8.setHours(hour || 8, minute || 0, 0, 0);
-
-  if(next8 <= now){
-    next8.setDate(next8.getDate() + 1);
-  }
-
-  const delay = next8.getTime() - now.getTime();
-  const mins  = Math.round(delay / 60000);
-
-  console.log(`☀️ Утренний пуш для ${userId} через ${mins} мин`);
-
-  const timer = setTimeout(async () => {
-    try{
-      await webpush.sendNotification(
-        subscription,
-        JSON.stringify({ type, title, body })
-      );
-      console.log(`✅ Утренний пуш отправлен: ${userId}`);
-      morningTimers.delete(userId);
-    }catch(err){
-      console.error(`❌ Ошибка:`, err.statusCode || err.message);
-      morningTimers.delete(userId);
-    }
-  }, delay);
-
-  morningTimers.set(userId, timer);
-
-  res.json({
-    ok: true,
-    scheduledFor: next8.toISOString(),
-    minutesLeft: mins
-  });
+  saveSub(userId, subscription);
+  const id = String(scheduleId || (type + ':' + userId)).slice(0, 180);
+  db.prepare(`INSERT INTO scheduledPush (scheduleId,userId,type,title,body,prompt,hour,minute,tzOffset,enabled,lastSentDay)
+    VALUES (?,?,?,?,?,?,?,?,?,?,COALESCE((SELECT lastSentDay FROM scheduledPush WHERE scheduleId = ?),''))
+    ON CONFLICT(scheduleId) DO UPDATE SET userId=excluded.userId,type=excluded.type,title=excluded.title,body=excluded.body,prompt=excluded.prompt,hour=excluded.hour,minute=excluded.minute,tzOffset=excluded.tzOffset,enabled=excluded.enabled`)
+    .run(id,userId,type||'morning',title||'',body||'',prompt||'',Number(hour)||0,Number(minute)||0,typeof tzOffset==='number'?tzOffset:180,enabled===false?0:1,id);
+  setTimeout(runReminderScheduler, 0);
+  res.json({ ok: true, scheduleId: id, persistent: true });
 }); 
 app.listen(PORT, () => console.log('Сервер запущен на порту', PORT));

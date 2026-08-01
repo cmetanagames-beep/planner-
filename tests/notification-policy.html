@@ -1,0 +1,19 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>Notification policy regression</title>
+<pre id="result">Loading…</pre>
+<script>
+Promise.all([fetch('../server/index.js').then(r=>r.text()),fetch('../app/sw.js').then(r=>r.text()),fetch('../app/assets/js/app.js').then(r=>r.text()),fetch('../app/assets/css/app.css').then(r=>r.text())]).then(([server,sw,app,css])=>{
+  const rows=[],check=(name,pass)=>rows.push({name,pass});
+  check('За час и за 30 минут',server.includes("key: 'h1'")&&server.includes("key: 'm30'")&&server.includes('за 30 минут'));
+  check('Важное дело за 2 часа',server.includes("key: 'important2h'")&&server.includes('🔴 ВАЖНО'));
+  check('Отдельная просрочка',server.includes("stage:'overdue'")&&server.includes('Просроченное дело'));
+  check('Расписания переживают перезапуск',server.includes('CREATE TABLE IF NOT EXISTS scheduledPush')&&server.includes('persistent: true'));
+  check('Этапы не гасятся service worker',sw.includes('important2h:[-150,-45]')&&sw.includes('m30:[-45,5]')&&sw.includes('overdue:[10,24*60]'));
+  check('Отдельный ключ каждого уведомления',sw.includes("d.eventKey||('task:'")&&server.includes("eventKey:'task:'"));
+  check('Часовой пояс и важность синхронизируются',app.includes('tzOffset:-new Date().getTimezoneOffset()')&&app.includes("pri:t.pri||'Y'"));
+  check('Safe area ограничена',css.includes('--lumo-safe-bottom')&&css.includes('height:calc(65px + var(--lumo-safe-bottom))'));
+  const failed=rows.filter(x=>!x.pass);
+  document.getElementById('result').textContent=(failed.length?'FAIL':'PASS')+` · ${rows.length-failed.length}/${rows.length}\n`+rows.map(x=>`${x.pass?'✓':'✗'} ${x.name}`).join('\n');
+});
+</script>

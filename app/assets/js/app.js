@@ -417,7 +417,20 @@ function moveNavPill(){
 }
 window.addEventListener('resize',()=>setTimeout(moveNavPill,50));
 window.addEventListener('resize',()=>setTimeout(alignFloatingControls,60));
-if(window.visualViewport)window.visualViewport.addEventListener('resize',()=>setTimeout(alignFloatingControls,60));
+function syncSafeBottomInset(){
+  const probe=document.createElement('div');
+  probe.style.cssText='position:fixed;left:-9999px;bottom:0;padding-bottom:env(safe-area-inset-bottom);visibility:hidden;pointer-events:none';
+  document.body.appendChild(probe);
+  const measured=parseFloat(getComputedStyle(probe).paddingBottom)||0;
+  probe.remove();
+  const standalone=window.matchMedia?.('(display-mode: standalone)').matches||navigator.standalone===true;
+  const safe=standalone?Math.max(0,Math.min(34,measured)):Math.max(0,Math.min(24,measured));
+  document.documentElement.style.setProperty('--lumo-safe-bottom',safe+'px');
+}
+syncSafeBottomInset();
+window.addEventListener('pageshow',syncSafeBottomInset);
+window.addEventListener('resize',()=>setTimeout(syncSafeBottomInset,40));
+if(window.visualViewport)window.visualViewport.addEventListener('resize',()=>{setTimeout(alignFloatingControls,60);setTimeout(syncSafeBottomInset,40)});
 function fabRipple(e){
   const fab=document.getElementById('fab');
   if(!fab)return;
@@ -2139,21 +2152,28 @@ function inQuietHours(){
 
 function requestNotify(){
   if(!('Notification'in window)){toast('Уведомления не поддерживаются');return;}
-  Notification.requestPermission().then(p=>{toast(p==='granted'?'🔔 Напоминания включены':'Уведомления отклонены');if(p==='granted'){scheduleAllTimeouts();scheduleHabitReminderLocal();scheduleShoppingReminderLocal();scheduleShoppingPushServer(true);}});
+  Notification.requestPermission().then(p=>{toast(p==='granted'?'🔔 Напоминания включены':'Уведомления отклонены');if(p==='granted'){scheduleAllTimeouts();scheduleHabitReminderLocal();scheduleHabitPushServer(true);scheduleShoppingReminderLocal();scheduleShoppingPushServer(true);scheduleSmartInsightPush(true);syncPushData();}});
 }
 let localTimeouts=[];
 function scheduleAllTimeouts(){localTimeouts.forEach(t=>clearTimeout(t));localTimeouts=[];getTasks().forEach(scheduleLocalTimeout);}
-function scheduleLocalTimeout(t){
+async function scheduleLocalTimeout(t){
   if(!t.date||!t.time||t.done)return;
   if(!('Notification'in window)||Notification.permission!=='granted')return;
-  const when=new Date(t.date+'T'+t.time).getTime()-Date.now();
-  if(when<=0||when>86400000*2)return;
-  const id=setTimeout(()=>{
-    if(inQuietHours())return;
-    const key=`task-local:${t.id}:${t.date}:${t.time}`;
-    notifyOnce(key,()=>{try{new Notification('⏰ '+t.title,{body:catLabel(t.module)+(t.desc?' · '+t.desc:''),tag:key,renotify:false,icon:'data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><text y="80" font-size="80">📋</text></svg>'});vibrate([50,30,50]);}catch(e){}});
-  },when);
-  localTimeouts.push(id);
+  try{const reg=await navigator.serviceWorker?.ready,sub=await reg?.pushManager?.getSubscription();if(sub)return;}catch(e){}
+  const at=new Date(t.date+'T'+t.time).getTime(),important=t.pri==='R';
+  const stages=[...(important?[{key:'important2h',offset:-7200000,title:'🔴 Важное дело — за 2 часа'}]:[]),
+    {key:'h1',offset:-3600000,title:important?'🔴 Важное дело — за час':'Скоро дело — за час'},
+    {key:'m30',offset:-1800000,title:important?'🔴 Важное дело — за 30 минут':'Скоро дело — за 30 минут'},
+    {key:'start',offset:0,title:important?'🔴 ВАЖНО: '+t.title:'⏰ '+t.title},
+    {key:'overdue',offset:900000,title:important?'🚨 Важное дело просрочено':'⚠️ Просроченное дело'}];
+  stages.forEach(stage=>{
+    const delay=at+stage.offset-Date.now();if(delay<=0||delay>86400000*2)return;
+    const id=setTimeout(()=>{
+      if(inQuietHours())return;
+      const key=`task:${t.id}:${t.date}:${t.time}:${stage.key}`;
+      notifyOnce(key,()=>{try{new Notification(stage.title,{body:(stage.key==='start'||stage.key==='overdue'?t.title+' · ':t.title+' · ')+catLabel(t.module),tag:key,renotify:false,icon:'./assets/icons/icon.png'});vibrate(important?[100,60,100]:[50,30,50]);}catch(e){}});
+    },delay);localTimeouts.push(id);
+  });
 }
 function getHabitReminder(){return load().habitReminder||{enabled:false,time:'09:00'};}
 function loadHabitReminder(){const r=getHabitReminder(),box=document.getElementById('habit-reminder-box'),time=document.getElementById('habit-reminder-time');if(box){box.classList.toggle('on',r.enabled);box.textContent=r.enabled?'✓':'';}if(time)time.value=r.time||'09:00';}
@@ -2350,24 +2370,24 @@ async function checkPushHealth(showToast=false){
   el.innerHTML=lines.join('<br>');if(showToast)toast(ok?'✅ Push-цепочка готова':'Есть проблема в push-настройках');
 }
 async function scheduleHabitPushServer(force=false){
-  const r=getHabitReminder();if(!r.enabled||!('serviceWorker'in navigator))return;
-  const left=incompleteHabits();if(!left.length)return;
-  const key=`habit_push_scheduled_v1:${todayKey()}:${r.time}`;
+  const r=getHabitReminder();if(!('serviceWorker'in navigator))return;
+  const left=incompleteHabits();
+  const key=`habit_push_scheduled_v2:${todayKey()}:${r.time}:${r.enabled?'on':'off'}:${left.map(h=>h.id).join(',')}`;
   if(!force&&localStorage.getItem('habit_push_last_key')===key)return;
   try{
     const reg=await navigator.serviceWorker.ready,sub=await reg.pushManager.getSubscription();if(!sub)return;
     const [hour,minute]=(r.time||'09:00').split(':').map(Number);
-    const response=await fetch(FAMILY_SERVER+'/schedule-morning',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({userId:PUSH_USER_ID,subscription:sub,type:'habit',scheduleId:'habit:'+PUSH_USER_ID,reminderTime:r.time,title:'🌱 Не забудь о привычках',body:left.slice(0,5).map(h=>h.icon+' '+h.name).join(' · '),hour:hour||0,minute:minute||0,date:todayKey()})});
+    const response=await fetch(FAMILY_SERVER+'/schedule-morning',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({userId:PUSH_USER_ID,subscription:sub,type:'habit',scheduleId:'habit:'+PUSH_USER_ID,enabled:!!r.enabled,reminderTime:r.time,title:'🌱 Не забудь о привычках',body:left.slice(0,5).map(h=>h.icon+' '+h.name).join(' · ')||'Проверь сегодняшний ритм',hour:hour||0,minute:minute||0,tzOffset:-new Date().getTimezoneOffset(),date:todayKey()})});
     if(response.ok)localStorage.setItem('habit_push_last_key',key);
   }catch(e){}
 }
 async function scheduleShoppingPushServer(force=false){
-  const r=getShoppingReminder(),items=activeShoppingItems();if(!r.enabled||!items.length||!('serviceWorker'in navigator))return;
-  const fingerprint=items.map(x=>String(x.id)+':'+String(x.t)).join('|').slice(0,220),key=`shopping_push:${todayKey()}:${r.time}:${fingerprint}`;
+  const r=getShoppingReminder(),items=activeShoppingItems();if(!('serviceWorker'in navigator))return;
+  const fingerprint=items.map(x=>String(x.id)+':'+String(x.t)).join('|').slice(0,220),key=`shopping_push:${todayKey()}:${r.time}:${r.enabled?'on':'off'}:${fingerprint}`;
   if(!force&&localStorage.getItem('shopping_push_last_key')===key)return;
   try{
     const reg=await navigator.serviceWorker.ready,sub=await reg.pushManager.getSubscription();if(!sub)return;
-    const [hour,minute]=(r.time||'18:00').split(':').map(Number),response=await fetch(FAMILY_SERVER+'/schedule-morning',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({userId:PUSH_USER_ID,subscription:sub,type:'shopping-reminder',scheduleId:'shopping:'+PUSH_USER_ID,reminderTime:r.time,title:'🛒 Не забудь про покупки',body:items.slice(0,5).map(x=>x.t).join(' · '),hour:hour||18,minute:minute||0,date:todayKey()})});
+    const [hour,minute]=(r.time||'18:00').split(':').map(Number),response=await fetch(FAMILY_SERVER+'/schedule-morning',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({userId:PUSH_USER_ID,subscription:sub,type:'shopping-reminder',scheduleId:'shopping:'+PUSH_USER_ID,enabled:!!r.enabled&&!!items.length,reminderTime:r.time,title:'🛒 Не забудь про покупки',body:items.slice(0,5).map(x=>x.t).join(' · ')||'Список покупок пока пуст',hour:hour||18,minute:minute||0,tzOffset:-new Date().getTimezoneOffset(),date:todayKey()})});
     if(response.ok)localStorage.setItem('shopping_push_last_key',key);
   }catch(e){}
 }
@@ -2376,10 +2396,10 @@ function syncPushData(){
   const now=Date.now(),notifyHour=load().notifyHour||'09:00';
   const tasks=getTasks().filter(t=>!t.done&&t.date).map(t=>{
     const time=t.time||notifyHour,scheduledAt=new Date(t.date+'T'+time).getTime();
-    return {id:String(t.id),title:t.title,date:t.date,time:t.time||'',module:t.module,scheduledAt:Number.isFinite(scheduledAt)?scheduledAt:null};
-  }).filter(t=>!t.scheduledAt||t.scheduledAt>now-60000);
+    return {id:String(t.id),title:t.title,date:t.date,time:t.time||'',module:t.module,pri:t.pri||'Y',scheduledAt:Number.isFinite(scheduledAt)?scheduledAt:null};
+  }).filter(t=>!t.scheduledAt||t.scheduledAt>now-86400000);
   const habits=getHabits().map(h=>({id:String(h.id),name:h.name,icon:h.icon||'⭐',doneToday:!!h.log?.[todayKey()]})),habitReminder=getHabitReminder(),shoppingReminder=getShoppingReminder(),shopping=activeShoppingItems().map(x=>({id:String(x.id),t:x.t}));
-  const payload={userId:PUSH_USER_ID,name:getMyName(),role:getMyRole(),notifyHour,quiet:getQuiet(),habitReminder:{...habitReminder,habits},shoppingReminder,shopping,syncVersion:Date.now(),tasks};
+  const payload={userId:PUSH_USER_ID,name:getMyName(),role:getMyRole(),notifyHour,tzOffset:-new Date().getTimezoneOffset(),quiet:getQuiet(),habitReminder:{...habitReminder,habits},shoppingReminder,shopping,syncVersion:Date.now(),tasks};
   const snapshot={type:'TASK_SNAPSHOT',tasks,notifyHour,habits,habitReminder,shoppingReminder,shopping,day:todayKey()};
   if(navigator.serviceWorker?.controller)navigator.serviceWorker.controller.postMessage(snapshot);
   else navigator.serviceWorker?.ready?.then(reg=>reg.active?.postMessage(snapshot)).catch(()=>{});
@@ -2566,7 +2586,7 @@ async function pullShopping(){
 
 /* ===== ИИ-АССИСТЕНТ ===== */
 let aiHistory=[];
-let assistantDialogue={lastTaskId:null,suggestedTaskIds:[],suggestionIndex:0,lastTopic:'',pendingTeachPhrase:''};
+let assistantDialogue={lastTaskId:null,suggestedTaskIds:[],suggestionIndex:0,lastTopic:'',pendingTeachPhrase:'',teachingStage:''};
 function aiHello(){
   const chat=document.getElementById('ai-chat');
   const name=getMyName();
@@ -2690,6 +2710,7 @@ function finishAssistantTeaching(correctText){const source=assistantDialogue.pen
 
 function localDateKey(d){return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');}
 function localRepeat(text){
+  if(/кажд\S*\s+(?:утро|вечер)|по\s+утрам|по\s+вечерам/.test(text))return 'daily';
   if(/кажд\S*\s+день|ежеднев/.test(text))return 'daily';
   if(/кажд\S*\s+(понедельник|вторник|сред|четверг|пятниц|суббот|воскрес)|еженедел/.test(text))return 'weekly';
   if(/кажд\S*\s+месяц|ежемесяч/.test(text))return 'monthly';
@@ -2763,6 +2784,7 @@ function normalizeAssistantText(text){
 function splitLocalSpeech(text){
   let s=normalizeAssistantText(text);
   s=s.replace(/^так\s+/i,'').replace(/(?:^|\s)в\s+пн(?=\s|$)/gi,' в понедельник').replace(/(?:^|\s)во?\s+вт(?=\s|$)/gi,' во вторник').replace(/(?:^|\s)в\s+ср(?=\s|$)/gi,' в среду').replace(/(?:^|\s)в\s+чт(?=\s|$)/gi,' в четверг').replace(/(?:^|\s)в\s+пт(?=\s|$)/gi,' в пятницу').replace(/(?:^|\s)в\s+сб(?=\s|$)/gi,' в субботу').replace(/(?:^|\s)в\s+вс(?=\s|$)/gi,' в воскресенье').trim();
+  if((/привычк/.test(s)||/(?:кажд\S*\s+(?:утро|вечер)|ежедневно).*(?:зарядк|читать|пить|бег|трениров|гулять)/.test(s))&&!/(?:потрат|зарплат|доход|расход|купить.+(?:и|после).+(?:позвон|встреч|заказать))/.test(s))return [s];
   s=s.replace(/[;,\n]+|[.!?]+(?=\s|$)/g,' | ');
   const starters='позвон(?:ить|и)|созвон(?:иться|ится|иться)|написать|отправить|забрать|отвезти|отнести|привезти|сходить|съездить|встретиться|встретить|встреча|проводить|подготовить|сделать|проверить|закончить|начать|забронировать|вызвать|помыть|убраться|убрать|погулять|полить|посадить|принять|выпить|к\\s+врачу|врач|купить|докупить|заказать|оплат(?:ить|ил[аи]?)|заплат(?:ить|ил[аи]?)|потратил|потратила|купил|купила|отдать|вернуть|получить|получил|получила|пришл[ао]?\\s+(?:зп|зарплата)|зарплата|аванс|премия|тренировка|зарядка|заниматься|читать|напомни|добавь|создай';
   s=s.replace(/\s+(?=из\s+них(?:\s+я)?(?:\s+уже)?\s+(?:потратила?|заплатила?|отдала?|ушло))/gi,' | ');
@@ -2880,8 +2902,16 @@ function parseLocalPlan(text){
       return;
     }
     const repeat=localRepeat(low);
+    if(/(?:добавь|создай|запиши|хочу|нужно|новая|новую).{0,18}привычк|привычк.{0,12}(?:добавь|создай|запиши)/.test(low)){
+      let name=cleanLocalTitle(chunk)
+        .replace(/^(?:я\s+)?(?:хочу|нужно|надо)?\s*(?:добавить|добавь|создать|создай|записать|запиши)?\s*(?:новую?\s+)?привычк(?:у|и)?\s*/i,'')
+        .replace(/^(?:каждый день|ежедневно)\s*/i,'').trim();
+      if(name){name=name.charAt(0).toUpperCase()+name.slice(1);actions.push({type:'habit',title:name,date,time,repeat:repeat||'daily',_source:chunk});}
+      else unknown.push(chunk);
+      return;
+    }
     if(repeat&&/(трениров|зарядк|читать|прогул|заниматься|пить|учить|бег)/.test(low)){
-      let name=cleanLocalTitle(chunk);if(name)actions.push({type:'habit',title:name,date,time,repeat,_source:chunk});else unknown.push(chunk);return;
+      let name=cleanLocalTitle(chunk).replace(/^(?:кажд\S*\s+(?:утро|вечер)|по\s+(?:утрам|вечерам)|ежедневно)\s*/i,'');if(name)actions.push({type:'habit',title:name.charAt(0).toUpperCase()+name.slice(1),date,time,repeat,_source:chunk});else unknown.push(chunk);return;
     }
     let title=cleanLocalTitle(chunk);
     if(/^(?:напоминани[ея]|напомнить)$/i.test(title))title='Напоминание';
@@ -2940,7 +2970,7 @@ function tryLocalAnswer(text){
     list.sort((a,b)=>(a.date+a.time).localeCompare(b.date+b.time));
     return list.length?`На ближайшие 7 дней:<br>${list.slice(0,12).map(t=>`• ${esc(t.title)} — ${fmtDate(t.date)}${t.time?', '+esc(t.time):''}`).join('<br>')}`:'На ближайшие 7 дней подходящих дел нет.';
   }
-  if(/(?:мои|какие|сколько).*(?:дел|задач).*(?:сегодня)|(?:дел|задач).*(?:на сегодня)/.test(low)){
+  if(/(?:мои|какие|сколько).*(?:дел|задач).*(?:сегодня)|что\s+у\s+нас.*(?:сегодня).*(?:дел|задач)|(?:дел|задач).*(?:на сегодня|сегодня)/.test(low)){
     const list=getTasks().filter(t=>!t.done&&t.date===todayKey());
     return list.length
       ?`Сегодня ${list.length} ${list.length===1?'дело':'дел'}:<br>${list.slice(0,8).map(t=>`• ${esc(t.title)}${t.time?' — '+esc(t.time):''}`).join('<br>')}`
@@ -2968,8 +2998,9 @@ function localTaskOrder(){
 }
 function tryLocalDialogue(text){
   const low=String(text).toLowerCase().replace(/ё/g,'е').trim();
-  if(/^(привет|здравствуй|доброе утро|добрый день|добрый вечер|хай|салют)\b/.test(low)){assistantDialogue.lastTopic='greeting';return 'Привет! 👋 Я рядом. Можешь продиктовать весь день одной фразой, спросить, с чего начать, или попросить изменить уже созданное дело.';}
+  if(/^(привет|здравствуй|доброе утро|добрый день|добрый вечер|хай|салют)(?:$|[\s,.!?])/.test(low)){assistantDialogue.lastTopic='greeting';return 'Привет! 👋 Я рядом. Можешь продиктовать весь день одной фразой, спросить, с чего начать, добавить привычку или попросить изменить уже созданное дело.';}
   if(/^(спасибо|благодарю|круто|отлично|молодец|понял|поняла)\b/.test(low))return 'Рад помочь 🙂 Продолжаем — что разобрать или запланировать дальше?';
+  if(/(?:объясни|расскажи).*(?:понятн|проще)|(?:научи|обучи)\s+меня|я\s+не\s+понял.*(?:сказал|объяснил)/.test(low))return 'Конечно. Я могу:<br>• создать дело: «завтра позвонить Егору в 10»;<br>• добавить привычку: «добавь привычку пить воду каждый день»;<br>• записать деньги: «потратил 850 рублей на продукты»;<br>• показать данные: «что у нас сегодня по делам?»;<br>• изменить запись: «перенеси созвон с Егором на 2 августа».<br><br>Пиши обычной фразой — запятые не нужны. Ничего не сохраню без экрана проверки.';
   if(/кто ты|что ты умеешь|чем поможешь|расскажи о себе/.test(low))return 'Я локальный помощник Lumo. Разбираю длинную речь на дела, покупки, доходы, расходы и привычки, ищу по данным и предлагаю изменения с подтверждением. Свободные знания обо всём мире без Grok ограничены, зато данные планировщика не отправляю в интернет.';
   if(/(?:мне\s+)?(?:тяжело|грустно|плохо|тревожно)|я\s+(?:устал|устала|не успеваю)|слишком много дел/.test(low)){
     const list=localTaskOrder();assistantDialogue.suggestedTaskIds=list.map(x=>x.id);assistantDialogue.suggestionIndex=0;assistantDialogue.lastTopic='support';
@@ -3377,6 +3408,19 @@ async function aiSend(textOverride=null){
   window._lastUserText=rawText;
   if(!hasOverride||inp.value.trim()===rawText)inp.value='';aiAddMsg('user',esc(rawText));
 
+  const teachingLow=rawText.toLowerCase().replace(/ё/g,'е').trim();
+  if(assistantDialogue.teachingStage==='awaitingPhrase'){
+    if(/^(?:отмена|отмени|не надо)$/.test(teachingLow)){assistantDialogue.teachingStage='';aiAddMsg('ai','Хорошо, режим обучения закрыт.');return;}
+    assistantDialogue.teachingStage='';assistantDialogue.pendingTeachPhrase=rawText;
+    aiAddMsg('ai',`Хорошо, запоминаем фразу «<b>${esc(rawText)}</b>». Теперь напиши, что она должна означать, обычной понятной командой. Например: «добавь привычку читать каждый день» или «перенеси встречу на завтра в 10».`);
+    return;
+  }
+  if(/^(?:давай\s+)?(?:я\s+)?тебя\s+(?:научу|обучу)|^хочу\s+научить\s+тебя|^режим\s+обучения/.test(teachingLow)){
+    assistantDialogue.teachingStage='awaitingPhrase';assistantDialogue.pendingTeachPhrase='';
+    aiAddMsg('ai','Давай. Сначала отправь фразу, которую я сейчас понимаю неправильно. Следующим сообщением объясни, какое действие она должна выполнять. Я покажу результат перед сохранением и только после успешного разбора запомню правило. Для выхода напиши «отмена».');
+    return;
+  }
+
   if(pendingLocalPlan||pendingLocalOps){
     const low=text.toLowerCase().trim();
     if(/^(да|давай|сохрани|сохранить|примени|применить|подтверждаю|верно|все верно|всё верно)$/.test(low)){pendingLocalPlan?confirmLocalPlan():confirmLocalOps();return;}
@@ -3438,8 +3482,8 @@ async function aiSend(textOverride=null){
   const localAnswer=tryLocalAnswer(text);
   if(localAnswer){finishAssistantTeaching(text);aiAddMsg('ai',localAnswer);return;}
 
-  if(assistantDialogue.pendingTeachPhrase)aiAddMsg('ai','Это объяснение я тоже пока не понял. Напиши ту же команду проще: сначала действие, затем что сделать, дату, время или сумму. Для выхода напиши «отмена».');
-  else{assistantDialogue.pendingTeachPhrase=rawText;aiAddMsg('ai','Пока не понял эту формулировку и ничего не сохранил. Объясни её другими словами — например: «перенеси созвон с Егором на 2 августа». Когда я успешно разберу объяснение, то запомню исходную фразу для следующего раза.');}
+  if(assistantDialogue.pendingTeachPhrase)aiAddMsg('ai','Пока не смог разобрать объяснение. Попробуй одной конкретной командой: что сделать, с чем, когда или на какую сумму. Например: «добавь привычку пить воду каждый день». Для выхода напиши «отмена».');
+  else aiAddMsg('ai','Я понял слова, но не вижу конкретного действия или вопроса по данным Lumo. Можешь написать, например: «что у нас сегодня по делам?», «добавь привычку читать каждый день» или «завтра позвонить Егору в 10». Если хочешь научить меня своей фразе, напиши «я тебя научу».');
 }
 
 async function aiParse(text){return parseLocalPlan(text);}
@@ -4903,7 +4947,7 @@ function getSmartSuggestions(){
   if(overdue.length)out.push({id:'overdue',level:'bad',title:`Просрочено дел: ${overdue.length}`,body:overdue.slice(0,3).map(x=>x.title).join(' · '),prompt:`Помоги разобрать ${overdue.length} просроченных дел: предложи, что перенести, выполнить или удалить`});
   const budgets=d.budgets||{},stats=getExpenseStats();Object.entries(budgets).forEach(([cat,limit])=>{const used=(stats.byCat.find(x=>x.name===cat)||{}).sum||0,pct=limit?Math.round(used/limit*100):0;if(pct>=100)out.push({id:'budget:'+cat,level:'bad',title:`Лимит «${cat}» превышен`,body:`Потрачено ${fmtMoney(used)} ₽ из ${fmtMoney(limit)} ₽`,prompt:`Покажи расходы категории ${cat} и помоги понять, почему лимит превышен на ${fmtMoney(used-limit)} рублей`});else if(pct>=80)out.push({id:'budget-near:'+cat,level:'warn',title:`Лимит «${cat}» почти исчерпан`,body:`Использовано ${pct}%`,prompt:`Проанализируй расходы ${cat} и предложи, как не превысить лимит до конца месяца`})});
   const due=(d.autopays||[]).map(x=>({...x,_days:daysUntil(nextPayDateKey(x))})).filter(x=>x._days>=0&&x._days<=2);if(due.length)out.push({id:'payments',level:'warn',title:'Скоро регулярные платежи',body:due.slice(0,3).map(x=>`${x.name} · ${fmtMoney(x.amount)} ₽`).join(' · '),prompt:'Покажи ближайшие регулярные платежи и проверь, хватает ли текущего баланса'});
-  const habits=(d.habits||[]).filter(h=>!h.log?.[tk]);if(habits.length&&new Date().getHours()>=12)out.push({id:'habits',level:'info',title:`Осталось привычек: ${habits.length}`,body:habits.slice(0,4).map(x=>(x.icon||'')+' '+x.name).join(' · '),prompt:'Покажи невыполненные привычки сегодня и помоги составить короткий план на вечер'});
+  const habits=(d.habits||[]).filter(h=>!h.log?.[tk]);if(habits.length)out.push({id:'habits',level:'info',title:`Осталось привычек: ${habits.length}`,body:habits.slice(0,4).map(x=>(x.icon||'')+' '+x.name).join(' · '),prompt:'Покажи невыполненные привычки сегодня и помоги составить короткий план на день'});
   const shopping=(d.shopping||[]).filter(x=>!x.done);if(shopping.length>=3)out.push({id:'shopping',level:'info',title:`В покупках ${shopping.length} позиций`,body:shopping.slice(0,4).map(x=>x.t).join(' · '),prompt:'Покажи текущий список покупок и помоги сгруппировать его по отделам магазина'});
   const oldDebts=(d.debts||[]).filter(x=>!x.closed&&x.remind&&(Date.now()-new Date(x.date).getTime())>=7*86400000);if(oldDebts.length)out.push({id:'debts',level:'warn',title:`Давно открытых долгов: ${oldDebts.length}`,body:oldDebts.slice(0,3).map(x=>`${x.name} · ${fmtMoney(x.amount)} ₽`).join(' · '),prompt:'Покажи незакрытые долги и предложи, кому пора напомнить'});
   if(new Date().getHours()>=18&&todayOpen.length){const done=todayAll.filter(t=>t.done).length;out.push({id:'evening-review',level:'info',title:'Разобрать остаток дня',body:`Осталось ${todayOpen.length} из ${todayAll.length} дел`,prompt:'Подведи итог дня покажи что выполнено и помоги решить что делать с остатком'});}
@@ -4913,9 +4957,9 @@ function getSmartSuggestions(){
 function renderSmartSuggestions(){const list=getSmartSuggestions().slice(0,1);if(!list.length)return'';return `<section class="smart-suggestions"><div class="smart-head"><span>Предложение Lumo</span></div>${list.map(x=>`<button class="smart-card ${x.level}" onclick="openInsightConversation(${jsArg(x.prompt)},${jsArg(x.title+' — '+x.body)})"><i>${ICONS.ai}</i><span><b>${esc(x.title)}</b><small>${esc(x.body)}</small></span><em>›</em></button>`).join('')}</section>`}
 function openInsightConversation(prompt,summary){submitAssistantPrompt(prompt||summary||'')}
 async function scheduleSmartInsightPush(force=false){
-  const r=getInsightReminder(),suggestions=getSmartSuggestions();if(!r.enabled||!suggestions.length)return;
-  const top=suggestions[0],fingerprint=(top.id+':'+top.title+':'+top.body).slice(0,180),key=`insight_push:${todayKey()}:${r.time}:${fingerprint}`;if(!force&&localStorage.getItem('insight_push_last_key')===key)return;
-  try{const reg=await navigator.serviceWorker.ready,sub=await reg.pushManager.getSubscription();if(!sub)return;const [hour,minute]=String(r.time||'18:30').split(':').map(Number);const response=await fetch(FAMILY_SERVER+'/schedule-morning',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({userId:PUSH_USER_ID,subscription:sub,type:'insight',scheduleId:'insight:'+PUSH_USER_ID,reminderTime:r.time,title:top.title,body:top.body,prompt:top.prompt,hour:hour||18,minute:minute||30,date:todayKey()})});if(response.ok)localStorage.setItem('insight_push_last_key',key)}catch(e){}
+  const r=getInsightReminder(),suggestions=getSmartSuggestions(),top=suggestions[0]||{id:'none',title:'Предложение Lumo',body:'',prompt:''};
+  const fingerprint=(top.id+':'+top.title+':'+top.body).slice(0,180),key=`insight_push:${todayKey()}:${r.time}:${r.enabled&&suggestions.length?'on':'off'}:${fingerprint}`;if(!force&&localStorage.getItem('insight_push_last_key')===key)return;
+  try{const reg=await navigator.serviceWorker.ready,sub=await reg.pushManager.getSubscription();if(!sub)return;const [hour,minute]=String(r.time||'18:30').split(':').map(Number);const response=await fetch(FAMILY_SERVER+'/schedule-morning',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({userId:PUSH_USER_ID,subscription:sub,type:'insight',scheduleId:'insight:'+PUSH_USER_ID,enabled:!!r.enabled&&!!suggestions.length,reminderTime:r.time,title:top.title,body:top.body,prompt:top.prompt,hour:hour||18,minute:minute||30,tzOffset:-new Date().getTimezoneOffset(),date:todayKey()})});if(response.ok)localStorage.setItem('insight_push_last_key',key)}catch(e){}
 }
 
 function dateKeyOf(d){

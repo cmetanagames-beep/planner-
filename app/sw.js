@@ -1,4 +1,4 @@
-const CACHE = 'planner-v93';
+const CACHE = 'planner-v96';
 const PUSH_STATE_CACHE = 'lumo-push-state-v1';
 
 const ASSETS = [
@@ -92,9 +92,12 @@ async function pushAllowed(d){
       const task=tasks.find(t=>String(t.id)===String(d.taskId))||tasks.find(t=>body.includes(String(t.title||'').trim().toLowerCase()));
       if(!task)return false;
       const taskAt=Number(task.scheduledAt)||new Date(task.date+'T'+(task.time||'09:00')).getTime();
-      // Одно актуальное напоминание рядом со временем дела; ранние и просроченные push гасим.
-      if(Number.isFinite(taskAt)&&(Date.now()>taskAt+10*60000||Date.now()<taskAt-30000))return false;
-      const dedupeKey='task:'+task.id+':'+taskAt;
+      const now=Date.now(),stage=String(d.stage||'start');
+      const windows={important2h:[-150,-45],h1:[-75,-20],m30:[-45,5],start:[-5,20],overdue:[10,24*60]};
+      const windowMin=windows[stage]||windows.start;
+      const deltaMin=(now-taskAt)/60000;
+      if(Number.isFinite(taskAt)&&(deltaMin<windowMin[0]||deltaMin>windowMin[1]))return false;
+      const dedupeKey=d.eventKey||('task:'+task.id+':'+taskAt+':'+stage);
       if(await cache.match('./__push_seen__/'+encodeURIComponent(dedupeKey)))return false;
       await cache.put('./__push_seen__/'+encodeURIComponent(dedupeKey),new Response(String(Date.now())));
     }
@@ -164,8 +167,8 @@ async function showPush(d){
       badge: './assets/icons/icon.png',
       vibrate: [50, 80, 50],
       requireInteraction: true,
-      tag: d.taskId || 'reminder',
-      data: { taskId: d.taskId },
+      tag: d.eventKey || d.taskId || 'reminder',
+      data: { type:d.type||'task-reminder', taskId: d.taskId, stage:d.stage||'' },
       actions: [
         { action: 'done',   title: '✅ Выполнено'   },
         { action: 'snooze', title: '⏰ Отложить 1ч'  }
