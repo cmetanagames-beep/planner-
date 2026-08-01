@@ -2271,7 +2271,7 @@ async function resolveCloudConflict(choice){if(!cloudConflict)return;let data=ch
 
 /* ===== СЕМЬЯ + ПУШИ (сервер) ===== */
 const FAMILY_SERVER='https://pushevgen.duckdns.org'; // без слэша на конце, через https!
-const LUMO_APP_VERSION='v102';
+const LUMO_APP_VERSION='v103';
 const LUMO_DEVICE_ID=(()=>{let id=localStorage.getItem('lumo_device_id_v1');if(!id){id='dev_'+Date.now().toString(36)+'_'+Math.random().toString(36).slice(2,10);localStorage.setItem('lumo_device_id_v1',id)}return id})();
 const LUMO_SUPPORT_CODE=(()=>{let code=localStorage.getItem('lumo_support_code_v1');if(!code){const chars='ABCDEFGHJKLMNPQRSTUVWXYZ23456789';code='';for(let i=0;i<8;i++)code+=chars[Math.floor(Math.random()*chars.length)];localStorage.setItem('lumo_support_code_v1',code)}return code})();
 function diagnosticPlatform(){const ua=navigator.userAgent||'';if(/android/i.test(ua))return'Android';if(/iphone|ipad|ipod/i.test(ua))return'iOS';if(/windows/i.test(ua))return'Windows';if(/macintosh|mac os/i.test(ua))return'macOS';return'Web'}
@@ -2483,44 +2483,44 @@ async function renderFamily(){
   document.getElementById('family-body').innerHTML=html;
   if(fam)loadFamilyMembers();
 }
-function saveMyProfile(){
+function saveMyProfile(silent=false){
   const d=load();d.myName=document.getElementById('fam-name').value.trim();d.myRole=document.getElementById('fam-role').value;save(d);
-  toast('Профиль сохранён 👤');syncPushData();
+  if(!silent)toast('Профиль сохранён 👤');syncPushData();
   sendOrQueue('/profile',{userId:PUSH_USER_ID,name:d.myName,role:d.myRole},'profile');
 }
 async function createFamily(){
+  saveMyProfile(true);
   if(!getMyName()){toast('Сначала введи имя');return;}
-  saveMyProfile();
   try{
     const r=await fetch(FAMILY_SERVER+'/family/create',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({userId:PUSH_USER_ID,name:getMyName(),role:getMyRole()})});
-    const d=await r.json();
-    if(d.ok){
+    const d=await r.json().catch(()=>({ok:false,err:`Ошибка сервера (${r.status})`}));
+    if(r.ok&&d.ok){
       const s=load();
       s.familyId=d.familyCode;   // ← familyCode, не familyId!
       save(s);
       confetti();
       toast('👨‍👩‍👦 Семья создана! Код: '+d.familyCode);
       renderFamily();
-    } else toast(d.err||'Ошибка создания');
+    } else toast(d.message||d.err||`Ошибка создания (${r.status})`);
   }
   catch(e){toast('Сервер недоступен');}
 }
 async function joinFamily(){
   const code=document.getElementById('fam-code').value.trim().toUpperCase();
   if(!code){toast('Введи код');return;}
+  saveMyProfile(true);
   if(!getMyName()){toast('Сначала введи имя');return;}
-  saveMyProfile();
   try{
     const r=await fetch(FAMILY_SERVER+'/family/join',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({userId:PUSH_USER_ID,familyCode:code,name:getMyName(),role:getMyRole()})});
-    const d=await r.json();
-    if(d.ok){
+    const d=await r.json().catch(()=>({ok:false,err:`Ошибка сервера (${r.status})`}));
+    if(r.ok&&d.ok){
       const s=load();
       s.familyId=d.familyCode;   // ← familyCode!
       save(s);
       confetti();
       toast('🔗 Ты в семье!');
       renderFamily();
-    } else toast(d.err||'Код не найден');   // ← d.err, не d.error!
+    } else toast(d.message||d.err||`Ошибка входа (${r.status})`);
   }
   catch(e){toast('Сервер недоступен');}
 }
@@ -2863,6 +2863,10 @@ function normalizeSpokenMoneyAmounts(text){
 function splitLocalSpeech(text){
   let s=normalizeAssistantText(text);
   s=s.replace(/^так\s+/i,'').replace(/(?:^|\s)в\s+пн(?=\s|$)/gi,' в понедельник').replace(/(?:^|\s)во?\s+вт(?=\s|$)/gi,' во вторник').replace(/(?:^|\s)в\s+ср(?=\s|$)/gi,' в среду').replace(/(?:^|\s)в\s+чт(?=\s|$)/gi,' в четверг').replace(/(?:^|\s)в\s+пт(?=\s|$)/gi,' в пятницу').replace(/(?:^|\s)в\s+сб(?=\s|$)/gi,' в субботу').replace(/(?:^|\s)в\s+вс(?=\s|$)/gi,' в воскресенье').trim();
+  // Разговорное «добавь на завтра…» задаёт дату всего действия. Приводим
+  // предлог к форме, которую одинаково понимают разбор даты и очистка заголовка.
+  s=s.replace(/(^|\s)на\s+(сегодня|завтра|послезавтра)(?=\s|$)/gi,'$1$2')
+    .replace(/(^|\s)на\s+(понедельник|вторник|среду?|четверг|пятницу?|субботу?|воскресенье)(?=\s|$)/gi,'$1в $2');
   if((/привычк/.test(s)||/(?:кажд\S*\s+(?:утро|вечер)|ежедневно).*(?:зарядк|читать|пить|бег|трениров|гулять)/.test(s))&&!/(?:потрат|зарплат|доход|расход|купить.+(?:и|после).+(?:позвон|встреч|заказать))/.test(s))return [s];
   s=s.replace(/[;,\n]+|[.!?]+(?=\s|$)/g,' | ');
   const starters='позвон(?:ить|и)|созвон(?:иться|ится|иться)|написать|отправить|забрать|отвезти|отнести|привезти|сходить|съездить|встретиться|встретить|встреча|проводить|подготовить|сделать|проверить|закончить|начать|забронировать|вызвать|помыть|убраться|убрать|погулять|полить|посадить|принять|выпить|к\\s+врачу|врач|купить|докупить|заказать|оплат(?:ить|ил[аи]?)|заплат(?:ить|ил[аи]?)|потратил|потратила|купил|купила|отдать|вернуть|получить|получил|получила|пришл[ао]?\\s+(?:зп|зарплата)|зарплата|аванс|премия|тренировка|зарядка|заниматься|читать|напомни|добавь|создай';
@@ -2879,6 +2883,12 @@ function splitLocalSpeech(text){
   s=s.replace(/\s+(?=из\s+них(?:\s+я)?(?:\s+уже)?\s+\d)/gi,' | ');
   s=s.replace(/\s+(?:и\s+)?(?=(?:сегодня|завтра|послезавтра|во?\s+(?:понедельник|вторник|среду|четверг|пятницу|субботу|воскресенье)|кажд\S*\s+(?:день|понедельник|вторник|среду|четверг|пятницу|субботу|воскресенье))\s+(?:мне\s+)?(?:нужно\s+|надо\s+)?)/gi,' | ');
   const raw=s.split('|').map(x=>x.trim()).filter(x=>x.length>1),out=[];
+  // Граница по дате или по глаголу не должна превращать вводную команду в
+  // отдельное дело: «добавь завтра | встреча», «напомни | позвонить маме».
+  const commandOnly=new RegExp('^(?:добавь|создай|запиши|запланируй|поставь|напомни)(?:\\s+(?:сегодня|завтра|послезавтра|во?\\s+(?:понедельник|вторник|среду?|четверг|пятницу?|субботу?|воскресенье)))?(?:\\s+(?:утром|днем|днём|вечером|ночью))?(?:\\s+(?:в|к|на)\\s*\\d{1,2}(?:(?:[:.\\-]|\\s)\\d{2})?\\s*(?:час(?:а|ов)?|утра|дня|вечера)?)?$','i');
+  for(let i=0;i<raw.length-1;i++){
+    if(commandOnly.test(raw[i])){raw[i+1]=raw[i]+' '+raw[i+1];raw[i]='';}
+  }
   for(let i=0;i<raw.length-1;i++){
     if(/^из\s+них(?:\s+я)?(?:\s+уже)?$/i.test(raw[i])){raw[i+1]=raw[i]+' '+raw[i+1];raw[i]='';continue;}
     const detachedAmount=raw[i].match(/^(?:из\s+них(?:\s+я)?(?:\s+уже)?\s+)?(\d[\d\s]{1,9}(?:\s*(?:₽|р|руб\w*|т|тыс\w*|тыщ\w*))?)$/i);

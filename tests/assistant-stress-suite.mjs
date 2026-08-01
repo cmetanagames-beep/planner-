@@ -31,6 +31,14 @@ for(let i=0;i<24;i++){
 const spoken=[['пять тысяч',5000],['восемнадцать тысяч',18000],['двадцать пять тысяч',25000],['сто тысяч',100000],['двести тридцать тысяч',230000],['один миллион двести тысяч',1200000]];
 spoken.forEach(([words,value],i)=>verify(`сумма словами ${i+1}`,`получил доход ${words} рублей`,p=>by(p,'income').length===1&&by(p,'income')[0].amount===value));
 
+const commandPrefixes=['Добавь','Создай','Запиши','Запланируй','Поставь','Напомни'];
+const commandDates=['на завтра','завтра','на понедельник','в понедельник'];
+const commandTasks=[['встреча с клиентом в 15-00','Встреча с клиентом','15:00'],['позвонить маме в 18:30','Позвонить маме','18:30'],['отправить отчёт в 10','Отправить отчет','10:00']];
+commandPrefixes.forEach(prefix=>commandDates.forEach(date=>commandTasks.forEach(([task,title,time])=>{
+  const label=`команда с датой: ${prefix} ${date} ${task}`;
+  verify(label,`${prefix} ${date} ${task}`,p=>by(p,'task').length===1&&by(p,'task')[0].title===title&&by(p,'task')[0].time===time&&p.unknown.length===0);
+})));
+
 console.log(`${failures.length?'FAIL':'PASS'} · ${total-failures.length}/${total}`);
 failures.slice(0,20).forEach(x=>console.log(`✗ ${x.name}\n  ${x.text}\n  ${JSON.stringify(x.plan||x.error)}`));
 if(failures.length)process.exitCode=1;

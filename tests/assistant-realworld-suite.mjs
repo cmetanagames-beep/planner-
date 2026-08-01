@@ -11,6 +11,10 @@ const actions=(p,type)=>p.actions.filter(x=>x.type===type);
 const has=(p,type,predicate)=>p.actions.some(x=>x.type===type&&predicate(x));
 const noGarbage=p=>!actions(p,'task').some(x=>/^(?:нужно|надо|встреча в|\d+|пять тысяч|в \d)/i.test(x.title))&&p.unknown.length===0;
 
+test('команда на завтра со скриншота','Добавь на завтра встреча в 15-00',p=>actions(p,'task').length===1&&actions(p,'task')[0].title==='Встреча'&&actions(p,'task')[0].time==='15:00'&&p.unknown.length===0);
+test('напомнить на завтра','Напомни на завтра позвонить маме в 18:30',p=>actions(p,'task').length===1&&actions(p,'task')[0].title==='Позвонить маме'&&actions(p,'task')[0].time==='18:30'&&p.unknown.length===0);
+test('запланировать на понедельник','Запланируй на понедельник встреча с клиентом в 10',p=>actions(p,'task').length===1&&actions(p,'task')[0].title==='Встреча с клиентом'&&actions(p,'task')[0].time==='10:00'&&p.unknown.length===0);
+
 test('фраза со скриншота',
   'В понедельник у меня встреча в 15:00 во вторник мне нужно забрать ребёнка из садика в 16:00 пришла зарплата в 16 000 руб. из них я пять тысяч потратил на квартиру и 3000 на собаку',
   p=>actions(p,'task').length===2&&actions(p,'task')[0].title==='Встреча'&&actions(p,'task')[0].time==='15:00'&&/Забрать ребенка из садика/i.test(actions(p,'task')[1].title)&&actions(p,'task')[1].time==='16:00'&&has(p,'income',x=>x.amount===16000)&&has(p,'expense',x=>x.amount===5000&&x.category==='Жильё')&&has(p,'expense',x=>x.amount===3000&&x.category==='Питомцы')&&noGarbage(p));

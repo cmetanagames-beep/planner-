@@ -433,6 +433,11 @@ app.post('/test', async (req, res) => {
 app.post('/family/create', (req, res) => {
   const { userId, name, role } = req.body;
   if (!userId || !name) return res.json({ ok: false, err: 'нет userId или имени' });
+  const existing = getMember(userId);
+  if (existing) {
+    saveMember(userId, existing.familyCode, name, role || existing.role);
+    return res.json({ ok: true, familyCode: existing.familyCode, name, existing: true });
+  }
   let code;
   do { code = makeFamilyCode(); }
   while (db.prepare('SELECT 1 FROM familyMembers WHERE familyCode = ?').get(code));
