@@ -4,10 +4,11 @@ import cors from 'cors';
 import webpush from 'web-push';
 import Database from 'better-sqlite3';
 import TelegramBot from 'node-telegram-bot-api';
+import QRCode from 'qrcode';
 import { spawn } from 'node:child_process';
 import { randomUUID, timingSafeEqual } from 'node:crypto';
-import { existsSync, mkdirSync, readFileSync, readdirSync, statSync, unlinkSync, writeFileSync } from 'node:fs';
-import { tmpdir } from 'node:os';
+import { existsSync, mkdirSync, readFileSync, readdirSync, statfsSync, statSync, unlinkSync, writeFileSync } from 'node:fs';
+import { cpus, freemem, loadavg, tmpdir, totalmem } from 'node:os';
 import path from 'node:path';
 
 const app = express();
@@ -17,6 +18,9 @@ const DEVELOPER_UI_DIR = process.env.DEVELOPER_UI_DIR || path.join(process.cwd()
 app.use('/dev', express.static(DEVELOPER_UI_DIR, { index: 'index.html', maxAge: '5m', fallthrough: true }));
 
 const db = new Database('planner.db');
+db.pragma('journal_mode = WAL');
+db.pragma('synchronous = NORMAL');
+db.pragma('busy_timeout = 5000');
 
 db.exec(`CREATE TABLE IF NOT EXISTS subs (userId TEXT PRIMARY KEY, subscription TEXT)`);
 db.exec(`CREATE TABLE IF NOT EXISTS userData (userId TEXT PRIMARY KEY, tasks TEXT, notifyHour TEXT, tzOffset INTEGER, sentKeys TEXT, reminders TEXT)`);
@@ -39,6 +43,8 @@ db.exec(`CREATE TABLE IF NOT EXISTS developerAccess (id INTEGER PRIMARY KEY AUTO
 db.exec(`CREATE TABLE IF NOT EXISTS telegramLog (id INTEGER PRIMARY KEY AUTOINCREMENT, ok INTEGER NOT NULL, message TEXT, error TEXT, ts INTEGER NOT NULL)`);
 db.exec(`CREATE TABLE IF NOT EXISTS cloudData (code TEXT PRIMARY KEY, data TEXT NOT NULL, revision INTEGER NOT NULL DEFAULT 1, updatedAt INTEGER NOT NULL, updatedBy TEXT)`);
 db.exec(`CREATE TABLE IF NOT EXISTS cloudDevices (userId TEXT PRIMARY KEY, code TEXT NOT NULL)`);
+db.exec(`CREATE TABLE IF NOT EXISTS cloudInvites (token TEXT PRIMARY KEY, code TEXT NOT NULL, createdBy TEXT, expiresAt INTEGER NOT NULL, usedAt INTEGER, usedBy TEXT)`);
+db.prepare('DELETE FROM cloudInvites WHERE expiresAt < ? OR usedAt IS NOT NULL').run(Date.now() - 24 * 60 * 60 * 1000);
 db.exec(`CREATE TABLE IF NOT EXISTS eventFeed (id TEXT PRIMARY KEY, targetUserId TEXT NOT NULL, familyCode TEXT, type TEXT, title TEXT, body TEXT, data TEXT, ts INTEGER, readAt INTEGER)`);
 try { db.exec(`ALTER TABLE inbox ADD COLUMN status TEXT DEFAULT 'pending'`); } catch (e) {}
 try { db.exec(`ALTER TABLE inbox ADD COLUMN comment TEXT DEFAULT ''`); } catch (e) {}
@@ -88,6 +94,7 @@ function getSub(userId) {
 function deleteSub(userId) {
   db.prepare('DELETE FROM subs WHERE userId = ?').run(userId);
 }
+function validSubscription(subscription){return !!(subscription?.endpoint&&subscription?.keys?.auth&&subscription?.keys?.p256dh);}
 
 function saveUserData(userId, u) {
   db.prepare(`INSERT INTO userData (userId, tasks, notifyHour, tzOffset, sentKeys, reminders) VALUES (?, ?, ?, ?, ?, ?) ON CONFLICT(userId) DO UPDATE SET tasks = excluded.tasks, notifyHour = excluded.notifyHour, tzOffset = excluded.tzOffset, sentKeys = excluded.sentKeys, reminders = excluded.reminders`).run(
@@ -279,15 +286,24 @@ app.post('/telemetry/push-state', (req, res) => {
 
 app.post('/subscribe', (req, res) => {
   const { userId, subscription } = req.body;
-  if (!userId || !subscription) return res.json({ ok: false, err: 'нет userId/subscription' });
+  if (!userId || !validSubscription(subscription)) return res.status(400).json({ ok: false, err: 'некорректная push-подписка' });
   saveSub(userId, subscription);
   console.log('Подписан:', userId);
   res.json({ ok: true });
 });
 
+const cloudHits = new Map();
+app.use('/cloud', (req, res, next) => {
+  const now=Date.now(), key=`${String(req.ip||'ip').slice(0,80)}:${String(req.body?.userId||'').slice(0,120)}`;
+  const recent=(cloudHits.get(key)||[]).filter(ts=>now-ts<10*60*1000);
+  if(recent.length>=240)return res.status(429).json({ok:false,err:'Слишком много запросов синхронизации',retryAfter:60});
+  recent.push(now);cloudHits.set(key,recent);next();
+});
+function validCloudPayload(data){try{const raw=JSON.stringify(data);return !!data&&raw.length>20&&raw.length<=6*1024*1024;}catch(_){return false;}}
+
 app.post('/cloud/create', (req, res) => {
   const { userId, data } = req.body || {};
-  if (!userId || !data) return res.json({ ok: false, err: 'нет данных' });
+  if (!userId || !validCloudPayload(data)) return res.status(400).json({ ok: false, err: 'нет данных или копия слишком большая' });
   const code = makeSyncCode(), now = Date.now();
   db.prepare('INSERT INTO cloudData (code, data, revision, updatedAt, updatedBy) VALUES (?, ?, 1, ?, ?)').run(code, JSON.stringify(data), now, userId);
   db.prepare('INSERT INTO cloudDevices (userId, code) VALUES (?, ?) ON CONFLICT(userId) DO UPDATE SET code=excluded.code').run(userId, code);
@@ -302,6 +318,28 @@ app.post('/cloud/connect', (req, res) => {
   res.json({ ok: true, code, revision: row.revision, updatedAt: row.updatedAt });
 });
 
+app.post('/cloud/invite/create', async (req, res) => {
+  const userId=String(req.body?.userId||''), device=db.prepare('SELECT code FROM cloudDevices WHERE userId=?').get(userId);
+  if(!device)return res.status(403).json({ok:false,err:'Сначала включи облачную защиту'});
+  const token=randomUUID().replace(/-/g,'').slice(0,20), expiresAt=Date.now()+15*60*1000;
+  db.prepare('INSERT INTO cloudInvites (token,code,createdBy,expiresAt) VALUES (?,?,?,?)').run(token,device.code,userId,expiresAt);
+  const url=`${String(req.headers.origin||'').replace(/\/$/,'')||'https://evgenakfix.github.io/planner'}/?cloudInvite=${token}`;
+  const qr=await QRCode.toDataURL(url,{width:360,margin:2,errorCorrectionLevel:'M'});
+  res.json({ok:true,token,url,qr,expiresAt});
+});
+
+app.post('/cloud/invite/use', (req, res) => {
+  const userId=String(req.body?.userId||''),token=String(req.body?.token||'').replace(/[^a-f0-9]/gi,'');
+  const invite=db.prepare('SELECT * FROM cloudInvites WHERE token=?').get(token);
+  if(!userId||!invite||invite.usedAt||invite.expiresAt<Date.now())return res.status(404).json({ok:false,err:'Приглашение недействительно или уже использовано'});
+  const row=db.prepare('SELECT revision,updatedAt FROM cloudData WHERE code=?').get(invite.code);
+  if(!row)return res.status(404).json({ok:false,err:'Облачная копия не найдена'});
+  const used=db.prepare('UPDATE cloudInvites SET usedAt=?,usedBy=? WHERE token=? AND usedAt IS NULL').run(Date.now(),userId,token);
+  if(!used.changes)return res.status(409).json({ok:false,err:'Приглашение уже использовано'});
+  db.prepare('INSERT INTO cloudDevices (userId,code) VALUES (?,?) ON CONFLICT(userId) DO UPDATE SET code=excluded.code').run(userId,invite.code);
+  res.json({ok:true,code:invite.code,revision:row.revision,updatedAt:row.updatedAt});
+});
+
 app.post('/cloud/sync', (req, res) => {
   const { userId, data, baseRevision, action } = req.body || {};
   const device = db.prepare('SELECT code FROM cloudDevices WHERE userId = ?').get(userId);
@@ -309,9 +347,12 @@ app.post('/cloud/sync', (req, res) => {
   const row = db.prepare('SELECT * FROM cloudData WHERE code = ?').get(device.code);
   if (!row) return res.json({ ok: false, err: 'Облачная копия не найдена' });
   if (action === 'pull' || data == null) return res.json({ ok: true, code: row.code, data: JSON.parse(row.data), revision: row.revision, updatedAt: row.updatedAt });
+  if(!validCloudPayload(data))return res.status(400).json({ok:false,err:'Копия повреждена или слишком большая'});
   if (action !== 'force' && Number(baseRevision || 0) !== Number(row.revision)) {
     return res.json({ ok: false, conflict: true, server: { data: JSON.parse(row.data), revision: row.revision, updatedAt: row.updatedAt } });
   }
+  const current=JSON.parse(row.data||'{}'), incoming=data||{};
+  if(action!=='force' && current?.planner && (!incoming?.planner || Object.keys(incoming.planner).length<2)) return res.status(409).json({ok:false,err:'Пустые данные не могут заменить облачную копию'});
   const revision = row.revision + 1, now = Date.now();
   db.prepare('UPDATE cloudData SET data = ?, revision = ?, updatedAt = ?, updatedBy = ? WHERE code = ?').run(JSON.stringify(data), revision, now, userId, row.code);
   res.json({ ok: true, code: row.code, revision, updatedAt: now });
@@ -586,7 +627,7 @@ const PRE_REMINDERS = [
   { key: 'm30', minExclusive: 0,  maxInclusive: 30, label: 'за 30 минут' }
 ];
 
-async function runReminderScheduler() {
+async function runReminderSchedulerPass() {
   const userIds = getAllUserData();
   for (const userId of userIds) {
     const u = getUserData(userId);
@@ -651,9 +692,17 @@ async function runReminderScheduler() {
     const { tk, hm } = localDateParts(Number.isFinite(Number(row.tzOffset)) ? Number(row.tzOffset) : 180);
     const due = Number(hm.replace(':', '')) >= (Number(row.hour) * 100 + Number(row.minute));
     if (!due || row.lastSentDay === tk) continue;
-    const sent = await sendPush(row.userId, { type: row.type, title: row.title, body: row.body, prompt: row.prompt || '', date: tk });
+    const sent = await sendPush(row.userId, { eventKey:`schedule:${row.scheduleId}:${tk}`, type: row.type, title: row.title, body: row.body, prompt: row.prompt || '', date: tk });
     if (sent) db.prepare('UPDATE scheduledPush SET lastSentDay = ? WHERE scheduleId = ?').run(tk, row.scheduleId);
   }
+}
+let schedulerRunning=false;
+async function runReminderScheduler(){
+  if(schedulerRunning)return;
+  schedulerRunning=true;
+  try{await runReminderSchedulerPass();}
+  catch(error){console.error('reminder scheduler failed:',error);raiseAlert('scheduler-failed',`Ошибка планировщика: ${error.message}`,15*60*1000);}
+  finally{schedulerRunning=false;}
 }
 setInterval(runReminderScheduler, 30000);
 setTimeout(runReminderScheduler, 1000);
@@ -801,10 +850,14 @@ app.get('/developer/status', requireDeveloper, (req, res) => {
   let databaseBytes = 0;
   try { databaseBytes = statSync('planner.db').size; } catch (_) {}
   const memory = process.memoryUsage();
+  let disk={total:0,free:0,used:0};
+  try{const s=statfsSync(process.cwd()),total=Number(s.blocks)*Number(s.bsize),free=Number(s.bavail)*Number(s.bsize);disk={total,free,used:total-free};}catch(_){}
+  const hostTotal=totalmem(),hostFree=freemem();
   res.json({
     ok: true,
     generatedAt: now,
     server: { uptimeSec: Math.floor(process.uptime()), node: process.version, pid: process.pid, memory: { rss: memory.rss, heapUsed: memory.heapUsed, heapTotal: memory.heapTotal } },
+    host: { memory:{total:hostTotal,free:hostFree,used:hostTotal-hostFree},disk,load:loadavg(),cpuCores:cpus().length },
     services: { push: !!(PUBLIC_KEY && PRIVATE_KEY), whisper: existsSync(WHISPER_BIN) && existsSync(WHISPER_MODEL), whisperBusy: voiceBusy, database: true, telegram: !!telegramBot, telegramLinked: !!telegramChatId() },
     database: {
       bytes: databaseBytes,
@@ -896,7 +949,7 @@ const PORT = process.env.PORT || 3000;
 app.post('/schedule-morning', express.json(), async (req, res) => {
   const { userId, subscription, type, title, body, prompt, hour, minute, scheduleId, enabled, tzOffset } = req.body;
 
-  if(!userId || !subscription){
+  if(!userId || !validSubscription(subscription)){
     return res.json({ ok: false, err: 'missing params' });
   }
 
@@ -920,7 +973,17 @@ async function monitorSystemHealth() {
   if (failed >= 3 && failed / Math.max(total, 1) >= .4) raiseAlert('push-rate', `За 15 минут не доставлено ${failed} из ${total} push.`, 30 * 60 * 1000);
   if (!existsSync(WHISPER_BIN) || !existsSync(WHISPER_MODEL)) raiseAlert('whisper-offline', 'Whisper недоступен: проверь бинарный файл и модель.', 3 * 60 * 60 * 1000);
   try { const bytes = statSync('planner.db').size; if (bytes > 100 * 1024 * 1024) raiseAlert('database-size', `База выросла до ${Math.round(bytes / 1048576)} МБ.`, 24 * 60 * 60 * 1000); } catch (_) {}
+  const memory=process.memoryUsage(),hostTotal=totalmem(),hostFree=freemem(),loads=loadavg(),cores=Math.max(cpus().length,1);
+  if(memory.rss>512*1024*1024)raiseAlert('process-memory',`Node использует ${Math.round(memory.rss/1048576)} МБ RAM.`,60*60*1000);
+  if(hostFree/hostTotal<.1)raiseAlert('host-memory',`На VPS осталось ${Math.round(hostFree/1048576)} МБ RAM.`,60*60*1000);
+  if(loads[0]>cores*2)raiseAlert('host-load',`Высокая нагрузка VPS: ${loads[0].toFixed(2)} при ${cores} CPU.`,30*60*1000);
+  try{const s=statfsSync(process.cwd()),free=Number(s.bavail)*Number(s.bsize),total=Number(s.blocks)*Number(s.bsize);if(free/total<.1)raiseAlert('disk-space',`На диске осталось ${Math.round(free/1048576)} МБ.`,3*60*60*1000);}catch(_){}
 }
 setInterval(monitorSystemHealth, 5 * 60 * 1000);
 setTimeout(monitorSystemHealth, 5000);
+setInterval(()=>{
+  const cutoff=Date.now()-24*60*60*1000;
+  for(const map of [telemetryHits,voiceHits,cloudHits,developerAttempts])for(const [key,list] of map)if(!(list||[]).some(ts=>ts>=cutoff))map.delete(key);
+  for(const [key,ts] of developerSuccessSeen)if(ts<cutoff)developerSuccessSeen.delete(key);
+},60*60*1000).unref();
 app.listen(PORT, () => console.log('Сервер запущен на порту', PORT));
