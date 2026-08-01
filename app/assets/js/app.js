@@ -2259,6 +2259,24 @@ async function resolveCloudConflict(choice){if(!cloudConflict)return;let data=ch
 
 /* ===== СЕМЬЯ + ПУШИ (сервер) ===== */
 const FAMILY_SERVER='https://pushevgen.duckdns.org'; // без слэша на конце, через https!
+const LUMO_APP_VERSION='v97';
+const LUMO_DEVICE_ID=(()=>{let id=localStorage.getItem('lumo_device_id_v1');if(!id){id='dev_'+Date.now().toString(36)+'_'+Math.random().toString(36).slice(2,10);localStorage.setItem('lumo_device_id_v1',id)}return id})();
+function diagnosticPlatform(){const ua=navigator.userAgent||'';if(/android/i.test(ua))return'Android';if(/iphone|ipad|ipod/i.test(ua))return'iOS';if(/windows/i.test(ua))return'Windows';if(/macintosh|mac os/i.test(ua))return'macOS';return'Web'}
+function diagnosticDisplayMode(){return window.matchMedia?.('(display-mode: standalone)').matches||navigator.standalone?'standalone':'browser'}
+async function reportDeviceHealth(force=false){
+  const last=Number(localStorage.getItem('lumo_device_health_at')||0);if(!force&&Date.now()-last<6*60*60*1000)return;
+  try{let subscribed=false,swVersion='none';if('serviceWorker'in navigator){const reg=await navigator.serviceWorker.ready.catch(()=>null);subscribed=!!(await reg?.pushManager?.getSubscription().catch(()=>null));swVersion=reg?.active?.scriptURL?.split('/').pop()||'none'}
+    await fetch(FAMILY_SERVER+'/telemetry/device',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({userId:PUSH_USER_ID,deviceId:LUMO_DEVICE_ID,platform:diagnosticPlatform(),appVersion:LUMO_APP_VERSION,swVersion,displayMode:diagnosticDisplayMode(),pushPermission:typeof Notification==='undefined'?'unsupported':Notification.permission,pushSubscribed:subscribed}),keepalive:true});localStorage.setItem('lumo_device_health_at',Date.now())
+  }catch(_){}
+}
+let diagnosticErrorSending=false;
+function reportClientError(kind,error,extra=''){
+  if(diagnosticErrorSending)return;diagnosticErrorSending=true;
+  const message=String(error?.message||error||'unknown error'),stack=String(error?.stack||''),path=location.pathname;
+  fetch(FAMILY_SERVER+'/telemetry/error',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({userId:PUSH_USER_ID,deviceId:LUMO_DEVICE_ID,kind,message:message+(extra?' · '+extra:''),stack,path,appVersion:LUMO_APP_VERSION}),keepalive:true}).catch(()=>{}).finally(()=>{diagnosticErrorSending=false});
+}
+window.addEventListener('error',event=>reportClientError('javascript',event.error||event.message));
+window.addEventListener('unhandledrejection',event=>reportClientError('promise',event.reason));
 let PUSH_USER_ID=localStorage.getItem('push_user_id')||'';
 if(!PUSH_USER_ID){PUSH_USER_ID='u_'+Date.now()+'_'+Math.random().toString(36).slice(2,8);localStorage.setItem('push_user_id',PUSH_USER_ID);}
 const VAPID_PUBLIC=localStorage.getItem('vapid_public')||''; // подставится с сервера при подписке

@@ -3,15 +3,18 @@ import express from 'express';
 import cors from 'cors';
 import webpush from 'web-push';
 import Database from 'better-sqlite3';
+import TelegramBot from 'node-telegram-bot-api';
 import { spawn } from 'node:child_process';
 import { randomUUID, timingSafeEqual } from 'node:crypto';
-import { existsSync, readFileSync, statSync, unlinkSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync, readdirSync, statSync, unlinkSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 
 const app = express();
 app.use(cors());
 app.use(express.json({ limit: '8mb' }));
+const DEVELOPER_UI_DIR = process.env.DEVELOPER_UI_DIR || path.join(process.cwd(), 'dev');
+app.use('/dev', express.static(DEVELOPER_UI_DIR, { index: 'index.html', maxAge: '5m', fallthrough: true }));
 
 const db = new Database('planner.db');
 
@@ -26,6 +29,11 @@ db.exec(`CREATE TABLE IF NOT EXISTS doneStat (id INTEGER PRIMARY KEY AUTOINCREME
 db.exec(`CREATE TABLE IF NOT EXISTS pushEvents (eventId TEXT PRIMARY KEY, ts INTEGER)`);
 db.exec(`CREATE TABLE IF NOT EXISTS scheduledPush (scheduleId TEXT PRIMARY KEY, userId TEXT NOT NULL, type TEXT NOT NULL, title TEXT, body TEXT, prompt TEXT, hour INTEGER NOT NULL, minute INTEGER NOT NULL, tzOffset INTEGER NOT NULL DEFAULT 180, enabled INTEGER NOT NULL DEFAULT 1, lastSentDay TEXT DEFAULT '')`);
 db.exec(`CREATE TABLE IF NOT EXISTS pushLog (id INTEGER PRIMARY KEY AUTOINCREMENT, userId TEXT, type TEXT, title TEXT, ok INTEGER NOT NULL, statusCode INTEGER, error TEXT, ts INTEGER NOT NULL)`);
+db.exec(`CREATE TABLE IF NOT EXISTS notificationTrace (id INTEGER PRIMARY KEY AUTOINCREMENT, traceKey TEXT NOT NULL, userId TEXT, type TEXT, stage TEXT NOT NULL, detail TEXT, ts INTEGER NOT NULL)`);
+db.exec(`CREATE INDEX IF NOT EXISTS notificationTraceKeyIdx ON notificationTrace(traceKey,ts)`);
+db.exec(`CREATE TABLE IF NOT EXISTS deviceHealth (deviceId TEXT PRIMARY KEY, userId TEXT NOT NULL, platform TEXT, appVersion TEXT, swVersion TEXT, displayMode TEXT, pushPermission TEXT, pushSubscribed INTEGER, lastSeen INTEGER NOT NULL)`);
+db.exec(`CREATE TABLE IF NOT EXISTS clientErrors (id INTEGER PRIMARY KEY AUTOINCREMENT, userId TEXT, deviceId TEXT, kind TEXT, message TEXT, stack TEXT, path TEXT, appVersion TEXT, ts INTEGER NOT NULL)`);
+db.exec(`CREATE TABLE IF NOT EXISTS systemState (key TEXT PRIMARY KEY, value TEXT, updatedAt INTEGER NOT NULL)`);
 db.exec(`CREATE TABLE IF NOT EXISTS cloudData (code TEXT PRIMARY KEY, data TEXT NOT NULL, revision INTEGER NOT NULL DEFAULT 1, updatedAt INTEGER NOT NULL, updatedBy TEXT)`);
 db.exec(`CREATE TABLE IF NOT EXISTS cloudDevices (userId TEXT PRIMARY KEY, code TEXT NOT NULL)`);
 db.exec(`CREATE TABLE IF NOT EXISTS eventFeed (id TEXT PRIMARY KEY, targetUserId TEXT NOT NULL, familyCode TEXT, type TEXT, title TEXT, body TEXT, data TEXT, ts INTEGER, readAt INTEGER)`);
@@ -35,6 +43,35 @@ try { db.exec(`ALTER TABLE inbox ADD COLUMN respondedAt INTEGER`); } catch (e) {
 db.prepare('DELETE FROM pushEvents WHERE ts < ?').run(Date.now() - 30 * 24 * 60 * 60 * 1000);
 db.prepare('DELETE FROM eventFeed WHERE ts < ?').run(Date.now() - 120 * 24 * 60 * 60 * 1000);
 db.prepare('DELETE FROM pushLog WHERE ts < ?').run(Date.now() - 30 * 24 * 60 * 60 * 1000);
+db.prepare('DELETE FROM notificationTrace WHERE ts < ?').run(Date.now() - 30 * 24 * 60 * 60 * 1000);
+db.prepare('DELETE FROM clientErrors WHERE ts < ?').run(Date.now() - 30 * 24 * 60 * 60 * 1000);
+
+function getSystemState(key, fallback = '') {
+  const row = db.prepare('SELECT value FROM systemState WHERE key = ?').get(key);
+  return row ? row.value : fallback;
+}
+function setSystemState(key, value) {
+  db.prepare(`INSERT INTO systemState (key,value,updatedAt) VALUES (?,?,?) ON CONFLICT(key) DO UPDATE SET value=excluded.value,updatedAt=excluded.updatedAt`).run(key, String(value), Date.now());
+}
+function getMaintenance() {
+  try { return JSON.parse(getSystemState('maintenance', '{"enabled":false,"message":"","features":{}}')); }
+  catch (_) { return { enabled: false, message: '', features: {} }; }
+}
+function featureForPath(pathname) {
+  if (/^\/voice\//.test(pathname)) return 'voice';
+  if (/^\/(family|inbox|shopping|rating|done|task-done|shared-expense|events)(\/|$)/.test(pathname)) return 'family';
+  if (/^\/(cloud|sync)(\/|$)/.test(pathname)) return 'sync';
+  if (/^\/(subscribe|test|schedule-morning)(\/|$)/.test(pathname)) return 'push';
+  return '';
+}
+app.use((req, res, next) => {
+  if (req.path.startsWith('/developer') || req.path.startsWith('/telemetry') || req.path === '/health' || req.path === '/app-status') return next();
+  const state = getMaintenance(), feature = featureForPath(req.path);
+  if (state.enabled || (feature && state.features?.[feature] === false)) {
+    return res.status(503).json({ ok: false, maintenance: true, feature, message: state.message || 'Сервис временно обслуживается' });
+  }
+  next();
+});
 
 function saveSub(userId, subscription) {
   db.prepare(`INSERT INTO subs (userId, subscription) VALUES (?, ?) ON CONFLICT(userId) DO UPDATE SET subscription = excluded.subscription`).run(userId, JSON.stringify(subscription));
@@ -113,6 +150,40 @@ if (!PUBLIC_KEY || !PRIVATE_KEY) {
 }
 webpush.setVapidDetails(VAPID_EMAIL, PUBLIC_KEY, PRIVATE_KEY);
 
+const TELEGRAM_BOT_TOKEN = String(process.env.TELEGRAM_BOT_TOKEN || '');
+const TELEGRAM_ALLOWED_USERNAME = String(process.env.TELEGRAM_ALLOWED_USERNAME || 'EvgenAkfix').replace(/^@/, '').toLowerCase();
+let telegramBot = null;
+function telegramChatId() { return String(process.env.TELEGRAM_CHAT_ID || getSystemState('telegramChatId', '')); }
+async function telegramSend(text) {
+  const chatId = telegramChatId();
+  if (!telegramBot || !chatId) return false;
+  try { await telegramBot.sendMessage(chatId, String(text).slice(0, 3900), { disable_web_page_preview: true }); return true; }
+  catch (error) { console.error('telegram alert failed:', error.message); return false; }
+}
+async function raiseAlert(key, text, cooldownMs = 60 * 60 * 1000) {
+  const stateKey = `alert:${key}`, last = Number(getSystemState(stateKey, '0'));
+  if (Date.now() - last < cooldownMs) return false;
+  if (await telegramSend(`🚨 Lumo Console\n${text}`)) { setSystemState(stateKey, Date.now()); return true; }
+  return false;
+}
+if (TELEGRAM_BOT_TOKEN) {
+  telegramBot = new TelegramBot(TELEGRAM_BOT_TOKEN, { polling: true });
+  telegramBot.onText(/^\/start(?:\s|$)/, async msg => {
+    const username = String(msg.from?.username || '').toLowerCase();
+    if (username !== TELEGRAM_ALLOWED_USERNAME) return telegramBot.sendMessage(msg.chat.id, 'Доступ запрещён.');
+    setSystemState('telegramChatId', msg.chat.id);
+    await telegramBot.sendMessage(msg.chat.id, '✅ Lumo Console подключена. Сюда будут приходить только технические тревоги.');
+  });
+  telegramBot.on('polling_error', error => console.error('telegram polling:', error.message));
+}
+
+function traceNotification(traceKey, userId, type, stage, detail = '') {
+  if (!traceKey) return;
+  db.prepare('INSERT INTO notificationTrace (traceKey,userId,type,stage,detail,ts) VALUES (?,?,?,?,?,?)').run(
+    String(traceKey).slice(0, 200), String(userId || '').slice(0, 160), String(type || 'generic').slice(0, 80), String(stage).slice(0, 60), String(detail || '').slice(0, 300), Date.now()
+  );
+}
+
 function claimPushEvent(eventId) {
   if (!eventId) return true;
   return db.prepare('INSERT OR IGNORE INTO pushEvents (eventId, ts) VALUES (?, ?)')
@@ -124,20 +195,26 @@ async function sendPush(userId, titleOrPayload, body, taskId) {
   const payload = typeof titleOrPayload === 'object' && titleOrPayload
     ? titleOrPayload
     : { title: titleOrPayload, body, taskId };
+  const traceKey = String(payload.traceKey || payload.eventKey || payload.eventId || `push-${randomUUID()}`).slice(0, 200);
+  payload.traceKey = traceKey;
   const logPush = (ok, statusCode = null, error = '') => db.prepare(
     'INSERT INTO pushLog (userId,type,title,ok,statusCode,error,ts) VALUES (?,?,?,?,?,?,?)'
   ).run(String(userId || '').slice(0, 160), String(payload.type || 'generic').slice(0, 80), String(payload.title || '').slice(0, 240), ok ? 1 : 0, statusCode, String(error || '').slice(0, 500), Date.now());
-  if (!sub) { logPush(false, null, 'subscription missing'); return false; }
+  traceNotification(traceKey, userId, payload.type, 'attempt', payload.stage || '');
+  if (!sub) { logPush(false, null, 'subscription missing'); traceNotification(traceKey, userId, payload.type, 'no-subscription'); return false; }
   const eventKey = payload.eventKey ? String(payload.eventKey).slice(0, 200) : '';
-  if (eventKey && !claimPushEvent(eventKey)) return true;
+  if (eventKey && !claimPushEvent(eventKey)) { traceNotification(traceKey, userId, payload.type, 'deduplicated'); return true; }
   try {
     await webpush.sendNotification(sub, JSON.stringify(payload));
     logPush(true, 201, '');
+    traceNotification(traceKey, userId, payload.type, 'sent', '201');
     console.log('Отправлено', userId, payload.title);
     return true;
   } catch (e) {
     if (eventKey) db.prepare('DELETE FROM pushEvents WHERE eventId = ?').run(eventKey);
     logPush(false, Number(e.statusCode) || null, e.message);
+    traceNotification(traceKey, userId, payload.type, 'failed', `${e.statusCode || ''} ${e.message || ''}`);
+    raiseAlert('push-failure', `Ошибка push ${e.statusCode || ''}: ${e.message || 'без описания'}`, 15 * 60 * 1000);
     console.log('Ошибка отправки', userId, e.message);
     if (e.statusCode === 404 || e.statusCode === 410) deleteSub(userId);
     return false;
@@ -145,6 +222,45 @@ async function sendPush(userId, titleOrPayload, body, taskId) {
 }
 
 app.get('/key', (req, res) => res.json({ key: PUBLIC_KEY }));
+app.get('/app-status', (req, res) => {
+  const maintenance = getMaintenance();
+  res.set('Cache-Control', 'no-store').json({ ok: !maintenance.enabled, maintenance });
+});
+
+const telemetryHits = new Map();
+function telemetryAllowed(req) {
+  const now = Date.now(), key = String(req.ip || 'unknown'), recent = (telemetryHits.get(key) || []).filter(ts => now - ts < 60 * 60 * 1000);
+  if (recent.length >= 180) return false;
+  recent.push(now); telemetryHits.set(key, recent); return true;
+}
+function cleanDiagnosticText(value, max = 500) {
+  return String(value || '').replace(/https?:\/\/\S+/gi, '[url]').replace(/[\r\n\t]+/g, ' ').replace(/\s{2,}/g, ' ').slice(0, max);
+}
+app.post('/telemetry/device', (req, res) => {
+  if (!telemetryAllowed(req)) return res.status(429).json({ ok: false });
+  const b = req.body || {}, userId = String(b.userId || '').slice(0, 160), deviceId = String(b.deviceId || '').slice(0, 160);
+  if (!userId || !deviceId) return res.status(400).json({ ok: false });
+  db.prepare(`INSERT INTO deviceHealth (deviceId,userId,platform,appVersion,swVersion,displayMode,pushPermission,pushSubscribed,lastSeen)
+    VALUES (?,?,?,?,?,?,?,?,?) ON CONFLICT(deviceId) DO UPDATE SET userId=excluded.userId,platform=excluded.platform,appVersion=excluded.appVersion,swVersion=excluded.swVersion,displayMode=excluded.displayMode,pushPermission=excluded.pushPermission,pushSubscribed=excluded.pushSubscribed,lastSeen=excluded.lastSeen`)
+    .run(deviceId, userId, cleanDiagnosticText(b.platform, 40), cleanDiagnosticText(b.appVersion, 30), cleanDiagnosticText(b.swVersion, 60), cleanDiagnosticText(b.displayMode, 30), cleanDiagnosticText(b.pushPermission, 30), b.pushSubscribed ? 1 : 0, Date.now());
+  res.json({ ok: true });
+});
+app.post('/telemetry/error', (req, res) => {
+  if (!telemetryAllowed(req)) return res.status(429).json({ ok: false });
+  const b = req.body || {};
+  db.prepare('INSERT INTO clientErrors (userId,deviceId,kind,message,stack,path,appVersion,ts) VALUES (?,?,?,?,?,?,?,?)').run(
+    String(b.userId || '').slice(0, 160), String(b.deviceId || '').slice(0, 160), cleanDiagnosticText(b.kind, 40), cleanDiagnosticText(b.message, 500), cleanDiagnosticText(b.stack, 1200), cleanDiagnosticText(b.path, 200), cleanDiagnosticText(b.appVersion, 30), Date.now()
+  );
+  raiseAlert('client-errors', 'Зафиксирована новая ошибка клиента. Открой раздел «Ошибки» в Lumo Console.', 30 * 60 * 1000);
+  res.json({ ok: true });
+});
+app.post('/telemetry/push-state', (req, res) => {
+  if (!telemetryAllowed(req)) return res.status(429).json({ ok: false });
+  const b = req.body || {}, stage = String(b.stage || '');
+  if (!['displayed', 'opened', 'suppressed'].includes(stage) || !b.traceKey) return res.status(400).json({ ok: false });
+  traceNotification(b.traceKey, '', b.type, stage, cleanDiagnosticText(b.detail, 100));
+  res.json({ ok: true });
+});
 
 app.post('/subscribe', (req, res) => {
   const { userId, subscription } = req.body;
@@ -586,6 +702,50 @@ function maskedUser(value) {
   const text = String(value || '');
   return text.length <= 6 ? '••••••' : `••••${text.slice(-6)}`;
 }
+function upcomingNotifications(hours = 24) {
+  const now = Date.now(), until = now + Math.min(Math.max(Number(hours) || 24, 1), 168) * 60 * 60 * 1000, items = [];
+  for (const userId of getAllUserData()) {
+    const u = getUserData(userId); if (!u) continue;
+    for (const task of u.tasks || []) {
+      if (task.done || !task.date || !task.time) continue;
+      const deadline = taskDeadlineMs(task, Number(u.tzOffset) || 180); if (!Number.isFinite(deadline)) continue;
+      const important = task.pri === 'R' || task.priority === 'important';
+      const stages = [...(important ? [['important2h', 120]] : []), ['h1', 60], ['m30', 30], ['start', 0], ['overdue', -15]];
+      const sent = u.reminders?.[task.id] || {};
+      for (const [stage, beforeMin] of stages) {
+        const at = deadline - beforeMin * 60000;
+        if (!sent[stage] && at >= now && at <= until) items.push({ at, kind: 'task', stage, userId: maskedUser(userId), ref: `дело •${String(task.id || '').slice(-5)}`, important });
+      }
+    }
+  }
+  for (const row of db.prepare('SELECT * FROM scheduledPush WHERE enabled=1').all()) {
+    const offset = Number(row.tzOffset) || 180, localNow = new Date(now + offset * 60000);
+    let at = Date.UTC(localNow.getUTCFullYear(), localNow.getUTCMonth(), localNow.getUTCDate(), Number(row.hour), Number(row.minute)) - offset * 60000;
+    if (at <= now || row.lastSentDay === localDateParts(offset).tk) at += 24 * 60 * 60 * 1000;
+    if (at <= until) items.push({ at, kind: row.type, stage: 'scheduled', userId: maskedUser(row.userId), ref: String(row.title || row.type).slice(0, 80), important: false });
+  }
+  return items.sort((a, b) => a.at - b.at).slice(0, 200);
+}
+
+const BACKUP_DIR = process.env.BACKUP_DIR || path.join(process.cwd(), 'backups');
+function backupList() {
+  try {
+    mkdirSync(BACKUP_DIR, { recursive: true });
+    return readdirSync(BACKUP_DIR).filter(name => /^planner-\d{8}-\d{6}\.db$/.test(name)).map(name => {
+      const full = path.join(BACKUP_DIR, name), stat = statSync(full);
+      return { name, bytes: stat.size, createdAt: stat.mtimeMs };
+    }).sort((a, b) => b.createdAt - a.createdAt);
+  } catch (_) { return []; }
+}
+async function createDatabaseBackup(reason = 'manual') {
+  mkdirSync(BACKUP_DIR, { recursive: true });
+  const stamp = new Date().toISOString().replace(/[-:]/g, '').replace('T', '-').slice(0, 15), name = `planner-${stamp}.db`, destination = path.join(BACKUP_DIR, name);
+  const integrity = db.pragma('quick_check', { simple: true });
+  if (String(integrity).toLowerCase() !== 'ok') throw new Error(`database integrity: ${integrity}`);
+  await db.backup(destination);
+  setSystemState('lastBackup', JSON.stringify({ name, reason, createdAt: Date.now() }));
+  return backupList().find(item => item.name === name);
+}
 
 app.get('/health', (req, res) => res.json({ ok: true, service: 'lumo-push', time: Date.now() }));
 app.get('/developer/status', requireDeveloper, (req, res) => {
@@ -598,6 +758,10 @@ app.get('/developer/status', requireDeveloper, (req, res) => {
   const recentPush = db.prepare(`SELECT userId,type,title,ok,statusCode,error,ts FROM pushLog ORDER BY ts DESC LIMIT 40`).all().map(row => ({
     ...row, userId: maskedUser(row.userId), title: String(row.title || '').slice(0, 120), error: String(row.error || '').slice(0, 160), ok: !!row.ok
   }));
+  const devices = db.prepare('SELECT * FROM deviceHealth ORDER BY lastSeen DESC LIMIT 100').all().map(row => ({ ...row, userId: maskedUser(row.userId), pushSubscribed: !!row.pushSubscribed }));
+  const versions = db.prepare('SELECT appVersion version,COUNT(*) count,MAX(lastSeen) lastSeen FROM deviceHealth GROUP BY appVersion ORDER BY count DESC').all();
+  const errors = db.prepare('SELECT id,userId,deviceId,kind,message,path,appVersion,ts FROM clientErrors ORDER BY ts DESC LIMIT 60').all().map(row => ({ ...row, userId: maskedUser(row.userId) }));
+  const recentTrace = db.prepare('SELECT traceKey,userId,type,stage,detail,ts FROM notificationTrace ORDER BY ts DESC LIMIT 80').all().map(row => ({ ...row, userId: maskedUser(row.userId) }));
   let databaseBytes = 0;
   try { databaseBytes = statSync('planner.db').size; } catch (_) {}
   const memory = process.memoryUsage();
@@ -605,7 +769,7 @@ app.get('/developer/status', requireDeveloper, (req, res) => {
     ok: true,
     generatedAt: now,
     server: { uptimeSec: Math.floor(process.uptime()), node: process.version, pid: process.pid, memory: { rss: memory.rss, heapUsed: memory.heapUsed, heapTotal: memory.heapTotal } },
-    services: { push: !!(PUBLIC_KEY && PRIVATE_KEY), whisper: existsSync(WHISPER_BIN) && existsSync(WHISPER_MODEL), whisperBusy: voiceBusy, database: true },
+    services: { push: !!(PUBLIC_KEY && PRIVATE_KEY), whisper: existsSync(WHISPER_BIN) && existsSync(WHISPER_MODEL), whisperBusy: voiceBusy, database: true, telegram: !!telegramBot, telegramLinked: !!telegramChatId() },
     database: {
       bytes: databaseBytes,
       subscriptions: scalar('SELECT COUNT(*) count FROM subs'),
@@ -618,9 +782,41 @@ app.get('/developer/status', requireDeveloper, (req, res) => {
       activeSchedules: scalar('SELECT COUNT(*) count FROM scheduledPush WHERE enabled=1')
     },
     delivery24h: { total: Number(delivery?.count || 0), sent: Number(delivery?.sent || 0), failed: Number(delivery?.failed || 0) },
-    schedules,
-    recentPush
+    schedules, recentPush, devices, versions, errors, recentTrace,
+    upcoming: upcomingNotifications(24),
+    backups: backupList().slice(0, 30),
+    maintenance: getMaintenance(),
+    telegram: { configured: !!telegramBot, linked: !!telegramChatId(), username: `@${process.env.TELEGRAM_ALLOWED_USERNAME || 'EvgenAkfix'}` }
   });
+});
+
+app.get('/developer/trace', requireDeveloper, (req, res) => {
+  const key = String(req.query.key || '').slice(0, 200);
+  const rows = key ? db.prepare('SELECT * FROM notificationTrace WHERE traceKey=? ORDER BY ts ASC LIMIT 200').all(key) : db.prepare('SELECT * FROM notificationTrace ORDER BY ts DESC LIMIT 200').all();
+  res.json({ ok: true, trace: rows.map(row => ({ ...row, userId: maskedUser(row.userId) })) });
+});
+app.post('/developer/test-push', requireDeveloper, async (req, res) => {
+  const device = db.prepare('SELECT * FROM deviceHealth WHERE deviceId=?').get(String(req.body?.deviceId || ''));
+  if (!device) return res.status(404).json({ ok: false, error: 'device not found' });
+  const traceKey = `developer-test-${randomUUID()}`;
+  const sent = await sendPush(device.userId, { type: 'developer-test', traceKey, title: '🧪 Тест Lumo Console', body: `Push доставлен на ${device.platform || 'устройство'} в ${new Date().toLocaleTimeString('ru-RU')}` });
+  res.json({ ok: sent, traceKey });
+});
+app.post('/developer/telegram/test', requireDeveloper, async (req, res) => {
+  const sent = await telegramSend('✅ Тест Lumo Console: связь с сервером работает.');
+  res.status(sent ? 200 : 503).json({ ok: sent, error: sent ? '' : (telegramBot ? 'Открой бота и нажми /start' : 'Не задан TELEGRAM_BOT_TOKEN') });
+});
+app.post('/developer/maintenance', requireDeveloper, (req, res) => {
+  const b = req.body || {}, features = {};
+  for (const key of ['voice', 'push', 'family', 'sync']) if (typeof b.features?.[key] === 'boolean') features[key] = b.features[key];
+  const state = { enabled: !!b.enabled, message: cleanDiagnosticText(b.message, 180), features };
+  setSystemState('maintenance', JSON.stringify(state));
+  telegramSend(`🛠 Режим обслуживания Lumo: ${state.enabled ? 'ВКЛЮЧЁН' : 'выключен'}${state.message ? `\n${state.message}` : ''}`);
+  res.json({ ok: true, maintenance: state });
+});
+app.post('/developer/backups', requireDeveloper, async (req, res) => {
+  try { const backup = await createDatabaseBackup('manual'); res.json({ ok: true, backup }); }
+  catch (error) { raiseAlert('backup-failed', `Ошибка резервной копии: ${error.message}`, 10 * 60 * 1000); res.status(500).json({ ok: false, error: error.message }); }
 });
 
 app.post('/voice/transcribe', express.raw({ type: ['audio/wav', 'audio/x-wav', 'application/octet-stream'], limit: VOICE_MAX_BYTES }), async (req, res) => {
@@ -671,4 +867,18 @@ app.post('/schedule-morning', express.json(), async (req, res) => {
   setTimeout(runReminderScheduler, 0);
   res.json({ ok: true, scheduleId: id, persistent: true });
 }); 
+async function monitorSystemHealth() {
+  try {
+    const lastBackup = backupList()[0];
+    if (!lastBackup || Date.now() - lastBackup.createdAt > 24 * 60 * 60 * 1000) await createDatabaseBackup('automatic');
+  } catch (error) { raiseAlert('backup-failed', `Не удалось создать резервную копию: ${error.message}`, 60 * 60 * 1000); }
+  const since = Date.now() - 15 * 60 * 1000;
+  const push = db.prepare(`SELECT COUNT(*) total,SUM(CASE WHEN ok=0 THEN 1 ELSE 0 END) failed FROM pushLog WHERE ts>=?`).get(since);
+  const failed = Number(push?.failed || 0), total = Number(push?.total || 0);
+  if (failed >= 3 && failed / Math.max(total, 1) >= .4) raiseAlert('push-rate', `За 15 минут не доставлено ${failed} из ${total} push.`, 30 * 60 * 1000);
+  if (!existsSync(WHISPER_BIN) || !existsSync(WHISPER_MODEL)) raiseAlert('whisper-offline', 'Whisper недоступен: проверь бинарный файл и модель.', 3 * 60 * 60 * 1000);
+  try { const bytes = statSync('planner.db').size; if (bytes > 100 * 1024 * 1024) raiseAlert('database-size', `База выросла до ${Math.round(bytes / 1048576)} МБ.`, 24 * 60 * 60 * 1000); } catch (_) {}
+}
+setInterval(monitorSystemHealth, 5 * 60 * 1000);
+setTimeout(monitorSystemHealth, 5000);
 app.listen(PORT, () => console.log('Сервер запущен на порту', PORT));
