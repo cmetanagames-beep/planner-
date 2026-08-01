@@ -50,6 +50,8 @@ db.exec(`CREATE TABLE IF NOT EXISTS cloudHistory (id INTEGER PRIMARY KEY AUTOINC
 db.exec(`CREATE TABLE IF NOT EXISTS cloudInvites (token TEXT PRIMARY KEY, code TEXT NOT NULL, createdBy TEXT, expiresAt INTEGER NOT NULL, usedAt INTEGER, usedBy TEXT)`);
 db.prepare('DELETE FROM cloudInvites WHERE expiresAt < ? OR usedAt IS NOT NULL').run(Date.now() - 24 * 60 * 60 * 1000);
 db.exec(`CREATE TABLE IF NOT EXISTS eventFeed (id TEXT PRIMARY KEY, targetUserId TEXT NOT NULL, familyCode TEXT, type TEXT, title TEXT, body TEXT, data TEXT, ts INTEGER, readAt INTEGER)`);
+db.exec(`CREATE TABLE IF NOT EXISTS userAccess (userId TEXT PRIMARY KEY, blocked INTEGER NOT NULL DEFAULT 0, reason TEXT, updatedAt INTEGER NOT NULL)`);
+db.exec(`CREATE TABLE IF NOT EXISTS adminAudit (id INTEGER PRIMARY KEY AUTOINCREMENT, supportCode TEXT, action TEXT NOT NULL, detail TEXT, ts INTEGER NOT NULL)`);
 try { db.exec(`ALTER TABLE inbox ADD COLUMN status TEXT DEFAULT 'pending'`); } catch (e) {}
 try { db.exec(`ALTER TABLE inbox ADD COLUMN comment TEXT DEFAULT ''`); } catch (e) {}
 try { db.exec(`ALTER TABLE inbox ADD COLUMN respondedAt INTEGER`); } catch (e) {}
@@ -60,6 +62,7 @@ db.prepare('DELETE FROM notificationTrace WHERE ts < ?').run(Date.now() - 30 * 2
 db.prepare('DELETE FROM clientErrors WHERE ts < ?').run(Date.now() - 30 * 24 * 60 * 60 * 1000);
 db.prepare('DELETE FROM developerAccess WHERE ts < ?').run(Date.now() - 30 * 24 * 60 * 60 * 1000);
 db.prepare('DELETE FROM telegramLog WHERE ts < ?').run(Date.now() - 30 * 24 * 60 * 60 * 1000);
+db.prepare('DELETE FROM adminAudit WHERE ts < ?').run(Date.now() - 180 * 24 * 60 * 60 * 1000);
 
 function getSystemState(key, fallback = '') {
   const row = db.prepare('SELECT value FROM systemState WHERE key = ?').get(key);
@@ -67,6 +70,15 @@ function getSystemState(key, fallback = '') {
 }
 function setSystemState(key, value) {
   db.prepare(`INSERT INTO systemState (key,value,updatedAt) VALUES (?,?,?) ON CONFLICT(key) DO UPDATE SET value=excluded.value,updatedAt=excluded.updatedAt`).run(key, String(value), Date.now());
+}
+function userAccessState(userId) {
+  if (!userId) return { blocked: false, reason: '' };
+  const row = db.prepare('SELECT blocked,reason,updatedAt FROM userAccess WHERE userId=?').get(String(userId));
+  return row ? { blocked: !!row.blocked, reason: row.reason || '', updatedAt: row.updatedAt } : { blocked: false, reason: '' };
+}
+function requestUserId(req) { return String(req.body?.userId || req.query?.userId || '').slice(0, 160); }
+function auditAdmin(supportCode, action, detail = '') {
+  db.prepare('INSERT INTO adminAudit(supportCode,action,detail,ts) VALUES(?,?,?,?)').run(String(supportCode || '').slice(0, 16), String(action || '').slice(0, 80), String(detail || '').slice(0, 500), Date.now());
 }
 function getMaintenance() {
   try { return JSON.parse(getSystemState('maintenance', '{"enabled":false,"message":"","features":{}}')); }
@@ -85,6 +97,12 @@ app.use((req, res, next) => {
   if (state.enabled || (feature && state.features?.[feature] === false)) {
     return res.status(503).json({ ok: false, maintenance: true, feature, message: state.message || 'Сервис временно обслуживается' });
   }
+  next();
+});
+app.use((req,res,next)=>{
+  if(req.path.startsWith('/developer')||req.path==='/health'||req.path==='/app-status')return next();
+  const userId=requestUserId(req),access=userAccessState(userId);
+  if(access.blocked)return res.status(403).json({ok:false,blocked:true,reason:access.reason||'Доступ временно приостановлен. Обратитесь в поддержку Lumo.'});
   next();
 });
 
@@ -217,6 +235,7 @@ function claimPushEvent(eventId) {
 }
 
 async function sendPush(userId, titleOrPayload, body, taskId) {
+  if(userAccessState(userId).blocked)return false;
   const sub = getSub(userId);
   const payload = typeof titleOrPayload === 'object' && titleOrPayload
     ? titleOrPayload
@@ -250,7 +269,8 @@ async function sendPush(userId, titleOrPayload, body, taskId) {
 app.get('/key', (req, res) => res.json({ key: PUBLIC_KEY }));
 app.get('/app-status', (req, res) => {
   const maintenance = getMaintenance();
-  res.set('Cache-Control', 'no-store').json({ ok: !maintenance.enabled, maintenance });
+  const access=userAccessState(String(req.query?.userId||''));
+  res.set('Cache-Control', 'no-store').json({ ok: !maintenance.enabled&&!access.blocked, maintenance, blocked:access.blocked, reason:access.reason||'' });
 });
 
 const telemetryHits = new Map();
@@ -792,6 +812,30 @@ function maskedUser(value) {
   const text = String(value || '');
   return text.length <= 6 ? '••••••' : `••••${text.slice(-6)}`;
 }
+function supportDevice(code) {
+  return db.prepare('SELECT * FROM deviceHealth WHERE supportCode=? ORDER BY lastSeen DESC LIMIT 1').get(String(code||'').toUpperCase().replace(/[^A-Z0-9]/g,'').slice(0,10));
+}
+function supportGroup(device) {
+  if(!device)return {userIds:[],cloudCode:''};
+  const cloud=db.prepare('SELECT code FROM cloudDevices WHERE userId=?').get(device.userId),cloudCode=cloud?.code||'';
+  const userIds=cloudCode?db.prepare('SELECT userId FROM cloudDevices WHERE code=?').all(cloudCode).map(x=>x.userId):[device.userId];
+  if(!userIds.includes(device.userId))userIds.push(device.userId);
+  return {userIds:[...new Set(userIds)],cloudCode};
+}
+function placeholders(values){return values.map(()=>'?').join(',');}
+function supportSummary(code) {
+  const device=supportDevice(code);if(!device)return null;
+  const group=supportGroup(device),ids=group.userIds,marks=placeholders(ids),now=Date.now();
+  const devices=db.prepare(`SELECT deviceId,platform,appVersion,swVersion,displayMode,pushPermission,pushSubscribed,lastSeen,supportCode FROM deviceHealth WHERE userId IN (${marks}) ORDER BY lastSeen DESC`).all(...ids).map(row=>({...row,pushSubscribed:!!row.pushSubscribed,stale:now-row.lastSeen>7*24*60*60*1000}));
+  const access=ids.map(userId=>userAccessState(userId)),blocked=access.some(x=>x.blocked),reason=access.find(x=>x.blocked)?.reason||'';
+  const subscriptionCount=Number(db.prepare(`SELECT COUNT(*) n FROM subs WHERE userId IN (${marks})`).get(...ids).n||0);
+  const schedules=db.prepare(`SELECT scheduleId,type,title,hour,minute,enabled,lastSentDay FROM scheduledPush WHERE userId IN (${marks}) ORDER BY enabled DESC,title LIMIT 40`).all(...ids).map(x=>({...x,enabled:!!x.enabled}));
+  const recentPush=db.prepare(`SELECT type,title,ok,statusCode,error,ts FROM pushLog WHERE userId IN (${marks}) ORDER BY ts DESC LIMIT 30`).all(...ids).map(x=>({...x,ok:!!x.ok,error:String(x.error||'').slice(0,200)}));
+  const errors=db.prepare(`SELECT id,kind,message,path,appVersion,ts,resolvedAt FROM clientErrors WHERE userId IN (${marks}) ORDER BY ts DESC LIMIT 30`).all(...ids);
+  let cloud=null;
+  if(group.cloudCode){const row=db.prepare('SELECT revision,updatedAt,data FROM cloudData WHERE code=?').get(group.cloudCode);if(row){let data={};try{data=JSON.parse(row.data||'{}')}catch(_){}const planner=data?.planner||{};cloud={revision:row.revision,updatedAt:row.updatedAt,bytes:Buffer.byteLength(row.data||''),tasks:Array.isArray(planner.tasks)?planner.tasks.length:0,expenses:Array.isArray(planner.finance)?planner.finance.length:0,income:Array.isArray(planner.income)?planner.income.length:0,notes:Array.isArray(planner.notes)?planner.notes.length:0,habits:Array.isArray(planner.habits)?planner.habits.length:0,history:Number(db.prepare('SELECT COUNT(*) n FROM cloudHistory WHERE code=?').get(group.cloudCode).n||0)};}}
+  return {supportCode:String(device.supportCode||''),blocked,reason,userCount:ids.length,subscriptionCount,devices,schedules,recentPush,errors,cloud};
+}
 function upcomingNotifications(hours = 24) {
   const now = Date.now(), until = now + Math.min(Math.max(Number(hours) || 24, 1), 168) * 60 * 60 * 1000, items = [];
   for (const userId of getAllUserData()) {
@@ -850,12 +894,13 @@ app.get('/developer/status', requireDeveloper, (req, res) => {
   const recentPush = db.prepare(`SELECT userId,type,title,ok,statusCode,error,ts FROM pushLog ORDER BY ts DESC LIMIT 40`).all().map(row => ({
     ...row, userId: maskedUser(row.userId), title: String(row.title || '').slice(0, 120), error: String(row.error || '').slice(0, 160), ok: !!row.ok
   }));
-  const devices = db.prepare('SELECT * FROM deviceHealth ORDER BY lastSeen DESC LIMIT 100').all().map(row => ({ ...row, userId: maskedUser(row.userId), pushSubscribed: !!row.pushSubscribed, stale: now-row.lastSeen>7*24*60*60*1000 }));
+  const devices = db.prepare('SELECT * FROM deviceHealth ORDER BY lastSeen DESC LIMIT 100').all().map(row => ({ ...row, userId: maskedUser(row.userId), pushSubscribed: !!row.pushSubscribed, blocked:userAccessState(row.userId).blocked, stale: now-row.lastSeen>7*24*60*60*1000 }));
   const versions = db.prepare('SELECT appVersion version,COUNT(*) count,MAX(lastSeen) lastSeen FROM deviceHealth GROUP BY appVersion ORDER BY count DESC').all();
   const errors = db.prepare('SELECT id,userId,deviceId,kind,message,path,appVersion,ts,resolvedAt FROM clientErrors ORDER BY ts DESC LIMIT 60').all().map(row => ({ ...row, userId: maskedUser(row.userId) }));
   const recentTrace = db.prepare('SELECT traceKey,userId,type,stage,detail,ts FROM notificationTrace ORDER BY ts DESC LIMIT 80').all().map(row => ({ ...row, userId: maskedUser(row.userId) }));
   const telegramLog = db.prepare('SELECT id,ok,message,error,ts FROM telegramLog ORDER BY ts DESC LIMIT 30').all().map(row => ({ ...row, ok: !!row.ok }));
   const accessLog = db.prepare('SELECT id,ip,ok,path,ts FROM developerAccess ORDER BY ts DESC LIMIT 30').all().map(row => ({ ...row, ok: !!row.ok, ip: maskedUser(row.ip) }));
+  const adminAudit=db.prepare('SELECT id,supportCode,action,detail,ts FROM adminAudit ORDER BY ts DESC LIMIT 50').all();
   let databaseBytes = 0;
   try { databaseBytes = statSync('planner.db').size; } catch (_) {}
   const memory = process.memoryUsage();
@@ -877,15 +922,35 @@ app.get('/developer/status', requireDeveloper, (req, res) => {
       cloudCopies: scalar('SELECT COUNT(*) count FROM cloudData'),
       unreadEvents: scalar('SELECT COUNT(*) count FROM eventFeed WHERE readAt IS NULL'),
       schedules: scalar('SELECT COUNT(*) count FROM scheduledPush'),
-      activeSchedules: scalar('SELECT COUNT(*) count FROM scheduledPush WHERE enabled=1')
+      activeSchedules: scalar('SELECT COUNT(*) count FROM scheduledPush WHERE enabled=1'),
+      blockedUsers: scalar('SELECT COUNT(*) count FROM userAccess WHERE blocked=1')
     },
     delivery24h: { total: Number(delivery?.count || 0), sent: Number(delivery?.sent || 0), failed: Number(delivery?.failed || 0) },
-    schedules, recentPush, devices, versions, errors, recentTrace, telegramLog, accessLog,
+    schedules, recentPush, devices, versions, errors, recentTrace, telegramLog, accessLog, adminAudit,
     upcoming: upcomingNotifications(24),
     backups: backupList().slice(0, 30),
     maintenance: getMaintenance(),
     telegram: { configured: !!telegramBot, linked: !!telegramChatId(), username: `@${process.env.TELEGRAM_ALLOWED_USERNAME || 'EvgenAkfix'}` }
   });
+});
+
+app.get('/developer/user',requireDeveloper,(req,res)=>{const summary=supportSummary(req.query?.supportCode);if(!summary)return res.status(404).json({ok:false,error:'Код поддержки не найден. Попросите пользователя открыть Настройки → Уведомления PWA.'});res.json({ok:true,user:summary});});
+app.post('/developer/user/access',requireDeveloper,(req,res)=>{
+  const support=String(req.body?.supportCode||'').toUpperCase().replace(/[^A-Z0-9]/g,'').slice(0,10),device=supportDevice(support);if(!device)return res.status(404).json({ok:false,error:'Код поддержки не найден'});
+  const group=supportGroup(device),blocked=!!req.body?.blocked,reason=cleanDiagnosticText(req.body?.reason,180)||(blocked?'Доступ временно приостановлен администратором Lumo.':'');
+  const stmt=db.prepare(`INSERT INTO userAccess(userId,blocked,reason,updatedAt) VALUES(?,?,?,?) ON CONFLICT(userId) DO UPDATE SET blocked=excluded.blocked,reason=excluded.reason,updatedAt=excluded.updatedAt`),tx=db.transaction(()=>group.userIds.forEach(id=>stmt.run(id,blocked?1:0,blocked?reason:'',Date.now())));tx();
+  auditAdmin(support,blocked?'access-block':'access-unblock',blocked?reason:`устройств: ${group.userIds.length}`);res.json({ok:true,user:supportSummary(support)});
+});
+app.post('/developer/user/message',requireDeveloper,async(req,res)=>{
+  const support=String(req.body?.supportCode||'').toUpperCase().replace(/[^A-Z0-9]/g,'').slice(0,10),device=supportDevice(support);if(!device)return res.status(404).json({ok:false,error:'Код поддержки не найден'});
+  const message=cleanDiagnosticText(req.body?.message,220);if(message.length<2)return res.status(400).json({ok:false,error:'Введите сообщение'});
+  const group=supportGroup(device);let sent=0;for(const userId of group.userIds)if(await sendPush(userId,{type:'support-message',eventKey:`support:${support}:${Date.now()}:${userId}`,title:'Поддержка Lumo',body:message}))sent++;
+  auditAdmin(support,'support-message',`${message} · доставлено ${sent}/${group.userIds.length}`);res.status(sent?200:503).json({ok:!!sent,sent,total:group.userIds.length,error:sent?'':'Нет активной push-подписки или доступ заблокирован'});
+});
+app.post('/developer/user/snapshot',requireDeveloper,(req,res)=>{
+  const support=String(req.body?.supportCode||'').toUpperCase().replace(/[^A-Z0-9]/g,'').slice(0,10),device=supportDevice(support);if(!device)return res.status(404).json({ok:false,error:'Код поддержки не найден'});
+  const group=supportGroup(device);if(!group.cloudCode)return res.status(404).json({ok:false,error:'Облачная защита не подключена'});const cloud=db.prepare('SELECT * FROM cloudData WHERE code=?').get(group.cloudCode);if(!cloud)return res.status(404).json({ok:false,error:'Облачная копия не найдена'});
+  db.prepare('INSERT INTO cloudHistory(code,revision,data,createdAt,reason) VALUES(?,?,?,?,?)').run(group.cloudCode,cloud.revision,cloud.data,Date.now(),'developer-manual-snapshot');auditAdmin(support,'cloud-snapshot',`revision ${cloud.revision}`);res.json({ok:true,user:supportSummary(support)});
 });
 
 app.get('/developer/trace', requireDeveloper, (req, res) => {
@@ -901,7 +966,7 @@ app.post('/developer/test-push', requireDeveloper, async (req, res) => {
   res.json({ ok: sent, traceKey });
 });
 app.post('/developer/device/update',requireDeveloper,async(req,res)=>{const device=db.prepare('SELECT * FROM deviceHealth WHERE deviceId=?').get(String(req.body?.deviceId||''));if(!device)return res.status(404).json({ok:false,error:'device not found'});const sent=await sendPush(device.userId,{type:'system-update',eventKey:`update:${device.deviceId}:${Date.now()}`,title:'Доступно обновление Lumo',body:'Открой уведомление, чтобы установить свежую версию.'});res.status(sent?200:503).json({ok:sent});});
-app.post('/developer/cloud/restore-yesterday',requireDeveloper,(req,res)=>{const support=String(req.body?.supportCode||'').toUpperCase(),device=db.prepare('SELECT * FROM deviceHealth WHERE supportCode=?').get(support);if(!device)return res.status(404).json({ok:false,error:'device not found'});const cloud=db.prepare('SELECT c.* FROM cloudData c JOIN cloudDevices d ON d.code=c.code WHERE d.userId=?').get(device.userId);if(!cloud)return res.status(404).json({ok:false,error:'cloud not connected'});const target=db.prepare('SELECT * FROM cloudHistory WHERE code=? AND createdAt<=? ORDER BY createdAt DESC LIMIT 1').get(cloud.code,Date.now()-20*60*60*1000);if(!target)return res.status(404).json({ok:false,error:'yesterday copy not found'});const now=Date.now();db.prepare('INSERT INTO cloudHistory(code,revision,data,createdAt,reason) VALUES(?,?,?,?,?)').run(cloud.code,cloud.revision,cloud.data,now,'before-developer-restore');db.prepare('UPDATE cloudData SET data=?,revision=?,updatedAt=?,updatedBy=? WHERE code=?').run(target.data,cloud.revision+1,now,'developer-restore',cloud.code);res.json({ok:true,revision:cloud.revision+1,restoredAt:target.createdAt});});
+app.post('/developer/cloud/restore-yesterday',requireDeveloper,(req,res)=>{const support=String(req.body?.supportCode||'').toUpperCase().replace(/[^A-Z0-9]/g,'').slice(0,10),device=supportDevice(support);if(!device)return res.status(404).json({ok:false,error:'device not found'});const cloud=db.prepare('SELECT c.* FROM cloudData c JOIN cloudDevices d ON d.code=c.code WHERE d.userId=?').get(device.userId);if(!cloud)return res.status(404).json({ok:false,error:'cloud not connected'});const target=db.prepare('SELECT * FROM cloudHistory WHERE code=? AND createdAt<=? ORDER BY createdAt DESC LIMIT 1').get(cloud.code,Date.now()-20*60*60*1000);if(!target)return res.status(404).json({ok:false,error:'yesterday copy not found'});const now=Date.now();db.prepare('INSERT INTO cloudHistory(code,revision,data,createdAt,reason) VALUES(?,?,?,?,?)').run(cloud.code,cloud.revision,cloud.data,now,'before-developer-restore');db.prepare('UPDATE cloudData SET data=?,revision=?,updatedAt=?,updatedBy=? WHERE code=?').run(target.data,cloud.revision+1,now,'developer-restore',cloud.code);auditAdmin(support,'cloud-restore-yesterday',`revision ${cloud.revision+1}`);res.json({ok:true,revision:cloud.revision+1,restoredAt:target.createdAt});});
 app.post('/developer/telegram/test', requireDeveloper, async (req, res) => {
   const sent = await telegramSend('✅ Тест Lumo Console: связь с сервером работает.');
   res.status(sent ? 200 : 503).json({ ok: sent, error: sent ? '' : (telegramBot ? 'Открой бота и нажми /start' : 'Не задан TELEGRAM_BOT_TOKEN') });

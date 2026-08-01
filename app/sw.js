@@ -1,4 +1,4 @@
-const CACHE = 'planner-v99';
+const CACHE = 'planner-v102';
 const PUSH_STATE_CACHE = 'lumo-push-state-v1';
 const PUSH_TRACE_API='https://pushevgen.duckdns.org/telemetry/push-state';
 function tracePush(d,stage,detail=''){if(!d?.traceKey)return Promise.resolve();return fetch(PUSH_TRACE_API,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({traceKey:d.traceKey,type:d.type||'',stage,detail}),keepalive:true}).catch(()=>{});}
@@ -7,8 +7,8 @@ const ASSETS = [
   './',
   './index.html',
   './manifest.json',
-  './assets/css/app.css',
-  './assets/js/app.js',
+  './assets/css/app.css?v=102',
+  './assets/js/app.js?v=102',
   './assets/icons/icon.svg',
   './assets/icons/icon.png'
 ];
@@ -39,6 +39,13 @@ self.addEventListener('activate', e => {
 // ===== КЭШ (офлайн) =====
 self.addEventListener('fetch', e => {
   if(e.request.method !== 'GET'){ return; }
+  if(e.request.mode === 'navigate'){
+    e.respondWith(fetch(e.request,{cache:'no-store'}).then(resp=>{
+      if(resp.status===200){const clone=resp.clone();caches.open(CACHE).then(c=>c.put('./index.html',clone));}
+      return resp;
+    }).catch(()=>caches.match('./index.html')));
+    return;
+  }
   e.respondWith(
     caches.match(e.request).then(r => r || fetch(e.request).then(resp => {
       if(resp.status === 200 &&
@@ -47,10 +54,7 @@ self.addEventListener('fetch', e => {
         caches.open(CACHE).then(c => c.put(e.request, clone));
       }
       return resp;
-    }).catch(() => {
-      if(e.request.mode === 'navigate') return caches.match('./index.html');
-      return Response.error();
-    }))
+    }).catch(() => Response.error()))
   );
 });
 

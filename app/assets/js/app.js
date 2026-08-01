@@ -2271,7 +2271,7 @@ async function resolveCloudConflict(choice){if(!cloudConflict)return;let data=ch
 
 /* ===== СЕМЬЯ + ПУШИ (сервер) ===== */
 const FAMILY_SERVER='https://pushevgen.duckdns.org'; // без слэша на конце, через https!
-const LUMO_APP_VERSION='v99';
+const LUMO_APP_VERSION='v102';
 const LUMO_DEVICE_ID=(()=>{let id=localStorage.getItem('lumo_device_id_v1');if(!id){id='dev_'+Date.now().toString(36)+'_'+Math.random().toString(36).slice(2,10);localStorage.setItem('lumo_device_id_v1',id)}return id})();
 const LUMO_SUPPORT_CODE=(()=>{let code=localStorage.getItem('lumo_support_code_v1');if(!code){const chars='ABCDEFGHJKLMNPQRSTUVWXYZ23456789';code='';for(let i=0;i<8;i++)code+=chars[Math.floor(Math.random()*chars.length)];localStorage.setItem('lumo_support_code_v1',code)}return code})();
 function diagnosticPlatform(){const ua=navigator.userAgent||'';if(/android/i.test(ua))return'Android';if(/iphone|ipad|ipod/i.test(ua))return'iOS';if(/windows/i.test(ua))return'Windows';if(/macintosh|mac os/i.test(ua))return'macOS';return'Web'}
@@ -2292,6 +2292,20 @@ window.addEventListener('error',event=>reportClientError('javascript',event.erro
 window.addEventListener('unhandledrejection',event=>reportClientError('promise',event.reason));
 let PUSH_USER_ID=localStorage.getItem('push_user_id')||'';
 if(!PUSH_USER_ID){PUSH_USER_ID='u_'+Date.now()+'_'+Math.random().toString(36).slice(2,8);localStorage.setItem('push_user_id',PUSH_USER_ID);}
+let _serverAccessCheckedAt=0;
+function renderServerAccess(state){
+  let overlay=document.getElementById('lumo-access-lock');
+  const locked=!!state?.blocked||!!state?.maintenance?.enabled;
+  if(!locked){overlay?.remove();return;}
+  if(!overlay){overlay=document.createElement('div');overlay.id='lumo-access-lock';overlay.innerHTML='<div class="access-lock-card"><div class="access-lock-icon">⌁</div><h1></h1><p></p><small></small><button type="button">Проверить доступ</button></div>';overlay.querySelector('button').onclick=()=>checkServerAccess(true);document.body.append(overlay);}
+  overlay.querySelector('h1').textContent=state.blocked?'Доступ к Lumo приостановлен':'Lumo временно обслуживается';
+  overlay.querySelector('p').textContent=state.reason||state.maintenance?.message||'Попробуйте снова немного позже.';
+  overlay.querySelector('small').textContent=`Код поддержки: ${LUMO_SUPPORT_CODE}`;
+}
+async function checkServerAccess(force=false){
+  if(!force&&Date.now()-_serverAccessCheckedAt<5*60*1000)return;_serverAccessCheckedAt=Date.now();
+  try{const r=await fetch(`${FAMILY_SERVER}/app-status?userId=${encodeURIComponent(PUSH_USER_ID)}`,{cache:'no-store'}),state=await r.json();renderServerAccess(state);}catch(_){}
+}
 const VAPID_PUBLIC=localStorage.getItem('vapid_public')||''; // подставится с сервера при подписке
 
 function getMyName(){return load().myName||'';}
@@ -2691,6 +2705,10 @@ function dateFromText(low){
 }
 function timeFromText(low){
   const relative=relativeScheduleFromText(low);if(relative)return relative.time;
+  if(/(?:^|\s)утром(?=\s|$)/.test(low))return '08:00';
+  if(/(?:^|\s)(?:днем|днём)(?=\s|$)/.test(low))return '13:00';
+  if(/(?:^|\s)вечером(?=\s|$)/.test(low))return '19:00';
+  if(/(?:^|\s)ночью(?=\s|$)/.test(low))return '22:00';
   const withoutDates=low.replace(/\b[0-3]?\d[./][01]?\d(?:[./](?:20)?\d{2})?\b/g,' ').replace(/(?:^|\s)(?:на|за)\s+0[1-9](?=\s|$)/g,' ');
   const tm=withoutDates.match(/(?:в|к|на|после)\s*(\d{1,2})(?:[:.\-\s](\d{2}))?(?!\s*(?:т(?:\s|$)|тыс|тыщ|руб|₽))(?:\s*(?:ч(?:ас(?:а|ов)?)?|утра|дня|вечера))?|\b(\d{1,2})[:.\-](\d{2})\b/);
   if(tm){let hh=Number(tm[1]||tm[3]),mm=Number(tm[2]||tm[4]||0);if(/вечера/.test(tm[0])&&hh<12)hh+=12;if(/дня/.test(tm[0])&&hh<7)hh+=12;if(hh<=23&&mm<=59)return String(hh).padStart(2,'0')+':'+String(mm).padStart(2,'0');}
@@ -2772,6 +2790,7 @@ function cleanLocalTitle(text){
     .replace(/^(?:у\s+меня|мне)\s+/i,'')
     .replace(/(?:^|\s)(?:сегодня|завтра|послезавтра|через\s+(?:(?:\d+\s+)?(?:дн[а-яё]*|час[а-яё]*|мин[а-яё]*)|полчас(?:а|ика)?))(?=\s|$)/gi,' ')
     .replace(/(?:^|\s)(?:в|во)\s+(?:понедельник|вторник|среду?|четверг|пятницу?|субботу?|воскресенье)(?=\s|$)/gi,' ')
+    .replace(/(?:^|\s)(?:утром|днем|днём|вечером|ночью)(?=\s|$)/gi,' ')
     .replace(/\b\d{1,2}\s+(?:январ\w*|феврал\w*|март\w*|апрел\w*|мая|июн\w*|июл\w*|август\w*|сентябр\w*|октябр\w*|ноябр\w*|декабр\w*)/gi,'')
     .replace(/\b[0-3]?\d[./][01]?\d(?:[./](?:20)?\d{2})?\b/g,' ')
     .replace(/(?:^|\s)(?:в|к|на)\s*\d{1,2}(?:(?:[:.\-]|\s)\d{2})?\s*(?:час(?:а|ов)?|утра|дня|вечера)?/gi,' ')
@@ -2811,7 +2830,35 @@ function normalizeAssistantText(text){
     [/(^|\s)доб(?=\s|$)/gi,'$1добавить']
   ];
   rules.forEach(([pattern,replacement])=>{value=value.replace(pattern,replacement);});
-  return value.replace(/\s+/g,' ').trim();
+  return normalizeSpokenMoneyAmounts(value).replace(/\s+/g,' ').trim();
+}
+function spokenRussianNumber(text){
+  const values={
+    ноль:0,один:1,одна:1,одно:1,два:2,две:2,три:3,четыре:4,пять:5,шесть:6,семь:7,восемь:8,девять:9,
+    десять:10,одиннадцать:11,двенадцать:12,тринадцать:13,четырнадцать:14,пятнадцать:15,шестнадцать:16,
+    семнадцать:17,восемнадцать:18,девятнадцать:19,двадцать:20,тридцать:30,сорок:40,пятьдесят:50,
+    шестьдесят:60,семьдесят:70,восемьдесят:80,девяносто:90,сто:100,двести:200,триста:300,
+    четыреста:400,пятьсот:500,шестьсот:600,семьсот:700,восемьсот:800,девятьсот:900
+  };
+  let total=0,current=0,used=false;
+  String(text||'').toLowerCase().trim().split(/\s+/).forEach(word=>{
+    if(Object.prototype.hasOwnProperty.call(values,word)){current+=values[word];used=true;return;}
+    if(/^(?:тысяч|тысяча|тысячи|тыщу|тыщи|тыщ)$/.test(word)){total+=(current||1)*1000;current=0;used=true;return;}
+    if(/^(?:миллион|миллиона|миллионов)$/.test(word)){total+=(current||1)*1000000;current=0;used=true;}
+  });
+  return used?total+current:0;
+}
+function normalizeSpokenMoneyAmounts(text){
+  const numberWord='(?:ноль|один|одна|одно|два|две|три|четыре|пять|шесть|семь|восемь|девять|десять|одиннадцать|двенадцать|тринадцать|четырнадцать|пятнадцать|шестнадцать|семнадцать|восемнадцать|девятнадцать|двадцать|тридцать|сорок|пятьдесят|шестьдесят|семьдесят|восемьдесят|девяносто|сто|двести|триста|четыреста|пятьсот|шестьсот|семьсот|восемьсот|девятьсот|тысяч(?:а|и|у)?|тыщ(?:а|и|у)?|миллион(?:а|ов)?)';
+  const hybrid=String(text||'').replace(/(^|\s)(\d[\d\s]{0,9})\s+(тысяч(?:а|и|у)?|тыщ(?:а|и|у)?|миллион(?:а|ов)?)(?=\s|$|[.,!?;])/gi,(whole,prefix,digits,scale)=>{
+    const base=Number(String(digits).replace(/\s/g,'')),factor=/миллион/i.test(scale)?1000000:1000;
+    return prefix+String(base*factor);
+  });
+  const pattern=new RegExp(`(^|\\s)(${numberWord}(?:\\s+${numberWord}){0,7})(?=\\s|$|[.,!?;])`,'gi');
+  return hybrid.replace(pattern,(whole,prefix,phrase)=>{
+    if(!/(?:тысяч|тыщ|миллион)/i.test(phrase))return prefix+phrase;
+    const value=spokenRussianNumber(phrase);return prefix+(value>0?String(value):phrase);
+  });
 }
 function splitLocalSpeech(text){
   let s=normalizeAssistantText(text);
@@ -2835,20 +2882,42 @@ function splitLocalSpeech(text){
   for(let i=0;i<raw.length-1;i++){
     if(/^из\s+них(?:\s+я)?(?:\s+уже)?$/i.test(raw[i])){raw[i+1]=raw[i]+' '+raw[i+1];raw[i]='';continue;}
     const detachedAmount=raw[i].match(/^(?:из\s+них(?:\s+я)?(?:\s+уже)?\s+)?(\d[\d\s]{1,9}(?:\s*(?:₽|р|руб\w*|т|тыс\w*|тыщ\w*))?)$/i);
-    if(detachedAmount&&/^(?:потрат|заплат|оплат|отдал|отдать|вернуть|ушло)/i.test(raw[i+1])){raw[i+1]=raw[i+1]+' '+detachedAmount[1];raw[i]='';continue;}
+    if(detachedAmount&&/^(?:потрат|заплат|оплат|отдал|отдать|вернуть|ушло)/i.test(raw[i+1])){
+      raw[i+1]=raw[i+1].replace(/^((?:потрат\S*|заплат\S*|оплат\S*|отдал\S*|отдать|вернуть|ушло))(?=\s|$)/i,`$1 ${detachedAmount[1]}`);
+      raw[i]='';continue;
+    }
     if(/(?:мне\s+)?(?:нужно|надо)(?:\s+по\s+работе)?\s+(?:в|к)\s*\d{1,2}(?::\d{2})?$/i.test(raw[i])){raw[i+1]=raw[i]+' '+raw[i+1];raw[i]='';}
   }
   for(let i=0;i<raw.length-1;i++){
     if(!raw[i])continue;
     const timingTail=raw[i].match(/\s+((?:(?:в|во)\s+(?:понедельник|вторник|среду?|четверг|пятницу?|субботу?|воскресенье)\s+)?(?:после\s+)?(?:в|к|на)\s*\d{1,2}(?:(?:[:.\-]|\s)\d{2})?\s*(?:час(?:а|ов)?|утра|дня|вечера)?(?:\s+(?:нужно|надо))?)$/i);
-    if(timingTail){raw[i]=raw[i].slice(0,timingTail.index).trim();raw[i+1]=timingTail[1]+' '+raw[i+1];}
-    const incomeLead=raw[i].match(/\s+(пришл\S*|получил\S*)$/i);
+    if(timingTail){
+      const beforeTiming=raw[i].slice(0,timingTail.index).trim();
+      const hasOwnAction=new RegExp(`(?:^|\\s)(?:${starters})(?=\\s|$)`,'i').test(beforeTiming);
+      const alreadyHasTime=/(?:^|\s)(?:в|к|на|после)\s*\d{1,2}(?:(?:[:.\-]|\s)\d{2})?(?=\s|$)/i.test(beforeTiming);
+      const connectorTail=/(?:^|\s)(?:потом|после)$/i.test(beforeTiming);
+      const afterTiming=/^после(?=\s|$)/i.test(timingTail[1]);
+      if(!hasOwnAction||alreadyHasTime||connectorTail||afterTiming){raw[i]=beforeTiming.replace(/\s+(?:потом|после)$/i,'').trim();raw[i+1]=timingTail[1]+' '+raw[i+1];}
+    }
+    const incomeLead=raw[i].match(/(?:^|\s)(пришл\S*|получил\S*)$/i);
     if(incomeLead&&/^(?:зарплата|аванс|премия)(?:\s|$)/i.test(raw[i+1])){
       raw[i]=raw[i].slice(0,incomeLead.index).trim();
       raw[i+1]=incomeLead[1]+' '+raw[i+1];
     }
   }
-  const onlyWhen=/^(?:и\s+)?(?:сегодня|завтра|послезавтра|во?\s+(?:понедельник|вторник|среду?|четверг|пятницу?|субботу?|воскресенье)|кажд\S*\s+(?:день|понедельник|вторник|среду?|четверг|пятницу?|субботу?|воскресенье))(?:\s+(?:(?:очень\s+)?срочн\S*|важн\S*|приоритетн\S*|как можно скорее))?(?:\s+(?:у\s+меня|мне)(?:\s+(?:нужно|надо))?)?(?:\s+(?:в|к|на)\s*\d{1,2}(?:(?:[:.\-]|\s)\d{2})?\s*(?:час(?:а|ов)?|утра|дня|вечера)?)?$/i;
+  // В одной разговорной фразе часто перечисляют несколько расходов без
+  // повторения глагола: «потратил 5000 на квартиру и 3000 на собаку».
+  // Каждая сумма должна стать самостоятельной финансовой записью.
+  const expanded=[];
+  raw.forEach(part=>{
+    if(!part||!/(?:потрат|заплат|оплат|отдал|отдать|вернуть|ушло)/i.test(part)){if(part)expanded.push(part);return;}
+    const verb=(part.match(/(?:^|\s)(потрат\S*|заплат\S*|оплат\S*|отдал\S*|отдать|вернуть|ушло)(?=\s|$)/i)||[])[1]||'потратил';
+    const pieces=part.split(/\s+(?:и|а)(?:\s+еще)?\s+(?=\d[\d\s]{0,9}(?:\s*(?:₽|р(?=\s|$)|руб[а-я]*|т(?=\s|$)|тыс[а-я]*|тыщ[а-я]*))?\s+(?:на|за)\s+)/i).map(x=>x.trim()).filter(Boolean);
+    expanded.push(pieces[0]);
+    pieces.slice(1).forEach(piece=>expanded.push(`${verb} ${piece}`));
+  });
+  raw.splice(0,raw.length,...expanded);
+  const onlyWhen=/^(?:и\s+)?(?:сегодня|завтра|послезавтра|во?\s+(?:понедельник|вторник|среду?|четверг|пятницу?|субботу?|воскресенье)|кажд\S*\s+(?:день|понедельник|вторник|среду?|четверг|пятницу?|субботу?|воскресенье))(?:\s+(?:утром|днем|днём|вечером|ночью))?(?:\s+(?:(?:очень\s+)?срочн\S*|важн\S*|приоритетн\S*|как можно скорее))?(?:\s+(?:у\s+меня|мне)(?:\s+(?:нужно|надо))?)?(?:\s+(?:в|к|на)\s*\d{1,2}(?:(?:[:.\-]|\s)\d{2})?\s*(?:час(?:а|ов)?|утра|дня|вечера)?)?$/i;
   for(let i=0;i<raw.length;i++){
     if(!raw[i])continue;
     const relativeOnly=/^(?:напомни\s+)?через\s+(?:(?:\d{1,3}\s+)?(?:минут(?:у|ы)?|мин(?:ут)?|час(?:а|ов)?)|полчас(?:а|ика)?)(?=\s|$)$/i.test(raw[i]);
@@ -2965,7 +3034,19 @@ function parseLocalPlan(text){
     const key=(a.title||'').toLowerCase().replace(/\s+/g,' ').trim();
     return !list.some((b,j)=>j!==index&&b.type==='task'&&b.time&&b.date===a.date&&(b.title||'').toLowerCase().replace(/\s+/g,' ').trim()===key);
   });
-  return {actions:compact,unknown};
+  // Последний защитный слой: помощник не должен предлагать пустые деньги,
+  // служебные обрывки речи или одинаковые карточки дважды.
+  const safe=[],seen=new Set();
+  compact.forEach(a=>{
+    const title=String(a.title||'').trim(),source=String(a._source||title||a.desc||'').trim();
+    const meaninglessTask=a.type==='task'&&(!/[а-яa-z]/i.test(title)||/^(?:нужно|надо|потом|после|утром|вечером|напомни|задача|дело|в\s*\d.*)$/i.test(title));
+    const emptyMoney=(a.type==='income'||a.type==='expense')&&!(Number(a.amount)>0);
+    const emptyCollection=(a.type==='shopping'&&!a.items?.length)||(a.type==='habit'&&!title)||(a.type==='note'&&!String(a.text||'').trim());
+    if(meaninglessTask||emptyMoney||emptyCollection){if(source)unknown.push(source);return;}
+    const key=[a.type,a.date||'',a.time||'',title.toLowerCase(),a.amount||'',a.category||'',a.source||''].join('|');
+    if(seen.has(key))return;seen.add(key);safe.push(a);
+  });
+  return {actions:safe,unknown:[...new Set(unknown.filter(Boolean))]};
 }
 function localPlanMeta(a){
   if(a.type==='expense')return `${fmtMoney(a.amount)} ₽ · ${a.category}`;
@@ -4657,6 +4738,8 @@ function resumeForegroundServices(force){
   pullAssignedTasks();
   if(getFamilyState())pullShopping();
   refreshWeather(false);
+  checkServerAccess(force);
+  reportDeviceHealth(force);
 }
 function initApp(){
   applyTheme();applyAccent();
@@ -4676,6 +4759,8 @@ scheduleAutoPayReminders();
 scheduleDebtReminders();
 scheduleHabitReminderLocal();
 scheduleShoppingReminderLocal();
+checkServerAccess(true);setInterval(()=>checkServerAccess(false),5*60*1000);
+reportDeviceHealth(true);
 
 if('serviceWorker' in navigator){
   navigator.serviceWorker.register('sw.js').then(reg => {

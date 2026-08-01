@@ -9,111 +9,79 @@
   <link rel="manifest" href="manifest.json">
   <link rel="icon" href="assets/developer.svg" type="image/svg+xml">
   <link rel="apple-touch-icon" href="assets/developer.png">
-  <link rel="stylesheet" href="assets/dev.css">
-  <link rel="stylesheet" href="assets/console.css">
+  <link rel="stylesheet" href="assets/dev.css?v=5">
+  <link rel="stylesheet" href="assets/console.css?v=5">
 </head>
 <body>
   <main class="shell">
     <header class="topbar">
-      <div class="brand"><img src="assets/developer.svg" alt=""><div><strong>Lumo Console</strong><span>закрытая диагностика</span></div></div>
+      <div class="brand"><img src="assets/developer.svg" alt=""><div><strong>Lumo Console</strong><span>управление и поддержка</span></div></div>
       <div class="actions"><button id="refreshBtn" class="icon-btn" aria-label="Обновить" title="Обновить">↻</button><button id="logoutBtn" class="quiet" hidden>Выйти</button></div>
     </header>
 
     <section id="loginView" class="login-card">
-      <div class="lock">⌁</div>
-      <p class="eyebrow">ДОСТУП РАЗРАБОТЧИКА</p>
-      <h1>Состояние Lumo</h1>
+      <div class="lock">⌁</div><p class="eyebrow">ДОСТУП РАЗРАБОТЧИКА</p><h1>Управление Lumo</h1>
       <p>Введите закрытый ключ. Он хранится только до закрытия этой вкладки.</p>
-      <form id="loginForm">
-        <label for="tokenInput">Ключ разработчика</label>
-        <div class="password-row"><input id="tokenInput" type="password" autocomplete="current-password" required><button type="button" id="showToken" class="icon-btn" aria-label="Показать ключ">◉</button></div>
-        <button class="primary" type="submit">Открыть консоль</button>
-        <output id="loginError" class="error"></output>
-      </form>
+      <form id="loginForm"><label for="tokenInput">Ключ разработчика</label><div class="password-row"><input id="tokenInput" type="password" autocomplete="current-password" required><button type="button" id="showToken" class="icon-btn" aria-label="Показать ключ">◉</button></div><button class="primary" type="submit">Открыть консоль</button><output id="loginError" class="error"></output></form>
     </section>
 
     <section id="dashboard" hidden>
       <div class="status-line"><span id="overallDot" class="dot"></span><div><strong id="overallText">Проверяю сервер…</strong><small id="updatedAt"></small></div><label class="auto"><input id="autoRefresh" type="checkbox" checked> авто 30 с</label></div>
-      <div id="serviceGrid" class="service-grid"></div>
-      <div id="metricGrid" class="metric-grid"></div>
-      <section class="panel server-panel"><div class="panel-title"><div><p class="eyebrow">СЕРВЕР</p><h2>Ресурсы VPS и процесса</h2></div><span id="serverNode" class="badge">Node</span></div><div id="serverMetricGrid" class="metric-grid"></div></section>
-
-      <nav class="section-nav" aria-label="Разделы консоли">
-        <a href="#devicesPanel">Устройства</a><a href="#errorsPanel">Ошибки</a><a href="#upcomingPanel">Будущие push</a><a href="#maintenancePanel">Управление</a>
-      </nav>
-
       <section id="alertPanel" class="panel alert-panel" hidden></section>
+      <div class="console-layout">
+        <nav class="console-nav" aria-label="Страницы консоли">
+          <button data-page="overview" class="active"><span>⌂</span>Обзор</button>
+          <button data-page="users"><span>◎</span>Пользователи</button>
+          <button data-page="push"><span>↗</span>Push</button>
+          <button data-page="errors"><span>!</span>Ошибки</button>
+          <button data-page="system"><span>⚙</span>Система</button>
+          <button data-page="security"><span>⌁</span>Безопасность</button>
+        </nav>
 
-      <section id="devicesPanel" class="panel">
-        <div class="panel-title"><div><p class="eyebrow">УСТРОЙСТВА</p><h2>Подключённые клиенты</h2></div><span id="deviceCount" class="badge">0</span></div>
-        <div id="deviceList" class="table-list empty">Нет данных</div>
-      </section>
+        <div class="console-content">
+          <section class="console-page active" data-page-view="overview">
+            <div class="page-heading"><div><p class="eyebrow">ГЛАВНАЯ</p><h1>Состояние Lumo</h1><p>Всё важное о сервере на одном экране.</p></div></div>
+            <div id="serviceGrid" class="service-grid"></div><div id="metricGrid" class="metric-grid"></div>
+            <section class="panel server-panel"><div class="panel-title"><div><p class="eyebrow">СЕРВЕР</p><h2>Ресурсы VPS и процесса</h2></div><span id="serverNode" class="badge">Node</span></div><div id="serverMetricGrid" class="metric-grid"></div></section>
+            <section class="panel"><div class="panel-title"><div><p class="eyebrow">ВЕРСИИ</p><h2>Распространение Lumo</h2></div></div><div id="versionList" class="version-list empty">Нет данных</div></section>
+          </section>
 
-      <section class="panel">
-        <div class="panel-title"><div><p class="eyebrow">ВЕРСИИ</p><h2>Распространение Lumo</h2></div></div>
-        <div id="versionList" class="version-list empty">Нет данных</div>
-      </section>
+          <section class="console-page" data-page-view="users">
+            <div class="page-heading"><div><p class="eyebrow">ПОДДЕРЖКА</p><h1>Пользователи</h1><p>Попросите открыть «Настройки → Уведомления PWA» и назвать код поддержки.</p></div></div>
+            <section class="panel support-search"><form id="supportSearchForm"><label for="supportCodeInput">Код поддержки</label><div class="support-search-row"><input id="supportCodeInput" maxlength="10" autocomplete="off" placeholder="Например: 7KKES3TN"><button class="primary" type="submit">Найти пользователя</button></div><small>Код не является паролем и используется только для поиска устройства.</small></form></section>
+            <section id="supportResult" class="panel support-result" hidden></section>
+            <section id="devicesPanel" class="panel"><div class="panel-title"><div><p class="eyebrow">ВСЕ УСТРОЙСТВА</p><h2>Подключённые клиенты</h2></div><span id="deviceCount" class="badge">0</span></div><div id="deviceList" class="table-list empty">Нет данных</div></section>
+          </section>
 
-      <section id="errorsPanel" class="panel">
-        <div class="panel-title"><div><p class="eyebrow">ОШИБКИ</p><h2>Ошибки приложения</h2></div><div class="filters"><button id="errorsOpen" class="chip active">Новые</button><button id="errorsAll" class="chip">Все</button></div></div>
-        <div id="errorList" class="table-list empty">Ошибок нет</div>
-      </section>
+          <section class="console-page" data-page-view="push">
+            <div class="page-heading"><div><p class="eyebrow">ДОСТАВКА</p><h1>Push-уведомления</h1><p>Расписание, дубли, полный путь и последние отправки.</p></div></div>
+            <section class="panel"><div class="panel-title"><div><p class="eyebrow">24 ЧАСА</p><h2>Будущие уведомления</h2></div><span id="upcomingCount" class="badge">0</span></div><div id="upcomingList" class="timeline empty">Нет запланированных уведомлений</div></section>
+            <section class="two-panels"><section class="panel"><div class="panel-title"><div><p class="eyebrow">ДЕДУПЛИКАЦИЯ</p><h2>Повторные уведомления</h2></div><span id="duplicateBadge" class="badge">0</span></div><div id="duplicateList" class="table-list empty">Повторов не обнаружено</div></section><section class="panel"><div class="panel-title"><div><p class="eyebrow">ДОСТАВКА</p><h2>За 24 часа</h2></div><span id="deliveryRate" class="badge">—</span></div><div id="deliveryStats" class="delivery"></div></section></section>
+            <section class="panel"><div class="panel-title"><div><p class="eyebrow">PUSH TRACE</p><h2>Полный путь уведомлений</h2></div><span id="traceCount" class="badge">0</span></div><div id="traceList" class="table-list empty">Трассировка пока пуста</div></section>
+            <section class="panel"><div class="panel-title"><div><p class="eyebrow">РАСПИСАНИЯ</p><h2>Автоматические уведомления</h2></div><span id="scheduleCount" class="badge">0</span></div><div id="scheduleList" class="table-list empty">Нет данных</div></section>
+            <section class="panel"><div class="panel-title"><div><p class="eyebrow">ЖУРНАЛ</p><h2>Последние отправки</h2></div></div><div id="pushList" class="table-list empty">Журнал пока пуст</div></section>
+          </section>
 
-      <section id="upcomingPanel" class="panel">
-        <div class="panel-title"><div><p class="eyebrow">24 ЧАСА</p><h2>Будущие уведомления</h2></div><span id="upcomingCount" class="badge">0</span></div>
-        <div id="upcomingList" class="timeline empty">Нет запланированных уведомлений</div>
-      </section>
+          <section class="console-page" data-page-view="errors">
+            <div class="page-heading"><div><p class="eyebrow">ДИАГНОСТИКА</p><h1>Ошибки приложения</h1><p>Ошибки клиентов с версиями и состоянием обработки.</p></div></div>
+            <section id="errorsPanel" class="panel"><div class="panel-title"><div><p class="eyebrow">ОШИБКИ</p><h2>Журнал клиентов</h2></div><div class="filters"><button id="errorsOpen" class="chip active">Новые</button><button id="errorsAll" class="chip">Все</button></div></div><div id="errorList" class="table-list empty">Ошибок нет</div></section>
+          </section>
 
-      <section class="panel">
-        <div class="panel-title"><div><p class="eyebrow">ДЕДУПЛИКАЦИЯ</p><h2>Повторные уведомления</h2></div><span id="duplicateBadge" class="badge">0</span></div>
-        <div id="duplicateList" class="table-list empty">Повторов не обнаружено</div>
-      </section>
-      <section class="panel"><div class="panel-title"><div><p class="eyebrow">PUSH TRACE</p><h2>Полный путь уведомлений</h2></div><span id="traceCount" class="badge">0</span></div><div id="traceList" class="table-list empty">Трассировка пока пуста</div></section>
+          <section class="console-page" data-page-view="system">
+            <div class="page-heading"><div><p class="eyebrow">ИНФРАСТРУКТУРА</p><h1>Система</h1><p>Обслуживание, Telegram и резервные копии.</p></div></div>
+            <section id="maintenancePanel" class="panel"><div class="panel-title"><div><p class="eyebrow">УПРАВЛЕНИЕ</p><h2>Режим обслуживания</h2></div><span id="maintenanceState" class="badge">выключен</span></div><div class="maintenance-grid"><label class="switch"><input id="maintenanceEnabled" type="checkbox"> Всё приложение</label><label class="switch"><input class="feature-toggle" data-feature="voice" type="checkbox"> Голос</label><label class="switch"><input class="feature-toggle" data-feature="push" type="checkbox"> Push</label><label class="switch"><input class="feature-toggle" data-feature="family" type="checkbox"> Семья</label><label class="switch"><input class="feature-toggle" data-feature="sync" type="checkbox"> Синхронизация</label></div><div class="action-row"><input id="maintenanceMessage" placeholder="Сообщение пользователям"><button id="saveMaintenance" class="primary">Сохранить режим</button></div></section>
+            <section class="two-panels"><section class="panel"><div class="panel-title"><div><p class="eyebrow">TELEGRAM</p><h2>Технические тревоги</h2></div><button id="testTelegram" class="quiet">Тест</button></div><div id="telegramState" class="inline-state"></div><div id="telegramList" class="table-list empty">История пуста</div></section><section class="panel"><div class="panel-title"><div><p class="eyebrow">BACKUP</p><h2>Копии SQLite</h2></div><button id="createBackup" class="quiet">Создать</button></div><div id="backupList" class="table-list empty">Копий пока нет</div></section></section>
+          </section>
 
-      <section class="panel">
-        <div class="panel-title"><div><p class="eyebrow">PUSH</p><h2>Доставка за 24 часа</h2></div><span id="deliveryRate" class="badge">—</span></div>
-        <div id="deliveryStats" class="delivery"></div>
-      </section>
-
-      <section class="panel">
-        <div class="panel-title"><div><p class="eyebrow">РАСПИСАНИЯ</p><h2>Автоматические уведомления</h2></div><span id="scheduleCount" class="badge">0</span></div>
-        <div id="scheduleList" class="table-list empty">Нет данных</div>
-      </section>
-
-      <section class="panel">
-        <div class="panel-title"><div><p class="eyebrow">ЖУРНАЛ</p><h2>Последние отправки</h2></div></div>
-        <div id="pushList" class="table-list empty">Журнал пока пуст</div>
-      </section>
-
-      <section id="maintenancePanel" class="panel">
-        <div class="panel-title"><div><p class="eyebrow">УПРАВЛЕНИЕ</p><h2>Режим обслуживания</h2></div><span id="maintenanceState" class="badge">выключен</span></div>
-        <div class="maintenance-grid">
-          <label class="switch"><input id="maintenanceEnabled" type="checkbox"> Всё приложение</label>
-          <label class="switch"><input class="feature-toggle" data-feature="voice" type="checkbox"> Голос</label>
-          <label class="switch"><input class="feature-toggle" data-feature="push" type="checkbox"> Push</label>
-          <label class="switch"><input class="feature-toggle" data-feature="family" type="checkbox"> Семья</label>
-          <label class="switch"><input class="feature-toggle" data-feature="sync" type="checkbox"> Синхронизация</label>
+          <section class="console-page" data-page-view="security">
+            <div class="page-heading"><div><p class="eyebrow">КОНТРОЛЬ</p><h1>Безопасность</h1><p>Входы разработчика и все действия поддержки.</p></div></div>
+            <section class="panel"><div class="panel-title"><div><p class="eyebrow">ВХОДЫ</p><h2>Доступ к консоли</h2></div><span class="badge">8 попыток / 15 мин</span></div><div id="accessList" class="table-list empty">Журнал пуст</div></section>
+            <section class="panel"><div class="panel-title"><div><p class="eyebrow">АУДИТ</p><h2>Действия с пользователями</h2></div></div><div id="adminAuditList" class="table-list empty">Действий пока нет</div></section>
+          </section>
         </div>
-        <div class="action-row"><input id="maintenanceMessage" placeholder="Сообщение пользователям"><button id="saveMaintenance" class="primary">Сохранить режим</button></div>
-      </section>
-
-      <section class="two-panels">
-        <section class="panel">
-          <div class="panel-title"><div><p class="eyebrow">TELEGRAM</p><h2>Технические тревоги</h2></div><button id="testTelegram" class="quiet">Тест</button></div>
-          <div id="telegramState" class="inline-state"></div><div id="telegramList" class="table-list empty">История пуста</div>
-        </section>
-        <section class="panel">
-          <div class="panel-title"><div><p class="eyebrow">BACKUP</p><h2>Копии SQLite</h2></div><button id="createBackup" class="quiet">Создать</button></div>
-          <div id="backupList" class="table-list empty">Копий пока нет</div>
-        </section>
-      </section>
-
-      <section class="panel">
-        <div class="panel-title"><div><p class="eyebrow">БЕЗОПАСНОСТЬ</p><h2>Входы в консоль</h2></div><span class="badge">8 попыток / 15 мин</span></div>
-        <div id="accessList" class="table-list empty">Журнал пуст</div>
-      </section>
+      </div>
     </section>
   </main>
-  <script src="assets/dev.js" type="module"></script>
+  <script src="assets/dev.js?v=5" type="module"></script>
 </body>
 </html>
