@@ -15,11 +15,14 @@ const tables=['userAccess','adminAudit'];
 const missingTables=tables.filter(name=>!server.includes(`CREATE TABLE IF NOT EXISTS ${name}`));
 const app=fs.readFileSync(new URL('../app/assets/js/app.js',import.meta.url),'utf8');
 const healthCalls=(app.match(/reportDeviceHealth\(/g)||[]).length;
+const requiredDevFeatures=['attentionGrid','attentionBadge','devicesAttention','devicesOutdated','devicesNoPush'];
+const missingDevFeatures=requiredDevFeatures.filter(id=>!declared.has(id));
 const failures=[
   ...missing.map(x=>`DOM id: ${x}`),
   ...missingViews.map(x=>`page view: ${x}`),
   ...missingEndpoints.map(x=>`endpoint: ${x}`),
   ...missingTables.map(x=>`table: ${x}`)
+  ,...missingDevFeatures.map(x=>`Dev feature: ${x}`)
   ,...(healthCalls>=3?[]:[`device health calls: ${healthCalls}`])
 ];
 console.log(`${failures.length?'FAIL':'PASS'} · DOM ${new Set(referenced).size}/${new Set(referenced).size} · pages ${new Set(pages).size}/${new Set(pages).size} · API ${endpoints.length}/${endpoints.length}`);

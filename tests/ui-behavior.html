@@ -14,6 +14,8 @@ document.getElementById('app').addEventListener('load',()=>{
   check('Выбрать скрыто без активных дел',!d.querySelector('.bulk-toggle'));
   w.setFilter('done');check('Выбрать видно для выполненных дел',!!d.querySelector('.bulk-toggle'));
   w.setTasks([{id:992,title:'Активное',done:false,date:w.todayKey(),module:'personal',pri:'Y'}]);w.setFilter('active');check('Выбрать видно для активных дел',!!d.querySelector('.bulk-toggle'));
+  w.switchTab('today');d.querySelector('.day-task-main').click();check('Карточка на главном открывает редактирование',d.getElementById('modal').classList.contains('on')&&d.getElementById('f-title').value==='Активное');w.closeModal();
+  d.querySelector('.day-task-complete').click();check('Кнопка на главном завершает дело',w.getTasks().some(x=>x.id===992&&x.done));
   w.openReceiptScanner();check('Галерея названа нейтрально',/Галерея устройства/.test(d.getElementById('modal-receipt').innerText)&&!/iPhone|iOS/i.test(d.getElementById('modal-receipt').innerText));w.closeReceiptScanner();
   w.openNativeDictation('Запасной режим');check('Голосовой fallback нейтрален',!/iPhone|iOS|Android/i.test(d.getElementById('modal-voice-fallback').innerText));w.closeNativeDictation();
  }catch(e){check('suite exception',false,e.stack||e.message)}finally{w.setTasks(original);}

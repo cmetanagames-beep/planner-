@@ -1,4 +1,4 @@
-const CACHE = 'planner-v103';
+const CACHE = 'planner-v116';
 const PUSH_STATE_CACHE = 'lumo-push-state-v1';
 const PUSH_TRACE_API='https://pushevgen.duckdns.org/telemetry/push-state';
 function tracePush(d,stage,detail=''){if(!d?.traceKey)return Promise.resolve();return fetch(PUSH_TRACE_API,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({traceKey:d.traceKey,type:d.type||'',stage,detail}),keepalive:true}).catch(()=>{});}
@@ -7,8 +7,8 @@ const ASSETS = [
   './',
   './index.html',
   './manifest.json',
-  './assets/css/app.css?v=103',
-  './assets/js/app.js?v=103',
+  './assets/css/app.css?v=116',
+  './assets/js/app.js?v=116',
   './assets/icons/icon.svg',
   './assets/icons/icon.png'
 ];
@@ -77,14 +77,17 @@ async function pushAllowed(d){
     try{const cache=await caches.open(PUSH_STATE_CACHE),r=await cache.match('./__task_snapshot__');if(!r)return false;const s=await r.json(),items=s.shopping||[];if(!s.shoppingReminder?.enabled||!items.length)return false;const key='./__push_seen__/shopping:'+String(d.date||s.day||'');if(await cache.match(key))return false;await cache.put(key,new Response(String(Date.now())));return true}catch(_){return false}
   }
   if(d.type==='morning')return true;
+  if(d.type==='morning-review'||d.type==='evening-review'){
+    try{const cache=await caches.open(PUSH_STATE_CACHE),key='./__push_seen__/day-review:'+d.type+':'+String(d.date||'');if(await cache.match(key))return false;await cache.put(key,new Response(String(Date.now())));return true}catch(_){return true}
+  }
   if(d.type==='insight'){
     try{const cache=await caches.open(PUSH_STATE_CACHE),key='./__push_seen__/insight:'+String(d.date||'')+':'+String(d.title||'');if(await cache.match(key))return false;await cache.put(key,new Response(String(Date.now())));return true}catch(_){return true}
   }
-  if(d.type==='habit'){
+  if(d.type==='habit'||d.type==='habit-rescue'){
     try{
       const cache=await caches.open(PUSH_STATE_CACHE),response=await cache.match('./__task_snapshot__');if(!response)return false;
-      const snapshot=await response.json(),pushDay=d.date||new Date().toISOString().slice(0,10),left=(snapshot.habits||[]).filter(h=>snapshot.day!==pushDay||!h.doneToday);if(!snapshot.habitReminder?.enabled||!left.length)return false;
-      const key='./__push_seen__/habit:'+pushDay;if(await cache.match(key))return false;await cache.put(key,new Response(String(Date.now())));return true;
+      const snapshot=await response.json(),pushDay=d.date||new Date().toISOString().slice(0,10),left=(snapshot.habits||[]).filter(h=>snapshot.day!==pushDay||!h.doneToday);if(!snapshot.habitReminder?.enabled||!left.length||(d.type==='habit-rescue'&&snapshot.habitReminder?.adaptive===false))return false;
+      const key='./__push_seen__/'+d.type+':'+pushDay;if(await cache.match(key))return false;await cache.put(key,new Response(String(Date.now())));return true;
     }catch(_){return false;}
   }
   const looksReminder=!!d.taskId||/напоминани|повторное/i.test(String(d.title||''));
@@ -142,8 +145,11 @@ async function showPush(d){
       });
     return;
   }
-  if(d.type === 'habit'){
-    const body=await currentHabitBody(d.body||'Отметь сегодняшний ритм',d.date);await self.registration.showNotification(d.title || '🌱 Не забудь о привычках',{body,icon:'./assets/icons/icon.png',badge:'./assets/icons/icon.png',tag:'habit-reminder',data:{type:'habit'}});return;
+  if(d.type === 'habit'||d.type==='habit-rescue'){
+    const body=await currentHabitBody(d.body||'Отметь сегодняшний ритм',d.date);await self.registration.showNotification(d.title || (d.type==='habit-rescue'?'Вернём привычку в ритм?':'Не забудь о привычках'),{body,icon:'./assets/icons/icon.png',badge:'./assets/icons/icon.png',tag:d.type,data:{type:d.type}});return;
+  }
+  if(d.type==='morning-review'||d.type==='evening-review'){
+    await self.registration.showNotification(d.title||'Обзор дня',{body:d.body||'',icon:'./assets/icons/icon.png',badge:'./assets/icons/icon.png',tag:d.type,data:{type:'insight',prompt:d.prompt||'',summary:(d.title||'')+(d.body?' — '+d.body:'')},actions:[{action:'discuss',title:'Открыть обзор'},{action:'later',title:'Позже'}]});return;
   }
   if(d.type === 'insight'){
     await self.registration.showNotification(d.title || 'Предложение Lumo',{
@@ -275,10 +281,8 @@ self.addEventListener('notificationclick', e => {
 self.addEventListener('sync', e => {
   if(e.tag === 'sync-tasks'){
     e.waitUntil(
-      fetch('https://pushevgen.duckdns.org/sync', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ synced: true })
+      clients.matchAll({ type: 'window', includeUncontrolled: true }).then(openClients => {
+        openClients.forEach(client => client.postMessage({ type: 'FLUSH_OFFLINE_QUEUE' }));
       }).catch(() => {})
     );
   }

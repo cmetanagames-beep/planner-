@@ -1,0 +1,44 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>Lumo intelligence features</title>
+<pre id="result">Checking…</pre>
+<iframe id="app" src="../app/index.html?intelligence-features=114" hidden></iframe>
+<script>
+app.onload=async()=>{
+  const w=app.contentWindow,rows=[],original=JSON.parse(JSON.stringify(w.load())),memory=w.localStorage.getItem('lumo_local_memory_v1');
+  const check=(name,pass,detail='')=>rows.push({name,pass:!!pass,detail});
+  try{
+    const today=w.todayKey(),past=new Date();past.setDate(past.getDate()-4);
+    w.save({tasks:[
+      {id:1,title:'Встреча',date:today,time:'10:00',duration:60,done:false,module:'work'},
+      {id:2,title:'Звонок',date:today,time:'10:30',duration:30,done:false,module:'personal'},
+      {id:3,title:'Обед',date:today,time:'12:00',duration:30,done:false,module:'personal'},
+      {id:4,title:'Будущее дело',date:w.nextWeekday((new Date().getDay()+1)%7),time:'09:00',duration:30,done:false,module:'personal'}
+    ],habits:[{id:'h-test',name:'Чтение',icon:'К',createdAt:w.localDateKey(past),log:{}}],finance:[],income:[],shopping:[]});
+    check('обнаруживает пересечение дел',w.findTaskConflicts({date:today,time:'10:15',duration:20},null).length===2);
+    check('не создаёт ложный конфликт',w.findTaskConflicts({date:today,time:'11:15',duration:30},null).length===0);
+    check('находит пары конфликтов',w.taskConflictPairs(today).length===1);
+    check('просроченное дело не называется «Сейчас»',w.todayTaskCountdown({date:today,time:'00:00'}).late&&w.todayTaskCountdown({date:today,time:'00:00'}).label==='просрочено');
+    check('утренний обзор содержит план',/Встреча/.test(w.dayReviewHtml('morning'))&&/Привычек осталось/.test(w.dayReviewHtml('morning')));
+    check('вечерний обзор содержит итог',/Вечерний обзор/.test(w.dayReviewHtml('evening'))&&/Дел выполнено/.test(w.dayReviewHtml('evening')));
+    check('адаптивное напоминание видит пропуск',w.adaptiveHabitTargets().some(x=>x.id==='h-test'&&x._missed>=2));
+    w.pendingAssignments=[{assignId:'assign-test',title:'Забрать посылку',fromName:'Анна',date:today,time:'18:00',desc:'Пункт выдачи'}];
+    w.switchTab('today');
+    check('поручение видно на главной',!!w.document.querySelector('.home-assignments')&&/Забрать посылку/.test(w.document.querySelector('.home-assignments').textContent));
+    check('главная разделяет дела сегодня и все активные',/0 из 3 сегодня · 4 активных всего/.test(w.document.querySelector('.today-date')?.textContent||''));
+    check('на главной есть принять и отказаться',[...w.document.querySelectorAll('.home-assignment-actions button')].map(x=>x.textContent.trim()).join('|')==='Отказаться|Принять');
+    const realFetch=w.fetch.bind(w);w.fetch=async(url,options)=>String(url).endsWith('/inbox/respond')?new w.Response(JSON.stringify({ok:true}),{status:200,headers:{'Content-Type':'application/json'}}):realFetch(url,options);
+    await w.respondAssignment('assign-test','accepted','home');
+    check('принятое поручение становится обычным делом',w.getTasks().some(x=>x.assignId==='assign-test'&&x.fromName==='Анна'));
+    w.pendingAssignments=[{assignId:'reject-test',title:'Лишнее поручение',fromName:'Анна',date:today}];await w.respondAssignment('reject-test','rejected','home');
+    check('отказ не создаёт дело',!w.getTasks().some(x=>x.assignId==='reject-test'));
+    w.fetch=realFetch;
+    w.rememberAssistantCorrection('моя особая команда','завтра проверить отчёт в 10');
+    check('помощник запоминает исправление',w.learnedAssistantPhrase('моя особая команда')==='завтра проверить отчёт в 10');
+    const merged=w.mergeCloudPayload({planner:{},assistantMemory:{phrases:{локально:'команда 1'}}},{planner:{},assistantMemory:{phrases:{облако:'команда 2'}}});
+    check('обучение синхронизируется между устройствами',merged.assistantMemory.phrases.локально==='команда 1'&&merged.assistantMemory.phrases.облако==='команда 2');
+  }catch(error){rows.push({name:'runtime',pass:false,detail:error.stack||error.message});}
+  finally{w.save(original);if(memory===null)w.localStorage.removeItem('lumo_local_memory_v1');else w.localStorage.setItem('lumo_local_memory_v1',memory);}
+  result.textContent=`${rows.every(x=>x.pass)?'PASS':'FAIL'} ${rows.filter(x=>x.pass).length}/${rows.length}\n`+rows.map(x=>`${x.pass?'✓':'✗'} ${x.name}${x.detail?' — '+x.detail:''}`).join('\n');
+};
+</script>

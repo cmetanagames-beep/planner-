@@ -1,5 +1,5 @@
-const CACHE = 'lumo-console-v5';
-const ASSETS = ['./','./index.html','./manifest.json','./assets/dev.css?v=5','./assets/console.css?v=5','./assets/dev.js?v=5','./assets/developer.svg','./assets/developer.png'];
+const CACHE = 'lumo-console-v6';
+const ASSETS = ['./','./index.html','./manifest.json','./assets/dev.css?v=6','./assets/console.css?v=6','./assets/dev.js?v=6','./assets/developer.svg','./assets/developer.png'];
 self.addEventListener('install', event => { event.waitUntil(caches.open(CACHE).then(cache => cache.addAll(ASSETS))); self.skipWaiting(); });
 self.addEventListener('activate', event => { event.waitUntil(caches.keys().then(keys => Promise.all(keys.filter(key => key.startsWith('lumo-console-') && key !== CACHE).map(key => caches.delete(key))))); self.clients.claim(); });
 self.addEventListener('fetch', event => {

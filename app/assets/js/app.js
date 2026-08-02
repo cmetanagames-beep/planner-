@@ -118,6 +118,8 @@ function rememberBackup(raw){
 }
 let _insightRefreshTimer=null;
 function queueSmartInsightRefresh(){clearTimeout(_insightRefreshTimer);_insightRefreshTimer=setTimeout(()=>{if('serviceWorker'in navigator)scheduleSmartInsightPush(false)},1200)}
+let _dayReviewRefreshTimer=null;
+function queueDayReviewRefresh(){clearTimeout(_dayReviewRefreshTimer);_dayReviewRefreshTimer=setTimeout(()=>{if('serviceWorker'in navigator)scheduleDayReviewPush(false)},1500)}
 function save(d){
   try{
     const previous=localStorage.getItem(KEY);
@@ -127,6 +129,7 @@ function save(d){
     rememberBackup(serialized);
     if(!window.__lumoCloudApplying){localStorage.setItem('lumo_cloud_dirty_v1','1');scheduleCloudSync();}
     queueSmartInsightRefresh();
+    queueDayReviewRefresh();
   }
   catch(e){toast('⚠️ Память заполнена! Сделай бэкап');}
 }
@@ -307,7 +310,7 @@ async function refreshWeather(force){
     const w=await fetchWeatherByCoords(lat,lon);
     setWeatherCache(w);renderWeatherChip(w);
     if(force)toast('🌤️ Погода обновлена');
-  }catch(e){if(!cache)chip.style.display='none';}
+  }catch(e){if(!cache){chip.textContent='Погода';chip.style.display='';chip.title='Нажми, чтобы разрешить геолокацию и обновить погоду';}}
 }
 function renderWeatherChip(w){
   const chip=document.getElementById('weatherChip');
@@ -457,6 +460,7 @@ function switchTab(tab){
   currentTab=tab;
   const isAI=tab==='ai',isFin=tab==='finance',isCal=tab==='calendar',isHabits=tab==='habits';
   const isMore=tab==='more',isToday=tab==='today',isMatrix=tab==='matrix',isNotes=tab==='notes';
+  document.body.classList.toggle('today-mode',isToday);
   const hideList=isAI||isFin;
   document.getElementById('ai-view').style.display=isAI?'block':'none';
   document.getElementById('ai-bar').style.display=isAI?'flex':'none';
@@ -478,25 +482,24 @@ else if(tab==='matrix')title='Матрица Эйзенхауэра';
   else title=catLabel(tab);
 
   // Приветствие по времени суток — только на "Сегодня"
-  if(tab==='today'){
-     title=''; 
-  }
+  if(tab==='today')title='Lumo';
   document.getElementById('hero-title').textContent=title;
  document.getElementById('streakBox').style.display=(hideList||isToday)?'none':'inline-flex';
-  // Скрываем всю строку чипов + дату на "Сегодня"
+  // На главном экране оставляем компактную погоду рядом с датой.
 const chipsRow=document.getElementById('hero-chips-row');
-if(chipsRow)chipsRow.style.display=(isToday||hideList)?'none':'flex';
-document.getElementById('hero-date').style.display=isToday?'none':'';
-if(!isToday)renderHeroDate();
+if(chipsRow)chipsRow.style.display=hideList?'none':'flex';
+document.getElementById('hero-date').style.display='';
+renderHeroDate();
+if(isToday)document.getElementById('hero-date').textContent=new Date().toLocaleDateString('ru-RU',{day:'numeric',month:'long'});
   const qc=document.getElementById('quoteChip');
 if(qc)qc.style.display=(isToday||hideList)?'none':'';
-document.getElementById('weatherChip').style.display=(hideList||isToday)?'none':'';
+document.getElementById('weatherChip').style.display=hideList?'none':'';
   if(isAI){document.getElementById('fab').style.display='none';if(!document.getElementById('ai-chat').children.length)aiHello();}
   else if(isFin)renderFinance();
   else if(isCal)renderCalendar();
   else if(isHabits)renderHabits();
   else if(tab==='more')renderMore();
-  else if(tab==='today')renderToday();
+  else if(tab==='today'){renderToday();pullAssignedTasks();}
   else if(tab==='notes')renderNotes();
   else if(tab==='matrix')renderMatrix();
   else render();
@@ -518,7 +521,7 @@ function refreshDayBoundary(force=false){
   renderHeroDate();renderStreak();renderFilters();refreshCurrentTab();updateAppBadge();
   scheduleAllTimeouts();scheduleHabitReminderLocal();scheduleShoppingReminderLocal();
   processAutoPays();scheduleAutoPayReminders();scheduleDebtReminders();
-  scheduleMorningPush();scheduleHabitPushServer();scheduleShoppingPushServer();scheduleSmartInsightPush();syncPushData();
+  scheduleMorningPush();scheduleHabitPushServer();scheduleShoppingPushServer();scheduleSmartInsightPush();scheduleDayReviewPush();syncPushData();
   return true;
 }
 let filterState='active';
@@ -651,9 +654,9 @@ function getHabits(){
   const d=load();
   if(!d.habits){
     d.habits=[
-      {id:'h1',name:'Пить воду',icon:'💧',log:{}},
-      {id:'h2',name:'Зарядка',icon:'🏃',log:{}},
-      {id:'h3',name:'Чтение',icon:'📖',log:{}}
+      {id:'h1',name:'Пить воду',icon:'💧',log:{},createdAt:todayKey()},
+      {id:'h2',name:'Зарядка',icon:'🏃',log:{},createdAt:todayKey()},
+      {id:'h3',name:'Чтение',icon:'📖',log:{},createdAt:todayKey()}
     ];
     save(d); // ← вот это было пропущено
   }
@@ -697,6 +700,7 @@ function toggleHabit(id,key){
   const habits=getHabits();
   const h=habits.find(x=>x.id===id);
   if(!h)return;
+  if(!h.createdAt)h.createdAt=todayKey();
   if(!h.log)h.log={};
   if(h.log[key]){delete h.log[key];_habitJustDone=null;vibrate(15);}
   else{
@@ -718,7 +722,7 @@ function addHabit(){
   const icon=(document.getElementById('habit-icon')?.value||'').trim()||'⭐';
   if(!name){toast('Введи название привычки');return;}
   const habits=getHabits();
-  habits.push({id:'h'+Date.now(),name,icon,log:{}});
+  habits.push({id:'h'+Date.now(),name,icon,log:{},createdAt:todayKey()});
   saveHabits(habits);
   scheduleHabitReminderLocal();syncPushData();scheduleHabitPushServer(true);
   toast('Привычка добавлена 💪');
@@ -760,8 +764,9 @@ function renderHabits(){
         <div><div class="habit-name">${esc(h.name)}</div>
           <div class="habit-caption"><span>Ежедневно</span><span>${todayOn?'Выполнено':'На сегодня'}</span></div>
         </div>
-        <button class="habit-today ${todayOn?'on':''}" onclick="toggleHabit(${jsArg(h.id)},${jsArg(tk)})" aria-label="Отметить сегодня">
+        <button class="habit-today ${todayOn?'on':''}" onclick="toggleHabit(${jsArg(h.id)},${jsArg(tk)})" aria-label="${todayOn?'Отменить выполнение сегодня':'Отметить выполненной сегодня'}">
           <svg viewBox="0 0 24 24" fill="none"><path d="M5 12.5l4.2 4L19 7"/></svg>
+          <small>${todayOn?'Готово':'Сегодня'}</small>
         </button>
       </div>
       <div class="habit-week">${week}</div>
@@ -778,7 +783,7 @@ function renderHabits(){
         <svg viewBox="0 0 72 72"><circle class="track" cx="36" cy="36" r="32"/><circle class="fill" cx="36" cy="36" r="32" stroke-dasharray="${ring}" stroke-dashoffset="${offset}"/></svg>
         <div class="habit-ring-label">${pct}%<small>сегодня</small></div>
       </div>
-      <div class="habit-summary-copy"><b>${summaryTitle}</b><span>${summaryText}</span></div>
+      <div class="habit-summary-copy"><small class="habit-summary-kicker">Ритм дня</small><b>${summaryTitle}</b><span>${summaryText}</span><div class="habit-summary-stats"><strong>${doneToday}/${habits.length}</strong> выполнено <i></i> <strong>${best}</strong> дней серия</div></div>
     </section>
     <div class="habit-toolbar">
       <h2>Мой ритм</h2>
@@ -842,7 +847,7 @@ function renderStats(){
 }
 
 function toggleTask(id){
-  const t=getTasks();const x=t.find(a=>a.id===id);if(!x)return;
+  const t=getTasks();const x=t.find(a=>String(a.id)===String(id));if(!x)return;
   x.done=!x.done;
   if(x.done&&x.repeat){
     const nd=nextRepeatDate(x.date,x.repeat);
@@ -885,8 +890,8 @@ function undoDelete(){
   toast('Восстановлено ✅');
 }
 function editTask(id){
-  const t=getTasks().find(a=>a.id===id);if(!t)return;
-  editId=id;fillModuleSelect();fillAssignSelect();editSubs=(t.subs||[]).map(s=>({...s}));
+  const t=getTasks().find(a=>String(a.id)===String(id));if(!t)return;
+  editId=t.id;fillModuleSelect();fillAssignSelect();editSubs=(t.subs||[]).map(s=>({...s}));
   document.getElementById('modal-title').textContent='Изменить дело';
   document.getElementById('f-title').value=t.title||'';
   document.getElementById('f-module').value=t.module||'personal';
@@ -1023,12 +1028,37 @@ function postponeTask(mode){
   toast('⏰ Новый срок: '+label);
 }
 function pickPri(p){currentPri=p;document.querySelectorAll('#modal .seg button').forEach(b=>b.classList.toggle('on',b.dataset.pri===p));}
-function saveTask(){
+function taskInterval(task){
+  if(!task?.date||!/^\d{2}:\d{2}$/.test(task.time||''))return null;
+  const [hour,minute]=task.time.split(':').map(Number),start=hour*60+minute,duration=Math.max(5,Number(task.duration||30));
+  return {start,end:start+duration};
+}
+function findTaskConflicts(candidate,excludeId=null,pool=getTasks()){
+  const interval=taskInterval(candidate);if(!interval)return[];
+  return (pool||[]).filter(task=>!task.done&&String(task.id)!==String(excludeId??'')&&task.date===candidate.date).filter(task=>{const other=taskInterval(task);return other&&interval.start<other.end&&other.start<interval.end;});
+}
+function conflictSummary(candidate,excludeId=null,pool=getTasks()){
+  const conflicts=findTaskConflicts(candidate,excludeId,pool);if(!conflicts.length)return'';
+  return conflicts.slice(0,3).map(task=>`${task.time} — ${task.title}`).join(' · ');
+}
+function annotatePlanConflicts(plan){
+  const planned=[];
+  (plan?.actions||[]).forEach(action=>{
+    if(action.type!=='task'||!action.time||action._removed)return;
+    const conflicts=findTaskConflicts(action,null,[...getTasks(),...planned]);
+    action._conflicts=conflicts.map(task=>({id:task.id||'',title:task.title,time:task.time}));
+    planned.push({...action,id:'plan-'+planned.length});
+  });
+  return plan;
+}
+async function saveTask(){
   const title=document.getElementById('f-title').value.trim();
   if(!title){toast('Введи название');return;}
   const chosenDate=document.getElementById('f-date').value||'',chosenTime=document.getElementById('f-time').value||'';
   if(isPastTaskSchedule(chosenDate,chosenTime)){syncTaskTimeConstraints();toast('Нельзя сохранить дело на прошедшее время');return;}
   const obj={title,module:document.getElementById('f-module').value,date:chosenDate,time:chosenTime,desc:document.getElementById('f-desc').value.trim(),pri:currentPri,repeat:document.getElementById('f-repeat').value||'',duration:Number(document.getElementById('f-duration').value)||30,energy:document.getElementById('f-energy').value||'medium',subs:editSubs.slice(),photos:editPhotos.slice()};
+  const conflicts=findTaskConflicts(obj,editId);
+  if(conflicts.length&&!await lumoConfirm(`В это время уже запланировано: ${conflictSummary(obj,editId)}. Сохранить дело с пересечением?`,'Конфликт в расписании','Всё равно сохранить'))return;
   const t=getTasks();
   if(editId){const x=t.find(a=>a.id===editId);if(x)Object.assign(x,obj);}
   else{obj.id=Date.now()+Math.floor(Math.random()*1000);obj.done=false;t.push(obj);}
@@ -1408,7 +1438,7 @@ function openBudget(){
   const budgets=getBudgets();
   document.getElementById('limit-list').innerHTML=getExpCats().map(c=>`
     <div class="limit-row"><span class="ln">${c.i} ${esc(c.name)}</span>
-    <input type="number" inputmode="numeric" data-cat="${esc(c.name)}" value="${budgets[c.name]||''}" placeholder="—"></div>`).join('');
+    <label class="limit-input-wrap"><input type="number" inputmode="numeric" data-cat="${esc(c.name)}" value="${budgets[c.name]||''}" placeholder="0" aria-label="Лимит: ${esc(c.name)}"><span>₽</span></label></div>`).join('');
   document.getElementById('modal-budget').classList.add('on');
 }
 function closeBudget(){document.getElementById('modal-budget').classList.remove('on');}
@@ -1526,10 +1556,11 @@ function finStats(y,m){
 function getExpenseStats(){const d=new Date();return finStats(d.getFullYear(),d.getMonth());}
 function finNav(dir){finDate.setMonth(finDate.getMonth()+dir);renderFinance();}
 
-function weekInsight(){
+function weekInsight(y=finDate.getFullYear(),m=finDate.getMonth()){
   const now=new Date();
   const weekAgo=now.getTime()-7*24*60*60*1000;
-  const exp=load().finance||[];
+  const ym=y+'-'+String(m+1).padStart(2,'0');
+  const exp=(load().finance||[]).filter(r=>r.date&&r.date.startsWith(ym));
   let weekSum=0,prevSum=0;
   const prevWeekAgo=weekAgo-7*24*60*60*1000;
   exp.forEach(r=>{
@@ -1593,7 +1624,7 @@ function renderFinance(){
   </div>${delta===null?'':`<div class="fin-compare ${delta<=0?'good':''}">${delta<=0?'↓':'↑'} ${Math.abs(delta)}% к прошлому месяцу <span>${delta<=0?'Расходы снизились':'Расходы выросли'}</span></div>`}`;
 
   html+=financeToolHub();
-  html+=`<div class="fin-insight">${weekInsight()}</div>`;
+  html+=`<div class="fin-insight">${weekInsight(y,m)}</div>`;
   html+=dayBars(y,m);
   html+=renderGoals();
   html+=renderBudgets();
@@ -2112,7 +2143,7 @@ function pickAccent(i){const d=load();d.accent=i;save(d);applyAccent();renderCol
 
 function getThemeMode(){return load().themeMode||'dark';}
 function setThemeMode(mode){
-  const d=load();d.themeMode=mode;save(d);applyTheme();updateThemeButtons();
+  const d=load();d.themeMode=mode;save(d);applyTheme();updateThemeButtons();updateSettingsOverview();
 }
 function updateThemeButtons(){
   const m=getThemeMode();
@@ -2133,7 +2164,20 @@ function toggleTheme(){
   setThemeMode(m==='dark'?'light':'dark');
   toast(getThemeMode()==='dark'?'🌙 Тёмная тема':'☀️ Светлая тема');
 }
-function openSettings(){renderColorPick();updateThemeButtons();loadNotifyHour();loadQuietHours();loadHabitReminder();loadShoppingReminder();loadInsightReminder();renderLocalMemoryInfo();cloudStatusText();document.getElementById('modal-settings').classList.add('on');checkPushHealth(false);}
+function updateSettingsOverview(pushReady){
+  const theme=document.getElementById('settings-theme-summary'),push=document.getElementById('settings-push-summary'),sync=document.getElementById('settings-sync-summary'),syncAction=document.getElementById('settings-sync-action');
+  const mode=getThemeMode();
+  if(theme)theme.textContent=mode==='auto'?'Авто':mode==='light'?'Светлая':'Тёмная';
+  if(push){
+    const permission=('Notification'in window)?Notification.permission:'unsupported';
+    push.textContent=pushReady===true?'Готов':pushReady===false?'Нужна проверка':permission==='granted'?'Разрешён':'Не включён';
+    push.classList.toggle('is-ready',pushReady===true);
+    push.classList.toggle('needs-attention',pushReady===false||permission!=='granted');
+  }
+  if(sync){const connected=!!localStorage.getItem(CLOUD_CODE_KEY);sync.textContent=connected?'В облаке':'Только на телефоне';sync.classList.toggle('is-ready',connected);if(syncAction)syncAction.textContent=connected?'Открыть':'Загрузить';}
+}
+function openSettingsSection(id){const target=document.getElementById(id);if(!target)return;document.querySelectorAll('#modal-settings .settings-group').forEach(x=>x.open=x===target);target.scrollIntoView({behavior:'smooth',block:'start'});}
+function openSettings(){renderColorPick();updateThemeButtons();updateSettingsOverview();loadNotifyHour();loadQuietHours();loadHabitReminder();loadShoppingReminder();loadInsightReminder();loadDayReview();renderLocalMemoryInfo();cloudStatusText();document.querySelectorAll('#modal-settings .settings-group').forEach(x=>x.open=false);document.getElementById('modal-settings').classList.add('on');checkPushHealth(false);}
 function closeSettings(){document.getElementById('modal-settings').classList.remove('on');}
 
 /* НАПОМИНАНИЯ / ТИХИЕ ЧАСЫ */
@@ -2175,14 +2219,24 @@ async function scheduleLocalTimeout(t){
     },delay);localTimeouts.push(id);
   });
 }
-function getHabitReminder(){return load().habitReminder||{enabled:false,time:'09:00'};}
-function loadHabitReminder(){const r=getHabitReminder(),box=document.getElementById('habit-reminder-box'),time=document.getElementById('habit-reminder-time');if(box){box.classList.toggle('on',r.enabled);box.textContent=r.enabled?'✓':'';}if(time)time.value=r.time||'09:00';}
+function getHabitReminder(){return {enabled:false,time:'09:00',adaptive:true,...(load().habitReminder||{})};}
+function habitMissedStreak(h,maxDays=7){
+  if(!h?.createdAt&&!Object.keys(h?.log||{}).length)return 0;
+  let missed=0;for(let i=1;i<=maxDays;i++){const day=new Date();day.setDate(day.getDate()-i);const key=localDateKey(day);if(h.createdAt&&key<h.createdAt)break;if(h.log?.[key])break;missed++;}return missed;
+}
+function adaptiveHabitTargets(){return incompleteHabits().map(h=>({...h,_missed:habitMissedStreak(h)})).filter(h=>h._missed>=2).sort((a,b)=>b._missed-a._missed);}
+function loadHabitReminder(){const r=getHabitReminder(),box=document.getElementById('habit-reminder-box'),adaptive=document.getElementById('habit-adaptive-box'),time=document.getElementById('habit-reminder-time'),hint=document.getElementById('habit-adaptive-hint');if(box){box.classList.toggle('on',r.enabled);box.textContent=r.enabled?'✓':'';}if(adaptive){adaptive.classList.toggle('on',r.adaptive!==false);adaptive.textContent=r.adaptive!==false?'✓':'';}if(time)time.value=r.time||'09:00';if(hint){const targets=adaptiveHabitTargets();hint.textContent=targets.length?`Повторное мягкое напоминание получат: ${targets.slice(0,3).map(h=>h.name).join(' · ')}.`:'Lumo усилит напоминание только для привычек, которые пропущены минимум два дня подряд.';}}
 function toggleHabitReminder(){const d=load(),r=getHabitReminder();r.enabled=!r.enabled;d.habitReminder=r;save(d);loadHabitReminder();scheduleHabitReminderLocal();syncPushData();scheduleHabitPushServer();toast(r.enabled?'🌱 Напоминания о привычках включены':'Напоминания о привычках выключены');}
 function saveHabitReminderTime(){const d=load(),r=getHabitReminder();r.time=document.getElementById('habit-reminder-time').value||'09:00';d.habitReminder=r;save(d);scheduleHabitReminderLocal();syncPushData();scheduleHabitPushServer(true);toast('🌱 Время привычек сохранено');}
+function toggleHabitAdaptive(){const d=load(),r=getHabitReminder();r.adaptive=!r.adaptive;d.habitReminder=r;save(d);loadHabitReminder();syncPushData();scheduleHabitPushServer(true);toast(r.adaptive?'Адаптивные напоминания включены':'Адаптивные напоминания выключены');}
 function getInsightReminder(){return load().insightReminder||{enabled:false,time:'18:30'}}
 function loadInsightReminder(){const r=getInsightReminder(),box=document.getElementById('insight-reminder-box'),inp=document.getElementById('insight-reminder-time');if(box){box.classList.toggle('on',r.enabled);box.textContent=r.enabled?'✓':''}if(inp)inp.value=r.time||'18:30'}
 function toggleInsightReminder(){const d=load(),r=getInsightReminder();r.enabled=!r.enabled;d.insightReminder=r;save(d);loadInsightReminder();scheduleSmartInsightPush(true);toast(r.enabled?'Умные предложения включены':'Умные предложения выключены')}
 function saveInsightReminderTime(){const d=load(),r=getInsightReminder();r.time=document.getElementById('insight-reminder-time').value||'18:30';d.insightReminder=r;save(d);scheduleSmartInsightPush(true);toast('Время предложений сохранено')}
+function getDayReview(){return {enabled:true,morning:'08:00',evening:'20:30',...(load().dayReview||{})};}
+function loadDayReview(){const r=getDayReview(),box=document.getElementById('day-review-box'),morning=document.getElementById('day-review-morning'),evening=document.getElementById('day-review-evening');if(box){box.classList.toggle('on',r.enabled);box.textContent=r.enabled?'✓':'';}if(morning)morning.value=r.morning||'08:00';if(evening)evening.value=r.evening||'20:30';}
+function toggleDayReview(){const d=load(),r=getDayReview();r.enabled=!r.enabled;d.dayReview=r;save(d);loadDayReview();scheduleDayReviewPush(true);toast(r.enabled?'Обзоры дня включены':'Обзоры дня выключены');}
+function saveDayReviewTimes(){const d=load(),r=getDayReview();r.morning=document.getElementById('day-review-morning')?.value||'08:00';r.evening=document.getElementById('day-review-evening')?.value||'20:30';d.dayReview=r;save(d);scheduleDayReviewPush(true);toast('Время обзоров сохранено');}
 let habitReminderTimeout=null;
 let shoppingReminderTimeout=null;
 function incompleteHabits(){const tk=todayKey();return getHabits().filter(h=>!h.log?.[tk]);}
@@ -2253,7 +2307,7 @@ const CLOUD_CODE_KEY='lumo_cloud_code_v1',CLOUD_REV_KEY='lumo_cloud_revision_v1'
 let cloudTimer=null,cloudConflict=null;
 function cloudPayload(){return {planner:load(),assistantMemory:getLocalMemory(),savedAt:Date.now()};}
 function scheduleCloudSync(){if(!localStorage.getItem(CLOUD_CODE_KEY))return;clearTimeout(cloudTimer);cloudTimer=setTimeout(()=>cloudSyncNow(false),1800);}
-function cloudStatusText(){const code=localStorage.getItem(CLOUD_CODE_KEY),el=document.getElementById('cloud-sync-status');if(!el)return;if(!code){el.textContent='Синхронизация не подключена';return;}const at=Number(localStorage.getItem('lumo_cloud_at_v1')||0);el.innerHTML=`Подключено · <span class="sync-code" onclick="copyCloudCode()">${esc(code)}</span><br>${at?'Последняя синхронизация: '+new Date(at).toLocaleString('ru-RU'):'Ожидает первой синхронизации'}`;}
+function cloudStatusText(){const code=localStorage.getItem(CLOUD_CODE_KEY),el=document.getElementById('cloud-sync-status');updateSettingsOverview();if(!el)return;if(!code){el.textContent='Синхронизация не подключена';return;}const at=Number(localStorage.getItem('lumo_cloud_at_v1')||0);el.innerHTML=`Подключено · <span class="sync-code" onclick="copyCloudCode()">${esc(code)}</span><br>${at?'Последняя синхронизация: '+new Date(at).toLocaleString('ru-RU'):'Ожидает первой синхронизации'}`;}
 async function createCloudSync(){try{const r=await fetch(FAMILY_SERVER+'/cloud/create',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({userId:PUSH_USER_ID,data:cloudPayload()})}),d=await r.json();if(!d.ok)throw new Error(d.err);localStorage.setItem(CLOUD_CODE_KEY,d.code);localStorage.setItem(CLOUD_REV_KEY,d.revision);localStorage.setItem('lumo_cloud_dirty_v1','0');localStorage.setItem('lumo_cloud_at_v1',d.updatedAt);cloudStatusText();copyCloudCode();toast('Код создан и скопирован');}catch(e){toast(e.message||'Не удалось создать синхронизацию');}}
 async function connectCloudSync(){const code=(document.getElementById('cloud-code-input')?.value||'').toUpperCase().replace(/[^A-Z0-9]/g,'');if(code.length!==12){toast('Проверь 12-значный код');return;}try{const r=await fetch(FAMILY_SERVER+'/cloud/connect',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({userId:PUSH_USER_ID,code})}),d=await r.json();if(!d.ok)throw new Error(d.err);localStorage.setItem(CLOUD_CODE_KEY,code);localStorage.setItem(CLOUD_REV_KEY,d.revision);localStorage.setItem('lumo_cloud_dirty_v1','0');await cloudSyncNow(true,'pull');cloudStatusText();toast('Устройство подключено');}catch(e){toast(e.message||'Код не найден');}}
 function copyCloudCode(){const code=localStorage.getItem(CLOUD_CODE_KEY)||'';if(code&&navigator.clipboard)navigator.clipboard.writeText(code);if(code)toast('Код скопирован');}
@@ -2265,13 +2319,13 @@ async function shareDeviceInvite(){if(!deviceInvite)return;const text='Подк�
 async function acceptCloudInvite(token){if(!await lumoConfirm('Это устройство получит общие дела, покупки, финансы, заметки и настройки.','Подключить к Lumo','Подключить'))return;try{const r=await fetch(FAMILY_SERVER+'/cloud/invite/use',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({userId:PUSH_USER_ID,token})}),d=await r.json();if(!d.ok)throw new Error(d.err);localStorage.setItem(CLOUD_CODE_KEY,d.code);localStorage.setItem(CLOUD_REV_KEY,d.revision);localStorage.setItem('lumo_cloud_dirty_v1','0');await cloudSyncNow(true,'pull');cloudStatusText();toast('Второе устройство подключено');}catch(e){toast(e.message||'Приглашение недействительно');}}
 async function disconnectCloudSync(){if(!localStorage.getItem(CLOUD_CODE_KEY))return;await fetch(FAMILY_SERVER+'/cloud/disconnect',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({userId:PUSH_USER_ID})}).catch(()=>{});localStorage.removeItem(CLOUD_CODE_KEY);localStorage.removeItem(CLOUD_REV_KEY);localStorage.removeItem('lumo_cloud_dirty_v1');cloudStatusText();toast('Синхронизация отключена на этом устройстве');}
 function applyCloudPayload(payload){if(!payload?.planner)return;window.__lumoCloudApplying=true;try{localStorage.setItem(KEY,JSON.stringify(payload.planner));if(payload.assistantMemory)localStorage.setItem(LOCAL_MEMORY_KEY,JSON.stringify(payload.assistantMemory));}finally{window.__lumoCloudApplying=false;}localStorage.setItem('lumo_cloud_dirty_v1','0');applyTheme();applyAccent();refreshCurrentTab();}
-function mergeCloudPayload(local,remote){const a=local?.planner||{},b=remote?.planner||{},out={...b,...a};['tasks','finance','income','notes','habits','shopping','cats','expCats','goals'].forEach(key=>{if(Array.isArray(a[key])||Array.isArray(b[key])){const map=new Map();[...(b[key]||[]),...(a[key]||[])].forEach((x,i)=>map.set(String(x?.id??x?.name??i),x));out[key]=[...map.values()];}});return {planner:out,assistantMemory:{taskModules:{...(remote?.assistantMemory?.taskModules||{}),...(local?.assistantMemory?.taskModules||{})},expenseCategories:{...(remote?.assistantMemory?.expenseCategories||{}),...(local?.assistantMemory?.expenseCategories||{})}},savedAt:Date.now()};}
+function mergeCloudPayload(local,remote){const a=local?.planner||{},b=remote?.planner||{},out={...b,...a};['tasks','finance','income','notes','habits','shopping','cats','expCats','goals'].forEach(key=>{if(Array.isArray(a[key])||Array.isArray(b[key])){const map=new Map();[...(b[key]||[]),...(a[key]||[])].forEach((x,i)=>map.set(String(x?.id??x?.name??i),x));out[key]=[...map.values()];}});return {planner:out,assistantMemory:{taskModules:{...(remote?.assistantMemory?.taskModules||{}),...(local?.assistantMemory?.taskModules||{})},expenseCategories:{...(remote?.assistantMemory?.expenseCategories||{}),...(local?.assistantMemory?.expenseCategories||{})},phrases:{...(remote?.assistantMemory?.phrases||{}),...(local?.assistantMemory?.phrases||{})}},savedAt:Date.now()};}
 async function cloudSyncNow(showToast=false,forcedAction=''){if(!localStorage.getItem(CLOUD_CODE_KEY))return showToast&&toast('Сначала подключи синхронизацию');const dirty=localStorage.getItem('lumo_cloud_dirty_v1')==='1',action=forcedAction||(dirty?'push':'pull');try{const body={userId:PUSH_USER_ID,baseRevision:Number(localStorage.getItem(CLOUD_REV_KEY)||0),action};if(action!=='pull')body.data=cloudPayload();const r=await fetch(FAMILY_SERVER+'/cloud/sync',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)}),d=await r.json();if(d.conflict){cloudConflict={local:cloudPayload(),server:d.server.data,serverRevision:d.server.revision};document.getElementById('modal-sync-conflict').classList.add('on');return;}if(!d.ok)throw new Error(d.err);if(d.data)applyCloudPayload(d.data);localStorage.setItem(CLOUD_REV_KEY,d.revision);localStorage.setItem('lumo_cloud_at_v1',d.updatedAt||Date.now());localStorage.setItem('lumo_cloud_dirty_v1','0');cloudStatusText();if(showToast)toast('Данные синхронизированы');}catch(e){if(showToast)toast(e.message||'Нет связи с сервером');}}
 async function resolveCloudConflict(choice){if(!cloudConflict)return;let data=choice==='server'?cloudConflict.server:choice==='merge'?mergeCloudPayload(cloudConflict.local,cloudConflict.server):cloudConflict.local;if(choice==='server'){applyCloudPayload(data);localStorage.setItem(CLOUD_REV_KEY,cloudConflict.serverRevision);}else{const r=await fetch(FAMILY_SERVER+'/cloud/sync',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({userId:PUSH_USER_ID,baseRevision:cloudConflict.serverRevision,action:'force',data})}),d=await r.json();if(d.ok){applyCloudPayload(data);localStorage.setItem(CLOUD_REV_KEY,d.revision);}}cloudConflict=null;document.getElementById('modal-sync-conflict').classList.remove('on');localStorage.setItem('lumo_cloud_at_v1',Date.now());cloudStatusText();toast('Конфликт решён');}
 
 /* ===== СЕМЬЯ + ПУШИ (сервер) ===== */
 const FAMILY_SERVER='https://pushevgen.duckdns.org'; // без слэша на конце, через https!
-const LUMO_APP_VERSION='v103';
+const LUMO_APP_VERSION='v116';
 const LUMO_DEVICE_ID=(()=>{let id=localStorage.getItem('lumo_device_id_v1');if(!id){id='dev_'+Date.now().toString(36)+'_'+Math.random().toString(36).slice(2,10);localStorage.setItem('lumo_device_id_v1',id)}return id})();
 const LUMO_SUPPORT_CODE=(()=>{let code=localStorage.getItem('lumo_support_code_v1');if(!code){const chars='ABCDEFGHJKLMNPQRSTUVWXYZ23456789';code='';for(let i=0;i<8;i++)code+=chars[Math.floor(Math.random()*chars.length)];localStorage.setItem('lumo_support_code_v1',code)}return code})();
 function diagnosticPlatform(){const ua=navigator.userAgent||'';if(/android/i.test(ua))return'Android';if(/iphone|ipad|ipod/i.test(ua))return'iOS';if(/windows/i.test(ua))return'Windows';if(/macintosh|mac os/i.test(ua))return'macOS';return'Web'}
@@ -2292,6 +2346,19 @@ window.addEventListener('error',event=>reportClientError('javascript',event.erro
 window.addEventListener('unhandledrejection',event=>reportClientError('promise',event.reason));
 let PUSH_USER_ID=localStorage.getItem('push_user_id')||'';
 if(!PUSH_USER_ID){PUSH_USER_ID='u_'+Date.now()+'_'+Math.random().toString(36).slice(2,8);localStorage.setItem('push_user_id',PUSH_USER_ID);}
+const LUMO_DEVICE_TOKEN=(()=>{let token=localStorage.getItem('lumo_device_token_v1');if(!/^[a-f0-9]{64}$/i.test(token||'')){const bytes=new Uint8Array(32);if(globalThis.crypto?.getRandomValues)globalThis.crypto.getRandomValues(bytes);else for(let i=0;i<bytes.length;i++)bytes[i]=Math.floor(Math.random()*256);token=[...bytes].map(x=>x.toString(16).padStart(2,'0')).join('');localStorage.setItem('lumo_device_token_v1',token)}return token})();
+const lumoNativeFetch=typeof window.fetch==='function'?window.fetch.bind(window):async()=>{throw new Error('fetch unavailable')};let lumoDeviceRegistration=null;
+async function ensureLumoDeviceRegistered(){
+  if(!lumoDeviceRegistration)lumoDeviceRegistration=lumoNativeFetch(FAMILY_SERVER+'/device/register',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({userId:PUSH_USER_ID,token:LUMO_DEVICE_TOKEN})}).then(async response=>{if(!response.ok){const data=await response.json().catch(()=>({}));throw new Error(data.error||'device registration failed')}return true}).catch(error=>{lumoDeviceRegistration=null;throw error});
+  return lumoDeviceRegistration;
+}
+window.fetch=async function lumoAuthenticatedFetch(input,options={}){
+  const url=typeof input==='string'?input:String(input?.url||'');
+  if(!url.startsWith(FAMILY_SERVER)||url.endsWith('/device/register'))return lumoNativeFetch(input,options);
+  await ensureLumoDeviceRegistered();
+  const headers=new Headers(options.headers||(input instanceof Request?input.headers:undefined));headers.set('X-Lumo-User',PUSH_USER_ID);headers.set('X-Lumo-Device-Token',LUMO_DEVICE_TOKEN);
+  return lumoNativeFetch(input,{...options,headers});
+};
 let _serverAccessCheckedAt=0;
 function renderServerAccess(state){
   let overlay=document.getElementById('lumo-access-lock');
@@ -2413,18 +2480,20 @@ async function checkPushHealth(showToast=false){
   }catch(e){lines.push('❌ Не удалось проверить push-службу');ok=false;}
   const now=Date.now(),next=getTasks().filter(t=>!t.done&&t.date&&t.time).map(t=>({...t,_at:new Date(t.date+'T'+t.time).getTime()})).filter(t=>t._at>now).sort((a,b)=>a._at-b._at)[0];
   lines.push(next?`🕒 Ближайшее: ${esc(next.title)} — ${fmtDate(next.date)}, ${esc(next.time)}`:'ℹ️ Нет будущих дел с точным временем');
-  el.innerHTML=lines.join('<br>');if(showToast)toast(ok?'✅ Push-цепочка готова':'Есть проблема в push-настройках');
+  el.innerHTML=lines.join('<br>');updateSettingsOverview(ok);if(showToast)toast(ok?'✅ Push-цепочка готова':'Есть проблема в push-настройках');
 }
 async function scheduleHabitPushServer(force=false){
   const r=getHabitReminder();if(!('serviceWorker'in navigator))return;
-  const left=incompleteHabits();
-  const key=`habit_push_scheduled_v2:${todayKey()}:${r.time}:${r.enabled?'on':'off'}:${left.map(h=>h.id).join(',')}`;
+  const left=incompleteHabits(),adaptive=adaptiveHabitTargets();
+  const key=`habit_push_scheduled_v3:${todayKey()}:${r.time}:${r.enabled?'on':'off'}:${r.adaptive?'adaptive':'single'}:${left.map(h=>h.id).join(',')}:${adaptive.map(h=>h.id+':'+h._missed).join(',')}`;
   if(!force&&localStorage.getItem('habit_push_last_key')===key)return;
   try{
     const reg=await navigator.serviceWorker.ready,sub=await reg.pushManager.getSubscription();if(!sub)return;
     const [hour,minute]=(r.time||'09:00').split(':').map(Number);
     const response=await fetch(FAMILY_SERVER+'/schedule-morning',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({userId:PUSH_USER_ID,subscription:sub,type:'habit',scheduleId:'habit:'+PUSH_USER_ID,enabled:!!r.enabled,reminderTime:r.time,title:'🌱 Не забудь о привычках',body:left.slice(0,5).map(h=>h.icon+' '+h.name).join(' · ')||'Проверь сегодняшний ритм',hour:hour||0,minute:minute||0,tzOffset:-new Date().getTimezoneOffset(),date:todayKey()})});
-    if(response.ok)localStorage.setItem('habit_push_last_key',key);
+    const baseMinutes=(hour||0)*60+(minute||0),rescueMinutes=Math.min(baseMinutes+180,20*60+30),rescueEnabled=!!r.enabled&&r.adaptive!==false&&adaptive.length>0&&rescueMinutes>baseMinutes;
+    const rescue=await fetch(FAMILY_SERVER+'/schedule-morning',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({userId:PUSH_USER_ID,subscription:sub,type:'habit-rescue',scheduleId:'habit-rescue:'+PUSH_USER_ID,enabled:rescueEnabled,reminderTime:String(Math.floor(rescueMinutes/60)).padStart(2,'0')+':'+String(rescueMinutes%60).padStart(2,'0'),title:'🌿 Вернём привычку в ритм?',body:adaptive.slice(0,4).map(h=>`${h.icon||'⭐'} ${h.name} · пропущено ${h._missed} дн.`).join(' · ')||'Выбери одну маленькую привычку на сегодня',hour:Math.floor(rescueMinutes/60),minute:rescueMinutes%60,tzOffset:-new Date().getTimezoneOffset(),date:todayKey()})});
+    if(response.ok&&rescue.ok)localStorage.setItem('habit_push_last_key',key);
   }catch(e){}
 }
 async function scheduleShoppingPushServer(force=false){
@@ -2563,10 +2632,13 @@ async function doAssign(toUserId,toName){
   else toast('📤 Поручение сохранено в очереди');
   closeAssign();
 }
+let _lastAssignmentPull=0;
 async function pullAssignedTasks(){
   if(!PUSH_USER_ID)return;
+  if(Date.now()-_lastAssignmentPull<3000)return;
+  _lastAssignmentPull=Date.now();
   try{const r=await fetch(FAMILY_SERVER+'/inbox',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({userId:PUSH_USER_ID})});const d=await r.json();
-    if(d.ok){window.pendingAssignments=d.tasks||[];updateNotificationBadge();}}
+    if(d.ok){const before=JSON.stringify((window.pendingAssignments||[]).map(x=>[x.assignId,x.status])),next=d.tasks||[];window.pendingAssignments=next;updateNotificationBadge();if(before!==JSON.stringify(next.map(x=>[x.assignId,x.status]))&&currentTab==='today')renderToday();}}
   catch(e){}
 }
 
@@ -2574,11 +2646,12 @@ function notificationIcon(type){return type==='assignment'?'📥':type==='assign
 function relativeEventTime(ts){const m=Math.max(0,Math.round((Date.now()-Number(ts||Date.now()))/60000));return m<1?'сейчас':m<60?m+' мин назад':m<1440?Math.round(m/60)+' ч назад':new Date(ts).toLocaleDateString('ru-RU');}
 async function fetchNotificationEvents(){try{const r=await fetch(FAMILY_SERVER+'/events/list',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({userId:PUSH_USER_ID})}),d=await r.json();if(d.ok){window.notificationEvents=d.events||[];return window.notificationEvents;}}catch(e){}return window.notificationEvents||[];}
 async function updateNotificationBadge(){const events=await fetchNotificationEvents(),pending=(window.pendingAssignments||[]).length,nonAssignment=events.filter(x=>!x.read&&x.type!=='assignment').length,assignmentUnread=events.filter(x=>!x.read&&x.type==='assignment').length,unread=nonAssignment+Math.max(pending,assignmentUnread);localStorage.setItem('lumo_unread_count_v1',String(unread));const dot=document.getElementById('notify-dot');if(dot){dot.textContent=unread>99?'99+':unread;dot.style.display=unread?'grid':'none';}updateAppBadge();}
-async function openNotificationCenter(){const modal=document.getElementById('modal-notifications'),body=document.getElementById('notification-body');modal.classList.add('on');body.innerHTML='<div class="ai-hint">Загружаю события…</div>';await pullAssignedTasks();const events=await fetchNotificationEvents(),pending=(window.pendingAssignments||[]).length,visible=events.filter(e=>!(pending&&e.type==='assignment'));let html=pending?`<button class="smart-card" onclick="openAssignmentsInbox()"><i>📥</i><span><b>Входящие поручения</b><small>Ждут ответа: ${pending}</small></span><em>›</em></button>`:'';html+=visible.map(e=>`<div class="feed-item ${e.read?'':'unread'}" onclick="openNotificationEvent(${jsArg(e.id)},${jsArg(e.type)})"><span class="feed-icon">${notificationIcon(e.type)}</span><span><b>${esc(e.title)}</b><p>${esc(e.body)}</p><small>${relativeEventTime(e.ts)}</small></span></div>`).join('');body.innerHTML=html||'<div class="empty"><div>🔔</div>Новых событий нет</div>';}
-async function openNotificationEvent(id,type){await fetch(FAMILY_SERVER+'/events/read',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({userId:PUSH_USER_ID,ids:[id]})}).catch(()=>{});if(type==='assignment'){document.getElementById('modal-notifications').classList.remove('on');openAssignmentsInbox();}else if(type==='family-shopping'){document.getElementById('modal-notifications').classList.remove('on');openShopping();}else{await openNotificationCenter();}updateNotificationBadge();}
-async function markAllNotificationsRead(){await fetch(FAMILY_SERVER+'/events/read',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({userId:PUSH_USER_ID})}).catch(()=>{});await openNotificationCenter();updateNotificationBadge();}
+async function openNotificationCenter(){const modal=document.getElementById('modal-notifications'),body=document.getElementById('notification-body');modal.classList.add('on');body.innerHTML='<div class="ai-hint">Загружаю события…</div>';await pullAssignedTasks();const events=await fetchNotificationEvents(),pending=(window.pendingAssignments||[]).length,visible=events.filter(e=>!e.read&&!(pending&&e.type==='assignment'));let html=pending?`<button class="smart-card" onclick="openAssignmentsInbox()"><i>📥</i><span><b>Входящие поручения</b><small>Ждут ответа: ${pending}</small></span><em>›</em></button>`:'';html+=visible.map(e=>`<div class="feed-item unread" onclick="openNotificationEvent(${jsArg(e.id)},${jsArg(e.type)})"><span class="feed-icon">${notificationIcon(e.type)}</span><span><b>${esc(e.title)}</b><p>${esc(e.body)}</p><small>${relativeEventTime(e.ts)}</small></span></div>`).join('');body.innerHTML=html||'<div class="empty"><div>🔔</div>Новых событий нет</div>';}
+async function persistNotificationRead(ids){const selected=Array.isArray(ids)&&ids.length?ids.map(String):null;window.notificationEvents=(window.notificationEvents||[]).map(event=>!selected||selected.includes(String(event.id))?{...event,read:true}:event);const payload={userId:PUSH_USER_ID,...(selected?{ids:selected}:{})};try{const response=await fetch(FAMILY_SERVER+'/events/read',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)});if(!response.ok)throw new Error('read state unavailable');}catch(_){enqueueChange('/events/read',payload,selected?'events-read:'+selected.join(','):'events-read:all');}}
+async function openNotificationEvent(id,type){await persistNotificationRead([id]);if(type==='assignment'){document.getElementById('modal-notifications').classList.remove('on');openAssignmentsInbox();}else if(type==='family-shopping'){document.getElementById('modal-notifications').classList.remove('on');openShopping();}else{await openNotificationCenter();}await updateNotificationBadge();}
+async function markAllNotificationsRead(){await persistNotificationRead();await openNotificationCenter();await updateNotificationBadge();const unread=(window.notificationEvents||[]).some(event=>!event.read)||(window.pendingAssignments||[]).length>0;if(!unread){const dot=document.getElementById('notify-dot');if(dot){dot.textContent='';dot.style.display='none';}localStorage.setItem('lumo_unread_count_v1','0');updateAppBadge();}}
 async function openAssignmentsInbox(){await pullAssignedTasks();const items=window.pendingAssignments||[],body=document.getElementById('inbox-body');document.getElementById('modal-inbox').classList.add('on');body.innerHTML=items.length?items.map(a=>`<div class="inbox-card"><h4>${esc(a.title)}</h4><p>От ${esc(a.fromName||'участника семьи')} · ${a.date?fmtDate(a.date):'без даты'}${a.time?' · '+esc(a.time):''}</p>${a.desc?`<p>${esc(a.desc)}</p>`:''}<input id="inbox-comment-${esc(a.assignId)}" placeholder="Комментарий отправителю (необязательно)"><div class="inbox-actions"><button class="reject" onclick="respondAssignment(${jsArg(a.assignId)},'rejected')">Отклонить</button><button class="accept" onclick="respondAssignment(${jsArg(a.assignId)},'accepted')">Принять</button></div></div>`).join(''):'<div class="empty"><div>📥</div>Новых поручений нет</div>';}
-async function respondAssignment(assignId,status){const a=(window.pendingAssignments||[]).find(x=>x.assignId===assignId);if(!a)return;const comment=document.getElementById('inbox-comment-'+assignId)?.value.trim()||'',payload={userId:PUSH_USER_ID,assignId,status,comment};let d={ok:true},queued=false;try{const r=await fetch(FAMILY_SERVER+'/inbox/respond',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)});d=await r.json();}catch(e){enqueueChange('/inbox/respond',payload,'inbox-response:'+assignId);queued=true;}if(!d.ok){toast(d.err||'Не удалось отправить ответ');return;}if(status==='accepted'&&!getTasks().some(x=>x.assignId===assignId)){const tasks=getTasks();tasks.push({id:Date.now()+Math.floor(Math.random()*10000),assignId,title:a.title,module:a.module||'personal',date:a.date||todayKey(),time:a.time||'',desc:a.desc||'',pri:a.pri||'Y',done:false,fromUserId:a.fromUserId,fromName:a.fromName});setTasks(tasks);}window.pendingAssignments=(window.pendingAssignments||[]).filter(x=>x.assignId!==assignId);openAssignmentsInbox();updateNotificationBadge();toast(queued?'Ответ сохранён и уйдёт при появлении сети':status==='accepted'?'Поручение добавлено в дела':'Поручение отклонено');}
+async function respondAssignment(assignId,status,source='inbox'){const a=(window.pendingAssignments||[]).find(x=>x.assignId===assignId);if(!a||window.assignmentResponding===assignId)return;window.assignmentResponding=assignId;if(source==='home')renderToday();const comment=document.getElementById('inbox-comment-'+assignId)?.value.trim()||'',payload={userId:PUSH_USER_ID,assignId,status,comment};let d={ok:true},queued=false;try{const r=await fetch(FAMILY_SERVER+'/inbox/respond',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)});d=await r.json();}catch(e){enqueueChange('/inbox/respond',payload,'inbox-response:'+assignId);queued=true;}if(!d.ok){window.assignmentResponding='';if(source==='home')renderToday();toast(d.err||'Не удалось отправить ответ');return;}if(status==='accepted'&&!getTasks().some(x=>x.assignId===assignId)){const tasks=getTasks(),date=a.date&&a.date>=todayKey()?a.date:todayKey();tasks.push({id:Date.now()+Math.floor(Math.random()*10000),assignId,title:a.title,module:a.module||'personal',date,time:a.time||'',desc:a.desc||'',pri:a.pri||'Y',done:false,fromUserId:a.fromUserId,fromName:a.fromName});setTasks(tasks);}window.pendingAssignments=(window.pendingAssignments||[]).filter(x=>x.assignId!==assignId);window.assignmentResponding='';if(source==='inbox')openAssignmentsInbox();else renderToday();updateNotificationBadge();toast(queued?'Ответ сохранён и уйдёт при появлении сети':status==='accepted'?'Поручение принято и добавлено в дела':'Поручение отклонено');}
 
 /* ===== РЕЙТИНГ СЕМЬИ ===== */
 async function openRating(){
@@ -2632,7 +2705,7 @@ async function pullShopping(){
 
 /* ===== ИИ-АССИСТЕНТ ===== */
 let aiHistory=[];
-let assistantDialogue={lastTaskId:null,suggestedTaskIds:[],suggestionIndex:0,lastTopic:'',pendingTeachPhrase:'',teachingStage:''};
+let assistantDialogue={lastTaskId:null,suggestedTaskIds:[],suggestionIndex:0,lastTopic:'',pendingTeachPhrase:'',teachingStage:'',lastUserText:''};
 function aiHello(){
   const chat=document.getElementById('ai-chat');
   const name=getMyName();
@@ -2691,7 +2764,7 @@ function dateFromText(low){
     if(d.getDate()===day&&d.getMonth()===month-1)return localDateKey(d);
   }
   const dayOnly=low.match(/(?:^|\s)([1-9]|[12]\d|3[01])\s*(?:числа|число)(?=\s|$)/);
-  if(dayOnly){const now=new Date(),day=Number(dayOnly[1]),d=new Date(now.getFullYear(),now.getMonth(),day);if(d<new Date(now.getFullYear(),now.getMonth(),now.getDate()))d.setMonth(d.getMonth()+1);if(d.getDate()===day)return localDateKey(d);}
+  if(dayOnly){const now=new Date(),day=Number(dayOnly[1]),d=new Date(now.getFullYear(),now.getMonth(),day),historic=/(?:был|была|были|было|прошл)/.test(low);if(!historic&&d<new Date(now.getFullYear(),now.getMonth(),now.getDate()))d.setMonth(d.getMonth()+1);if(d.getDate()===day)return localDateKey(d);}
   const shortDay=low.match(/(?:^|\s)(?:на|за)\s+(0[1-9]|[12]\d|3[01])(?=\s|$)/);
   if(shortDay){const now=new Date(),day=Number(shortDay[1]),d=new Date(now.getFullYear(),now.getMonth(),day);if(d<new Date(now.getFullYear(),now.getMonth(),now.getDate()))d.setMonth(d.getMonth()+1);if(d.getDate()===day)return localDateKey(d);}
   const months={январ:0,феврал:1,март:2,апрел:3,мая:4,май:4,июн:5,июл:6,август:7,сентябр:8,октябр:9,ноябр:10,декабр:11};
@@ -2757,6 +2830,10 @@ function saveAssistantRules(){const m={taskModules:{},expenseCategories:{},phras
 function assistantPhraseKey(text){return normalizeAssistantText(text).toLowerCase().replace(/[.,!?;:]+$/,'').replace(/\s+/g,' ').trim();}
 function learnedAssistantPhrase(text){return getLocalMemory().phrases[assistantPhraseKey(text)]||'';}
 function finishAssistantTeaching(correctText){const source=assistantDialogue.pendingTeachPhrase;if(!source)return;const key=assistantPhraseKey(source),value=String(correctText||'').trim();assistantDialogue.pendingTeachPhrase='';if(!key||!value||key===assistantPhraseKey(value))return;const m=getLocalMemory();m.phrases[key]=value;localStorage.setItem(LOCAL_MEMORY_KEY,JSON.stringify(m));localStorage.setItem('lumo_cloud_dirty_v1','1');scheduleCloudSync();renderLocalMemoryInfo();aiAddMsg('ai',`🧠 Запомнил: «<b>${esc(source)}</b>» означает «<b>${esc(value)}</b>».`);}
+function rememberAssistantCorrection(source,correctText){
+  const key=assistantPhraseKey(source),value=String(correctText||'').trim();if(!key||!value||key===assistantPhraseKey(value))return false;
+  const memory=getLocalMemory();memory.phrases[key]=value;localStorage.setItem(LOCAL_MEMORY_KEY,JSON.stringify(memory));localStorage.setItem('lumo_cloud_dirty_v1','1');scheduleCloudSync();renderLocalMemoryInfo();return true;
+}
 
 function localDateKey(d){return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');}
 function localRepeat(text){
@@ -3064,17 +3141,34 @@ function localPlanMeta(a){
   if(a.type==='note')return `Заметка · ${fmtDate(a.date||todayKey())}`;
   if(a.type==='shopping')return 'Список покупок';
   if(a.type==='habit')return `${a.repeat==='daily'?'Каждый день':'Каждую неделю'}${a.time?' · '+a.time:''}`;
-  return `${a.pri==='R'?'🔴 Важно · ':a.pri==='B'?'🔵 Потом · ':''}${fmtDate(a.date)}${a.time?' · '+a.time:''}${a.module?' · '+catLabel(a.module):''}${a.duration?' · ⏱ '+a.duration+' мин':''}${a.energy?` · ${a.energy==='high'?'⚡ много энергии':a.energy==='low'?'🌿 мало энергии':'◐ средняя энергия'}`:''}${a.repeat?' · повтор':''}${a._timeAdjusted?' · ⚠️ '+a._timeAdjusted:''}`;
+  return `${a.pri==='R'?'🔴 Важно · ':a.pri==='B'?'🔵 Потом · ':''}${fmtDate(a.date)}${a.time?' · '+a.time:''}${a.module?' · '+catLabel(a.module):''}${a.duration?' · ⏱ '+a.duration+' мин':''}${a.energy?` · ${a.energy==='high'?'⚡ много энергии':a.energy==='low'?'🌿 мало энергии':'◐ средняя энергия'}`:''}${a.repeat?' · повтор':''}${a._timeAdjusted?' · ⚠️ '+a._timeAdjusted:''}${a._conflicts?.length?' · ⚠️ пересекается: '+a._conflicts.map(x=>x.time+' '+x.title).join(', '):''}`;
+}
+function dayReviewSnapshot(){
+  const tk=todayKey(),tasks=getTasks().filter(t=>t.date===tk),open=tasks.filter(t=>!t.done).sort((a,b)=>(a.time||'99:99').localeCompare(b.time||'99:99')),done=tasks.filter(t=>t.done),habits=getHabits(),habitLeft=habits.filter(h=>!h.log?.[tk]);
+  return {tasks,open,done,habits,habitLeft,conflicts:taskConflictPairs(tk)};
+}
+function dayReviewHtml(period='morning'){
+  const s=dayReviewSnapshot(),morning=period==='morning';
+  if(morning){
+    const first=s.open[0],taskLines=s.open.length?s.open.slice(0,5).map(t=>`• ${t.time?esc(t.time)+' — ':''}${esc(t.title)}`).join('<br>'):'• Активных дел нет';
+    return `<b>Доброе утро! План на сегодня</b><br>${taskLines}<br><br>🌱 Привычек осталось: ${s.habitLeft.length}${s.conflicts.length?`<br>⚠️ Конфликтов по времени: ${s.conflicts.length}`:''}${first?`<br><br><small>Начни с «${esc(first.title)}»${first.time?' в '+esc(first.time):''}.</small>`:''}`;
+  }
+  const tail=s.open.length?`<br><br>Остались дела: ${s.open.slice(0,5).map(t=>esc(t.title)).join(' · ')}<br><small>Могу помочь перенести остаток на завтра.</small>`:s.habitLeft.length?`<br><br>Дела закрыты, но остались привычки: ${s.habitLeft.slice(0,5).map(h=>esc((h.icon||'')+' '+h.name)).join(' · ')}`:'<br><br>Всё действительно закрыто — можно спокойно завершать день ✨';
+  return `<b>Вечерний обзор</b><br>✅ Дел выполнено: ${s.done.length} из ${s.tasks.length}<br>🌱 Привычек: ${s.habits.length-s.habitLeft.length} из ${s.habits.length}${tail}`;
+}
+function dayReviewPush(period='morning'){
+  const s=dayReviewSnapshot(),morning=period==='morning';
+  if(morning)return {title:'☀️ План на сегодня',body:s.open.length?s.open.slice(0,3).map(t=>(t.time?t.time+' ':'')+t.title).join(' · '):'Активных дел нет — день свободен',prompt:'Покажи утренний обзор дня'};
+  return {title:'🌙 Итог дня',body:`Выполнено ${s.done.length} из ${s.tasks.length} дел · привычек ${s.habits.length-s.habitLeft.length} из ${s.habits.length}${s.open.length?' · осталось '+s.open.length:''}`,prompt:'Покажи вечерний обзор дня'};
 }
 function tryLocalAnswer(text){
   const low=text.toLowerCase();
   const receiptAnswer=tryReceiptAnswer(text);if(receiptAnswer)return receiptAnswer;
+  if(/утренн\w*\s+(?:обзор|план|итог)|(?:обзор|план)\s+(?:на\s+)?утро|что\s+сегодня\s+главн/.test(low))return dayReviewHtml('morning');
   if(/заверш\w*\s+день|итог\w*\s+(?:дня|сегодня)|вечерн\w*\s+(?:итог|обзор)/.test(low)){
-    const tasks=getTasks().filter(t=>t.date===todayKey()),done=tasks.filter(t=>t.done),left=tasks.filter(t=>!t.done),habits=getHabits(),habitDone=habits.filter(h=>h.log?.[todayKey()]).length;
-    const habitLeft=habits.filter(h=>!h.log?.[todayKey()]);
-    const tail=left.length?`<br><br>Остались дела: ${left.slice(0,5).map(t=>esc(t.title)).join(' · ')}<br><small>Могу перенести лишнее на завтра — напиши «разгрузи остаток дня».</small>`:habitLeft.length?`<br><br>Дела закрыты, но остались привычки: ${habitLeft.slice(0,5).map(h=>esc((h.icon||'')+' '+h.name)).join(' · ')}`:'<br><br>Всё действительно закрыто — можно спокойно завершать день ✨';
-    return `<b>Итог дня</b><br>✅ Дел выполнено: ${done.length} из ${tasks.length}<br>🌱 Привычек: ${habitDone} из ${habits.length}${tail}`;
+    return dayReviewHtml('evening');
   }
+  if(/конфликт|пересека\w*.*(?:дел|задач|расписан)|накладк\w*.*(?:врем|дел)/.test(low)){const pairs=taskConflictPairs();return pairs.length?`Нашёл конфликтов: <b>${pairs.length}</b><br>${pairs.slice(0,8).map(([a,b])=>`• ${esc(a.time)} ${esc(a.title)} ↔ ${esc(b.time)} ${esc(b.title)}`).join('<br>')}<br><br><small>Открой одно из дел и выбери другое время.</small>`:'Конфликтов по времени на сегодня нет.';}
   if(/перегруз|разгруз\w*\s+(?:мой\s+)?день|слишком\s+много\s+(?:дел|задач)/.test(low)){
     const tasks=getTasks().filter(t=>!t.done&&t.date===todayKey()),minutes=tasks.reduce((n,t)=>n+Number(t.duration||30),0),high=tasks.filter(t=>t.energy==='high').length;
     if(!tasks.length)return 'На сегодня активных дел нет — перегрузки не вижу.';
@@ -3130,6 +3224,7 @@ function tryLocalDialogue(text){
     if(!list.length)return 'Похоже, сейчас лучше выдохнуть: активных дел нет. Сделай небольшой перерыв и не добавляй себе лишнего 💜';
     const first=list[0];assistantDialogue.lastTaskId=first.id;return `Давай без перегруза. Сейчас выбери только одно: <b>${esc(first.title)}</b>${first.time?' к '+esc(first.time):''}. Остальное пока не трогай. Когда закончишь, напиши «что дальше».`;
   }
+  if(/(?:невыполненн|оставш|не сделал|не сделала|не отметил|не отметила).*(?:привыч)|(?:привыч).*(?:сегодня|вечер|остал|выполн)/.test(low))return tryLocalAnswer(text);
   const asksNext=/что\s+(?:мне\s+)?(?:делать\s+)?(?:сначала|первым)|с\s+чего\s+начать|что\s+важнее|расставь\s+приоритет|спланируй\s+(?:мне\s+|мой\s+)?день|план\s+на\s+(?:сегодня|день)|что\s+дальше|а\s+потом/.test(low);
   if(asksNext){
     let list=assistantDialogue.suggestedTaskIds.map(id=>getTasks().find(t=>t.id===id)).filter(t=>t&&!t.done);
@@ -3178,7 +3273,7 @@ function localPlanHTML(plan){
   return html;
 }
 function showLocalPlan(plan){
-  pendingLocalPlan=plan;
+  pendingLocalPlan=annotatePlanConflicts(plan);
   aiAddMsg('ai',localPlanHTML(plan));
 }
 function refreshLocalPlanPreview(){
@@ -3258,9 +3353,11 @@ function saveLocalPlanEdit(){
   pendingLocalPlan.actions[localEditIndex]=a;closeLocalPlanEdit();refreshLocalPlanPreview();toast('Исправление применено');
 }
 function closeLocalPlanEdit(){localEditIndex=-1;document.getElementById('modal-local-edit').classList.remove('on');}
-function confirmLocalPlan(){
+async function confirmLocalPlan(){
   if(!pendingLocalPlan)return;
-  const plan=pendingLocalPlan;pendingLocalPlan=null;
+  const plan=annotatePlanConflicts(pendingLocalPlan),conflicts=plan.actions.filter(a=>!a._removed&&a._conflicts?.length);
+  if(conflicts.length&&!await lumoConfirm(`Обнаружено пересечений: ${conflicts.map(a=>a.title+' — '+a._conflicts.map(x=>x.time+' '+x.title).join(', ')).join(' · ')}. Сохранить план?`,'Конфликт в расписании','Всё равно сохранить'))return;
+  pendingLocalPlan=null;
   const created=[];
   plan.actions.filter(a=>!a._removed).forEach(a=>{
     learnLocalAction(a);
@@ -3268,7 +3365,7 @@ function confirmLocalPlan(){
       addShoppingItems(a.items,'assistant');created.push({type:'shopping',data:a});return;
     }
     if(a.type==='habit'){
-      const h=getHabits();h.push({id:'h'+Date.now()+Math.floor(Math.random()*999),name:a.title,icon:'✨',log:{}});saveHabits(h);
+      const h=getHabits();h.push({id:'h'+Date.now()+Math.floor(Math.random()*999),name:a.title,icon:'✨',log:{},createdAt:todayKey()});saveHabits(h);
       if(a.time){const task={type:'task',title:a.title,date:a.date,time:a.time,module:'personal',pri:'Y',repeat:a.repeat};applyActionReturn(task);}
       created.push({type:'habit',data:a});return;
     }
@@ -3379,9 +3476,8 @@ function parseLocalManagement(text,forcedTaskId=null){
     const query=taskCommandQuery(text),candidates=forcedTaskId?getTasks().filter(t=>String(t.id)===String(forcedTaskId)&&!t.done):findTaskCandidatesForCommand(query);
     if(!candidates.length)return {error:'Не нашёл дело, которое нужно перенести.'};
     if(candidates.length>1)return {choice:{kind:'task_move',text,items:candidates.map(t=>({id:t.id,title:t.title,meta:`${fmtDate(t.date)}${t.time?' · '+t.time:''}`}))}};
-    const task=candidates[0];
-    const date=dateFromText(low),time=timeFromText(low)||task.time||'';
-    if(isPastTaskSchedule(date,time))return {error:'Это время уже прошло. Назови будущее время или скажи «через час».'};
+    const task=candidates[0],date=dateFromText(low),explicitTime=timeFromText(low);let time=explicitTime||task.time||'';
+    if(isPastTaskSchedule(date,time)){if(explicitTime)return {error:'Это время уже прошло. Назови будущее время или скажи «через час».'};time='';}
     ops.push({kind:'task_update',id:task.id,title:'Перенести дело',before:taskOpState(task),after:taskOpState({...task,date,time}),patch:{date,time}});
     return {ops};
   }
@@ -3527,9 +3623,13 @@ async function aiSend(textOverride=null){
   }
   const inp=document.getElementById('ai-input'),hasOverride=typeof textOverride==='string';
   const rawText=(hasOverride?textOverride:inp.value).trim();if(!rawText)return;
+  const previousUserText=assistantDialogue.lastUserText;
+  assistantDialogue.lastUserText=rawText;
+  const correction=rawText.match(/^(?:нет[, ]+)?(?:я\s+)?(?:имел[аи]?\s+в\s+виду|хотел[аи]?\s+сказать|правильно)\s*[:—-]?\s*(.+)$/i);
   let text=learnedAssistantPhrase(rawText)||rawText;
   window._lastUserText=rawText;
   if(!hasOverride||inp.value.trim()===rawText)inp.value='';aiAddMsg('user',esc(rawText));
+  if(correction?.[1]&&previousUserText&&rememberAssistantCorrection(previousUserText,correction[1])){text=correction[1].trim();pendingLocalPlan=null;pendingLocalOps=null;document.querySelector('.local-plan')?.closest('.ai-msg')?.remove();aiAddMsg('ai',`🧠 Понял исправление и запомнил его. В следующий раз фразу «<b>${esc(previousUserText)}</b>» разберу как «<b>${esc(text)}</b>».`);}
 
   const teachingLow=rawText.toLowerCase().replace(/ё/g,'е').trim();
   if(assistantDialogue.teachingStage==='awaitingPhrase'){
@@ -3861,105 +3961,74 @@ function renderMore(){
 }
 
 
+function homeAssistantSubmit(){
+  const source=document.getElementById('home-ai-input'),text=(source?.value||'').trim();
+  if(!text){source?.focus();return;}
+  switchTab('ai');
+  const target=document.getElementById('ai-input');target.value=text;target.focus();aiSend();
+}
+function homeAssistantVoice(){switchTab('ai');setTimeout(()=>toggleMic(),100);}
+function pendingAssignmentsHomeHTML(){
+  const items=window.pendingAssignments||[];if(!items.length)return'';
+  return `<section class="home-assignments" aria-label="Входящие поручения"><div class="home-assignment-head"><span class="home-assignment-icon">${ICONS.family}</span><span><small>СЕМЬЯ</small><b>Вам поручили</b></span><em>${items.length}</em></div><div class="home-assignment-list">${items.slice(0,3).map(item=>{const busy=window.assignmentResponding===item.assignId;return `<article class="home-assignment-card"><div class="home-assignment-copy"><b>${esc(item.title)}</b><span>От ${esc(item.fromName||'участника семьи')}${item.date?' · '+fmtDate(item.date):''}${item.time?' · '+esc(item.time):''}</span>${item.desc?`<small>${esc(item.desc)}</small>`:''}</div><div class="home-assignment-actions"><button class="decline" ${busy?'disabled':''} onclick="respondAssignment(${jsArg(item.assignId)},'rejected','home')">Отказаться</button><button class="accept" ${busy?'disabled':''} onclick="respondAssignment(${jsArg(item.assignId)},'accepted','home')">${busy?'Отправляю…':'Принять'}</button></div></article>`;}).join('')}</div>${items.length>3?`<button class="home-assignment-more" onclick="openAssignmentsInbox()">Показать все · ${items.length}</button>`:''}</section>`;
+}
+function todayTaskCategory(task){return String(modLabel[task.module]||'Личное').replace(/^[^\p{L}\p{N}]+/u,'').trim()||'Личное';}
+function todayTaskCountdown(task){
+  if(!task.date||!task.time)return {value:'Сегодня',label:'без времени',late:false};
+  const target=new Date(`${task.date}T${task.time}:00`),minutes=Math.round((target-Date.now())/60000);
+  if(minutes<0){const passed=Math.abs(minutes),hours=Math.floor(passed/60),rest=passed%60;return {value:hours?(rest?`${hours} ч ${rest} мин`:`${hours} ч`):`${passed} мин`,label:'просрочено',late:true};}
+  if(minutes<1)return {value:'Сейчас',label:'начинается',late:false};if(minutes<60)return {value:`${minutes} мин`,label:'до начала',late:false};
+  const hours=Math.floor(minutes/60),rest=minutes%60;return {value:rest?`${hours} ч ${rest} мин`:`${hours} ч`,label:'до начала',late:false};
+}
+function todayBentoTaskHTML(task,featured=false){
+  const icon=task.module==='shopping'?ICONS.shopping:task.module==='work'?ICONS.calendar:ICONS.all;
+  const id=jsArg(task.id),category=todayTaskCategory(task),countdown=todayTaskCountdown(task);
+  return `<article class="day-task-card ${featured?'featured':'compact'}" data-id="${esc(String(task.id))}">
+    <button class="day-task-main" onclick="editTask(${id})" aria-label="Открыть дело ${esc(task.title)}">
+      <span class="day-task-icon">${icon}</span>
+      <span class="day-task-copy"><b>${esc(task.title)}</b><small>${task.time?`<span class="day-task-time">${esc(task.time)}</span>`:''}<span>${esc(category)}</span></small></span>
+      ${featured?`<span class="day-task-countdown ${countdown.late?'late':''}"><strong>${esc(countdown.value)}</strong><small>${esc(countdown.label)}</small></span>`:''}
+    </button>
+    <button class="day-task-complete" onclick="toggleTask(${id})" aria-label="Отметить выполненным">${ICONS.habits}<span>Отметить выполненным</span></button>
+  </article>`;
+}
 function renderToday(){
   document.getElementById('filters').style.display='none';
-  const view=document.getElementById('view');
-  const tk=todayKey();
-  const tasks=getTasks();
-  const todayTasks=tasks.filter(t=>t.date===tk&&!t.done)
-    .sort((a,b)=>(a.time||'99:99')<(b.time||'99:99')?-1:1);
-  const overdue=tasks.filter(t=>isOverdue(t)&&t.date<tk);
-  const doneToday=tasks.filter(t=>t.date===tk&&t.done).length;
-  const totalToday=todayTasks.length+doneToday;
-  const pct=totalToday?Math.round(doneToday/totalToday*100):0;
-  const nothingPlanned=(totalToday===0); // на сегодня вообще ничего не было
-
-  const name=getMyName();
-  const h=new Date().getHours();
-  const hi=h<6?'Доброй ночи':h<12?'Доброе утро':h<18?'Добрый день':'Добрый вечер';
-  const greet=name?`${hi}, ${esc(name)}! 👋`:`${hi}! 👋`;
-
-  const w=getWeatherCache();
-  const weatherLine=(w&&w.temp!=null)
-    ?`<div class="today-weather-compact">${w.icon} ${w.temp}° · ${esc(w.desc)}</div>`
-    :'';
-
-  // текст рядом с кольцом
-  let ringSub;
-  if(overdue.length)ringSub=`⚠️ Просрочено: <b>${overdue.length}</b>`;
-  else if(totalToday===0)ringSub='Дел на сегодня нет 🎉';
-  else if(todayTasks.length===0&&doneToday>0)ringSub=`Всё выполнено! 🔥 (${doneToday})`;
-  else ringSub=`Осталось <b>${todayTasks.length}</b> из ${totalToday}`;
-
-  // кольцо (r=32, длина окружности ≈ 201)
-   const R=34, C=2*Math.PI*R, off=C-(pct/100)*C;
-
-  const todayLabel=new Date().toLocaleDateString('ru-RU',{weekday:'long',day:'numeric',month:'long'});
+  const view=document.getElementById('view'),tk=todayKey(),tasks=getTasks();
+  const todayTasks=tasks.filter(t=>t.date===tk&&!t.done).sort((a,b)=>(a.time||'99:99').localeCompare(b.time||'99:99'));
+  const overdue=tasks.filter(t=>isOverdue(t)&&t.date<tk),doneToday=tasks.filter(t=>t.date===tk&&t.done).length;
+  const totalToday=todayTasks.length+doneToday,activeTotal=tasks.filter(t=>!t.done).length,featured=todayTasks[0],secondary=todayTasks.slice(1,3),remaining=todayTasks.slice(3);
+  const w=getWeatherCache(),weatherLine=(w&&w.temp!=null)?`<div class="today-weather-compact">${w.temp}° · ${esc(w.desc)}</div>`:'';
   let html=`<div class="today-shell">
-    <div class="today-head"><div><div class="today-greeting">${greet}</div><div class="today-date">${todayLabel}</div></div>${weatherLine}</div>
-    <div class="tw-card today-progress-action" role="button" tabindex="0"
-         aria-label="${todayTasks.length?'Перейти к делам на сегодня':'Добавить дело на сегодня'}"
-         onclick="handleTodayProgress()"
-         onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();handleTodayProgress()}"
-         style="display:flex;align-items:center;gap:16px;margin-bottom:12px">
-      <div class="ring-wrap" style="--rc:var(--brand)">
-        <svg width="84" height="84" viewBox="0 0 84 84">
-          <circle class="ring-bg" cx="42" cy="42" r="${R}"></circle>
-          <circle class="ring-fg" cx="42" cy="42" r="${R}" stroke-dasharray="${C}" stroke-dashoffset="${off}"></circle>
-        </svg>
-        <div class="ring-txt"><b>${pct}%</b><small>сегодня</small></div>
-      </div>
-      <div class="ring-side">
-        <div class="rs-big">${nothingPlanned?'Нет дел':`${doneToday}/${totalToday} дел`}</div>
-        <div class="rs-sub">${ringSub}</div>
-      </div>
-    </div>`;
-
-  // мини-виджеты
-  const fs=getExpenseStats();
-  const habits=getHabits();
-  const habitsDone=habits.filter(hb=>hb.log&&hb.log[tk]).length;
-  html+=`<div class="tw-grid">
-    <div class="tw-card" onclick="switchTab('finance')">
-      <div class="tw-ico">${ICONS.finance}</div>
-      <div class="tw-lbl">Расходы за месяц</div>
-      <div class="tw-val">${fmtMoney(fs.total)} ₽</div>
-      <div class="tw-sub">Баланс: ${fs.balance>=0?'+':''}${fmtMoney(fs.balance)} ₽</div>
+    <div class="home-assistant">
+      <img src="assets/icons/icon.svg" alt="" class="home-assistant-mark">
+      <input id="home-ai-input" placeholder="Напишите, что добавить…" autocomplete="off" enterkeyhint="send" onkeydown="if(event.key==='Enter')homeAssistantSubmit()">
+      <button class="home-mic" onclick="homeAssistantVoice()" aria-label="Голосовой ввод">${'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="3" width="6" height="12" rx="3"/><path d="M5 11a7 7 0 0014 0M12 18v3M8 21h8"/></svg>'}</button>
+      <button class="home-send" onclick="homeAssistantSubmit()" aria-label="Отправить">${'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg>'}</button>
     </div>
-    <div class="tw-card" onclick="switchTab('habits')">
-      <div class="tw-ico">${ICONS.habits}</div>
-      <div class="tw-lbl">Привычки</div>
-      <div class="tw-val">${habitsDone}/${habits.length}</div>
-      <div class="tw-sub">${habitsDone===habits.length&&habits.length?'Все готовы! 🔥':'выполнено сегодня'}</div>
-    </div>
-  </div>`;
+    <div class="today-head"><div><div class="today-greeting">Ваш день</div><div class="today-date">${doneToday} из ${totalToday||0} сегодня · ${activeTotal} активных всего</div></div>${weatherLine}</div>`;
 
+  html+=pendingAssignmentsHomeHTML();
+
+  if(featured){
+    html+=`<section class="day-task-grid" id="today-task-section">${todayBentoTaskHTML(featured,true)}${secondary.length?`<div class="day-task-secondary">${secondary.map(t=>todayBentoTaskHTML(t)).join('')}</div>`:''}</section>`;
+  }else html+=emptyState(ICONS.today,'Сегодня всё свободно','Можно отдохнуть или добавить важное дело','openModal()','Добавить дело');
+
+  if(overdue.length)html+=`<div class="reschedule-bar day-overdue"><span>Просрочено: ${overdue.length}</span><button onclick="rescheduleOverdue()">Перенести на сегодня</button></div>`;
   html+=renderSmartSuggestions();
+  if(remaining.length)html+=`<div class="sub-h">Остальные дела</div><div class="list day-remaining">${remaining.map(t=>taskCardHTML(t)).join('')}</div>`;
 
-  if(overdue.length){
-    html+=`<div class="reschedule-bar" style="margin:6px 0 10px"><span>⚠️ Просрочено: ${overdue.length}</span><button onclick="rescheduleOverdue()">➡️ На сегодня</button></div>`;
-  }
-
-  html+=`<div class="sub-h" id="today-task-section">Дела на сегодня</div>`;
-  if(todayTasks.length){
-    html+='<div class="list" style="padding:0">';
-    todayTasks.forEach(t=>html+=taskCardHTML(t));
-    html+='</div>';
-  }else{
-    html+=emptyState(ICONS.today,'Сегодня всё свободно','Хороший момент отдохнуть или запланировать что-то важное','openModal()','Добавить дело');
-  }
-
-  html+=`<div class="sub-h">Быстрые действия</div>
-    <div class="qa-grid">
-      <div class="qa-btn" onclick="openModal()"><div class="qa-ico" style="background:linear-gradient(135deg,#6c5ce7,#a29bfe)">${ICONS.plus}</div>Добавить дело</div>
-      <div class="qa-btn" onclick="switchTab('calendar')"><div class="qa-ico" style="background:linear-gradient(135deg,#7c6cf0,#9b8ff5)">${ICONS.calendar}</div>Календарь</div>
-      <div class="qa-btn" onclick="openShopping()"><div class="qa-ico" style="background:linear-gradient(135deg,#8a7cf0,#b3a9f8)">${ICONS.shopping}</div>Покупки</div>
-      <div class="qa-btn" onclick="switchTab('ai')"><div class="qa-ico" style="background:linear-gradient(135deg,#9b6cf0,#c8a9f8)">${ICONS.ai}</div>Ассистент</div>
-    </div>
-  </div>`;
-
-  view.innerHTML=html;
-  attachSwipes();
+  const fs=getExpenseStats(),habits=getHabits(),habitsDone=habits.filter(hb=>hb.log&&hb.log[tk]).length;
+  html+=`<div class="sub-h">Обзор</div><div class="tw-grid day-overview">
+    <button class="tw-card" onclick="switchTab('finance')"><div class="tw-ico">${ICONS.finance}</div><div class="tw-lbl">Расходы за месяц</div><div class="tw-val">${fmtMoney(fs.total)} ₽</div><div class="tw-sub">Баланс: ${fs.balance>=0?'+':''}${fmtMoney(fs.balance)} ₽</div></button>
+    <button class="tw-card" onclick="switchTab('habits')"><div class="tw-ico">${ICONS.habits}</div><div class="tw-lbl">Привычки</div><div class="tw-val">${habitsDone}/${habits.length}</div><div class="tw-sub">выполнено сегодня</div></button>
+  </div><div class="sub-h">Быстрые действия</div><div class="qa-grid">
+    <button class="qa-btn" onclick="openModal()"><span class="qa-ico">${ICONS.plus}</span>Добавить дело</button>
+    <button class="qa-btn" onclick="switchTab('calendar')"><span class="qa-ico">${ICONS.calendar}</span>Календарь</button>
+    <button class="qa-btn" onclick="openShopping()"><span class="qa-ico">${ICONS.shopping}</span>Покупки</button>
+    <button class="qa-btn" onclick="switchTab('ai')"><span class="qa-ico">${ICONS.ai}</span>Ассистент</button>
+  </div></div>`;
+  view.innerHTML=html;attachSwipes();
 }
 function globalOpen(type,id){
   document.getElementById('search').value='';
@@ -4331,7 +4400,7 @@ function startAppTour(){
 function showTourStep(){
   clearInterval(tourTypingTimer);clearTourFocus();closeTourModals();
   if(tourStep===0){
-    switchTab('today');setTimeout(()=>focusTourElement('.today-progress-action'),100);
+    switchTab('today');setTimeout(()=>focusTourElement('.home-assistant'),100);
     renderTourCoach({title:'Экран «Сегодня»',text:'Это главный экран дня: прогресс, ближайшие дела, привычки и быстрые действия. Если на сегодня есть записи, нажатие на прогресс откроет их все, включая выполненные. Если записей нет — откроется создание дела.',example:'Карточки статистики в разделе дел тоже нажимаются: «Сегодня», «Активных» и «Готово» открывают соответствующие списки.'});return;
   }
   if(tourStep===1){
@@ -4446,7 +4515,7 @@ function showTourStep(){
     },80);
     renderTourCoach({title:'Управление существующими данными',text:'Помощник умеет переносить, выполнять и удалять дела, менять расходы и добавлять подзадачи. Перед изменением он всегда показывает «Было → Станет».',example:'Это безопасный пример: реальная встреча не создаётся и не изменяется.'});return;
   }
-  switchTab('today');setTimeout(()=>focusTourElement('.today-progress-action'),100);
+  switchTab('today');setTimeout(()=>focusTourElement('.day-task-grid, .empty-state'),100);
   renderTourCoach({title:'Готово — теперь можно начинать',text:'Ты увидел все основные возможности Lumo на настоящих экранах. Обучение всегда можно повторить кнопкой «?».',primary:'Завершить'});
 }
 function __showTourStepForTest(step){tourStep=Math.max(0,Math.min(TOUR_TOTAL-1,Number(step)||0));tourDemoDone=true;showTourStep();}
@@ -4740,7 +4809,7 @@ function resumeForegroundServices(force){
   if(!force&&!dayChanged&&now-_lastForegroundSync<30000)return;
   _lastForegroundSync=now;
   scheduleAllTimeouts();
-  scheduleHabitReminderLocal();scheduleHabitPushServer();scheduleShoppingReminderLocal();scheduleShoppingPushServer();scheduleSmartInsightPush();
+  scheduleHabitReminderLocal();scheduleHabitPushServer();scheduleShoppingReminderLocal();scheduleShoppingPushServer();scheduleSmartInsightPush();scheduleDayReviewPush();
   processAutoPays();
   scheduleAutoPayReminders();
   scheduleDebtReminders();
@@ -4800,6 +4869,7 @@ if('serviceWorker' in navigator){
     if(e.data&&e.data.type==='OPEN_SHOPPING')openShoppingFromPush();
     if(e.data&&e.data.type==='OPEN_NOTIFICATION_CENTER')openNotificationCenter();
     if(e.data&&e.data.type==='OPEN_FOCUS'){acknowledgeFocusPush();switchTab('matrix');toast('⏱ Фокус завершён');}
+    if(e.data&&e.data.type==='FLUSH_OFFLINE_QUEUE')flushOfflineQueue().then(()=>syncPushData()).then(()=>reportDeviceHealth(true)).catch(()=>{});
   });
 }
 
@@ -4821,6 +4891,7 @@ if('serviceWorker' in navigator){
   scheduleHabitPushServer();
   scheduleShoppingPushServer();
   scheduleSmartInsightPush();
+  scheduleDayReviewPush();
   startFocusTicker();
 
   // периодические проверки
@@ -4903,33 +4974,11 @@ function getStreakCount(){
 
 async function scheduleMorningPush(){
   try{
-    const scheduleKey='morning_push_scheduled_v1';
-    if(localStorage.getItem(scheduleKey)===todayKey())return;
-    // Нет подписки — выходим
+    const migrationKey='legacy_morning_disabled_v114';
+    if(localStorage.getItem(migrationKey)==='1')return scheduleDayReviewPush(false);
     const reg=await navigator.serviceWorker.ready;
     const sub=await reg.pushManager.getSubscription();
     if(!sub)return;
-
-    // Собираем данные
-    const tasks=getTasksForToday();
-    const balance=getMonthBalanceText();
-    const streak=getStreakCount();
-    const name=getMyName();
-
-    // Формируем текст
-    const taskLines=tasks.length>0
-      ? tasks.slice(0,3).map(t=>`• ${t.title}${t.time?' в '+t.time:''}`).join('\n')
-      : '• Дел на сегодня нет 🎉';
-
-    const greeting=name?`Доброе утро, ${name}!`:'Доброе утро!';
-
-    const body=[
-      '📋 '+taskLines,
-      `💰 Баланс: ${balance}`,
-      streak>=2?`🔥 Серия: ${streak} дней`:streak===1?'🌱 Первый день ритма':null
-    ].filter(Boolean).join('\n');
-
-    // Отправляем на сервер
     const resp=await fetch(FAMILY_SERVER+'/schedule-morning',{
       method:'POST',
       headers:{'Content-Type':'application/json'},
@@ -4937,18 +4986,13 @@ async function scheduleMorningPush(){
         userId:PUSH_USER_ID,
         subscription:sub,
         type:'morning',
-        title:'☀️ '+greeting,
-        body:body,
-        hour:8,
-        minute:0
+        scheduleId:'morning:'+PUSH_USER_ID,
+        title:'',body:'',hour:8,minute:0,enabled:false,
+        tzOffset:-new Date().getTimezoneOffset()
       })
     });
-
-    const d=await resp.json();
-    if(d.ok){
-      localStorage.setItem(scheduleKey,todayKey());
-      console.log('✅ Утренний пуш запланирован на 8:00');
-    }
+    if(resp.ok)localStorage.setItem(migrationKey,'1');
+    scheduleDayReviewPush(false);
   }catch(e){
     console.log('scheduleMorningPush: нет связи или нет подписки');
   }
@@ -5068,9 +5112,15 @@ function nextPayDate(ap){
   return now;
 }
 
+function taskConflictPairs(date=todayKey()){
+  const tasks=getTasks().filter(task=>!task.done&&task.date===date&&task.time).sort((a,b)=>a.time.localeCompare(b.time)),pairs=[];
+  tasks.forEach((task,index)=>tasks.slice(index+1).forEach(other=>{if(findTaskConflicts(task,task.id,[other]).length)pairs.push([task,other]);}));
+  return pairs;
+}
 function getSmartSuggestions(){
   const d=load(),tk=todayKey(),out=[];
   const todayOpen=(d.tasks||[]).filter(t=>!t.done&&t.date===tk),todayAll=(d.tasks||[]).filter(t=>t.date===tk),loadMinutes=todayOpen.reduce((n,t)=>n+Number(t.duration||30),0),highEnergy=todayOpen.filter(t=>t.energy==='high').length;
+  const conflicts=taskConflictPairs(tk);if(conflicts.length)out.push({id:'conflicts',level:'bad',title:`Конфликтов в расписании: ${conflicts.length}`,body:conflicts.slice(0,2).map(([a,b])=>`${a.time} ${a.title} ↔ ${b.time} ${b.title}`).join(' · '),prompt:'Покажи конфликты дел на сегодня и предложи безопасное новое время'});
   if(loadMinutes>480||todayOpen.length>8||highEnergy>3)out.push({id:'overload',level:'warn',title:'День перегружен',body:`${todayOpen.length} дел · около ${Math.floor(loadMinutes/60)} ч ${loadMinutes%60} мин · энергоёмких ${highEnergy}`,prompt:'Разгрузи мой день с учётом оценки времени и энергии и предложи что оставить а что перенести'});
   const overdue=(d.tasks||[]).filter(t=>!t.done&&t.date&&t.date<tk);
   if(overdue.length)out.push({id:'overdue',level:'bad',title:`Просрочено дел: ${overdue.length}`,body:overdue.slice(0,3).map(x=>x.title).join(' · '),prompt:`Помоги разобрать ${overdue.length} просроченных дел: предложи, что перенести, выполнить или удалить`});
@@ -5089,6 +5139,15 @@ async function scheduleSmartInsightPush(force=false){
   const r=getInsightReminder(),suggestions=getSmartSuggestions(),top=suggestions[0]||{id:'none',title:'Предложение Lumo',body:'',prompt:''};
   const fingerprint=(top.id+':'+top.title+':'+top.body).slice(0,180),key=`insight_push:${todayKey()}:${r.time}:${r.enabled&&suggestions.length?'on':'off'}:${fingerprint}`;if(!force&&localStorage.getItem('insight_push_last_key')===key)return;
   try{const reg=await navigator.serviceWorker.ready,sub=await reg.pushManager.getSubscription();if(!sub)return;const [hour,minute]=String(r.time||'18:30').split(':').map(Number);const response=await fetch(FAMILY_SERVER+'/schedule-morning',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({userId:PUSH_USER_ID,subscription:sub,type:'insight',scheduleId:'insight:'+PUSH_USER_ID,enabled:!!r.enabled&&!!suggestions.length,reminderTime:r.time,title:top.title,body:top.body,prompt:top.prompt,hour:hour||18,minute:minute||30,tzOffset:-new Date().getTimezoneOffset(),date:todayKey()})});if(response.ok)localStorage.setItem('insight_push_last_key',key)}catch(e){}
+}
+async function scheduleDayReviewPush(force=false){
+  const settings=getDayReview(),morning=dayReviewPush('morning'),evening=dayReviewPush('evening'),fingerprint=[settings.enabled,settings.morning,settings.evening,morning.body,evening.body].join('|').slice(0,520),key=`day_review:${todayKey()}:${fingerprint}`;
+  if(!force&&localStorage.getItem('day_review_push_last_key')===key)return;
+  try{
+    const reg=await navigator.serviceWorker.ready,subscription=await reg.pushManager.getSubscription();if(!subscription)return;
+    const schedule=async(period,time,content)=>{const [hour,minute]=String(time).split(':').map(Number);return fetch(FAMILY_SERVER+'/schedule-morning',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({userId:PUSH_USER_ID,subscription,type:period+'-review',scheduleId:'day-review-'+period+':'+PUSH_USER_ID,enabled:!!settings.enabled,title:content.title,body:content.body,prompt:content.prompt,hour:hour||0,minute:minute||0,tzOffset:-new Date().getTimezoneOffset(),date:todayKey()})});};
+    const [a,b]=await Promise.all([schedule('morning',settings.morning||'08:00',morning),schedule('evening',settings.evening||'20:30',evening)]);if(a.ok&&b.ok)localStorage.setItem('day_review_push_last_key',key);
+  }catch(e){}
 }
 
 function dateKeyOf(d){

@@ -9,8 +9,8 @@
   <link rel="manifest" href="manifest.json">
   <link rel="icon" href="assets/developer.svg" type="image/svg+xml">
   <link rel="apple-touch-icon" href="assets/developer.png">
-  <link rel="stylesheet" href="assets/dev.css?v=5">
-  <link rel="stylesheet" href="assets/console.css?v=5">
+  <link rel="stylesheet" href="assets/dev.css?v=6">
+  <link rel="stylesheet" href="assets/console.css?v=6">
 </head>
 <body>
   <main class="shell">
@@ -42,6 +42,7 @@
           <section class="console-page active" data-page-view="overview">
             <div class="page-heading"><div><p class="eyebrow">ГЛАВНАЯ</p><h1>Состояние Lumo</h1><p>Всё важное о сервере на одном экране.</p></div></div>
             <div id="serviceGrid" class="service-grid"></div><div id="metricGrid" class="metric-grid"></div>
+            <section class="panel attention-panel"><div class="panel-title"><div><p class="eyebrow">ТРЕБУЕТ ВНИМАНИЯ</p><h2>Что проверить сейчас</h2><p>Нажмите на карточку — консоль откроет нужный раздел и отфильтрует данные.</p></div><span id="attentionBadge" class="badge">0</span></div><div id="attentionGrid" class="attention-grid"></div></section>
             <section class="panel server-panel"><div class="panel-title"><div><p class="eyebrow">СЕРВЕР</p><h2>Ресурсы VPS и процесса</h2></div><span id="serverNode" class="badge">Node</span></div><div id="serverMetricGrid" class="metric-grid"></div></section>
             <section class="panel"><div class="panel-title"><div><p class="eyebrow">ВЕРСИИ</p><h2>Распространение Lumo</h2></div></div><div id="versionList" class="version-list empty">Нет данных</div></section>
           </section>
@@ -50,7 +51,7 @@
             <div class="page-heading"><div><p class="eyebrow">ПОДДЕРЖКА</p><h1>Пользователи</h1><p>Попросите открыть «Настройки → Уведомления PWA» и назвать код поддержки.</p></div></div>
             <section class="panel support-search"><form id="supportSearchForm"><label for="supportCodeInput">Код поддержки</label><div class="support-search-row"><input id="supportCodeInput" maxlength="10" autocomplete="off" placeholder="Например: 7KKES3TN"><button class="primary" type="submit">Найти пользователя</button></div><small>Код не является паролем и используется только для поиска устройства.</small></form></section>
             <section id="supportResult" class="panel support-result" hidden></section>
-            <section id="devicesPanel" class="panel"><div class="panel-title"><div><p class="eyebrow">ВСЕ УСТРОЙСТВА</p><h2>Подключённые клиенты</h2></div><span id="deviceCount" class="badge">0</span></div><div id="deviceList" class="table-list empty">Нет данных</div></section>
+            <section id="devicesPanel" class="panel"><div class="panel-title"><div><p class="eyebrow">ВСЕ УСТРОЙСТВА</p><h2>Подключённые клиенты</h2></div><span id="deviceCount" class="badge">0</span></div><div class="filters device-filters" aria-label="Фильтр устройств"><button id="devicesAll" class="chip active" data-device-filter="all">Все</button><button id="devicesAttention" class="chip" data-device-filter="attention">Требуют внимания</button><button id="devicesOutdated" class="chip" data-device-filter="outdated">Старая версия</button><button id="devicesNoPush" class="chip" data-device-filter="no-push">Без push</button></div><div id="deviceList" class="table-list empty">Нет данных</div></section>
           </section>
 
           <section class="console-page" data-page-view="push">
@@ -82,6 +83,6 @@
       </div>
     </section>
   </main>
-  <script src="assets/dev.js?v=5" type="module"></script>
+  <script src="assets/dev.js?v=6" type="module"></script>
 </body>
 </html>

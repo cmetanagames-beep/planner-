@@ -1,0 +1,30 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>Notification read state regression</title>
+<pre id="result">Loading…</pre>
+<iframe id="app" src="../app/index.html?notification-read=109" style="position:fixed;left:-10000px;width:390px;height:844px;border:0"></iframe>
+<script>
+const wait=ms=>new Promise(resolve=>setTimeout(resolve,ms));
+document.getElementById('app').addEventListener('load',async()=>{
+  const w=document.getElementById('app').contentWindow,d=w.document;
+  await wait(80);
+  let events=[
+    {id:'event-1',type:'info',title:'Первое',body:'Текст',ts:Date.now(),read:false},
+    {id:'event-2',type:'family-shopping',title:'Покупки',body:'Молоко',ts:Date.now(),read:false}
+  ];
+  w.fetch=async(url,options={})=>{
+    if(String(url).endsWith('/inbox'))return new w.Response(JSON.stringify({ok:true,tasks:[]}),{status:200,headers:{'Content-Type':'application/json'}});
+    if(String(url).endsWith('/events/list'))return new w.Response(JSON.stringify({ok:true,events}),{status:200,headers:{'Content-Type':'application/json'}});
+    if(String(url).endsWith('/events/read')){const body=JSON.parse(options.body||'{}'),ids=body.ids||null;events=events.map(event=>!ids||ids.includes(event.id)?{...event,read:true}:event);return new w.Response(JSON.stringify({ok:true}),{status:200,headers:{'Content-Type':'application/json'}});}
+    return new w.Response(JSON.stringify({ok:true}),{status:200,headers:{'Content-Type':'application/json'}});
+  };
+  await w.openNotificationCenter();
+  const before=d.querySelectorAll('#notification-body .feed-item').length;
+  await w.markAllNotificationsRead();
+  const after=d.querySelectorAll('#notification-body .feed-item').length;
+  const empty=/Новых событий нет/.test(d.getElementById('notification-body').textContent);
+  const badge=d.getElementById('notify-dot')?.style.display==='none';
+  const pass=before===2&&after===0&&empty&&badge;
+  document.getElementById('result').textContent=(pass?'PASS':'FAIL')+` before=${before} after=${after} empty=${empty} badge=${badge}`;
+});
+</script>

@@ -15,7 +15,7 @@
 <link rel="manifest" href="manifest.json">
 <link rel="apple-touch-icon" sizes="512x512" href="assets/icons/icon.png">
 <link rel="icon" type="image/svg+xml" href="assets/icons/icon.svg">
-<link rel="stylesheet" href="assets/css/app.css?v=103">
+<link rel="stylesheet" href="assets/css/app.css?v=116">
 </head>
 <body>
   <svg width="0" height="0" style="position:absolute"><defs>
@@ -71,10 +71,10 @@
   <div id="ai-suggest" class="ai-suggest"></div>
 </div>
 <div class="ai-input-bar" id="ai-bar" style="display:none">
-  <button class="mic-btn" id="mic" onclick="toggleMic()" aria-label="Голосовой ввод" title="Голосовой ввод"><svg viewBox="0 0 24 24" fill="none" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="3" width="6" height="12" rx="3"/><path d="M5 11a7 7 0 0014 0M12 18v3M8 21h8"/></svg></button>
   <button class="receipt-ai-btn" onclick="openAIReceipt()" title="Добавить чек"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M7 3h10a2 2 0 012 2v16l-3-2-4 2-4-2-3 2V5a2 2 0 012-2z"/><path d="M8 8h8M8 12h6M8 16h4"/></svg></button>
-  <input id="ai-input" placeholder="Напиши или надиктуй...">
-  <button class="send-btn" onclick="aiSend()">➤</button>
+  <input id="ai-input" placeholder="Напишите, что добавить…" autocomplete="off" enterkeyhint="send">
+  <button class="mic-btn" id="mic" onclick="toggleMic()" aria-label="Голосовой ввод" title="Голосовой ввод"><svg viewBox="0 0 24 24" fill="none" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="3" width="6" height="12" rx="3"/><path d="M5 11a7 7 0 0014 0M12 18v3M8 21h8"/></svg></button>
+  <button class="send-btn" onclick="aiSend()" aria-label="Отправить"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg></button>
 </div>
 
 <button class="fab" id="fab" onclick="fabRipple(event);fabAction()" oncontextmenu="event.preventDefault();openQuickCreate()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg><span id="fab-label">Новое дело</span></button>
@@ -296,7 +296,13 @@
 <div class="modal" id="modal-settings">
   <div class="sheet settings-sheet">
     <div class="sheet-handle"></div><h3>Настройки</h3>
-    <details class="settings-group" open><summary><span class="settings-icon"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 3a9 9 0 000 18V3z"/></svg></span><span><b>Оформление</b><small>Тема, цвет и нижнее меню</small></span></summary><div class="settings-content">
+    <div class="settings-overview" aria-label="Состояние Lumo">
+      <button type="button" onclick="openSettingsSection('settings-appearance')"><small>Тема</small><b id="settings-theme-summary">Тёмная</b><em>Изменить</em></button>
+      <button type="button" onclick="openSettingsSection('settings-push')"><small>Push</small><b id="settings-push-summary">Проверяю</b><em>Проверить</em></button>
+      <button type="button" onclick="openSettingsSection('settings-sync')"><small>Данные</small><b id="settings-sync-summary">Только на телефоне</b><em id="settings-sync-action">Загрузить</em></button>
+    </div>
+    <p class="settings-lead">Главное состояние видно сразу. Открой только тот раздел, который хочешь изменить.</p>
+    <details class="settings-group" id="settings-appearance"><summary><span class="settings-icon"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 3a9 9 0 000 18V3z"/></svg></span><span><b>Оформление</b><small>Тема, цвет и нижнее меню</small></span></summary><div class="settings-content">
       <label class="settings-label">Акцентный цвет</label><div class="color-pick" id="color-pick"></div>
       <label class="settings-label">Тема</label><div class="seg"><button type="button" class="pri-b" id="th-auto" onclick="setThemeMode('auto')">Авто</button><button type="button" class="pri-b" id="th-light" onclick="setThemeMode('light')">Светлая</button><button type="button" class="pri-b" id="th-dark" onclick="setThemeMode('dark')">Тёмная</button></div>
       <div class="settings-inline"><button onclick="openMenuEditor();closeSettings()">Настроить меню</button><button onclick="openCatModal();closeSettings()">Категории</button></div>
@@ -311,6 +317,10 @@
       <div class="field"><label>Время списка покупок</label><input id="shopping-reminder-time" type="time" value="18:00" onchange="saveShoppingReminderTime()"></div>
       <div class="chk-toggle" onclick="toggleInsightReminder()"><div class="box" id="insight-reminder-box"></div><div class="lbl">Умные предложения Lumo</div></div>
       <div class="field"><label>Время предложений</label><input id="insight-reminder-time" type="time" value="18:30" onchange="saveInsightReminderTime()"></div>
+      <div class="chk-toggle" onclick="toggleDayReview()"><div class="box" id="day-review-box"></div><div class="lbl">Утренний и вечерний обзор дня</div></div>
+      <div class="two-col"><div class="field"><label>Утром</label><input id="day-review-morning" type="time" value="08:00" onchange="saveDayReviewTimes()"></div><div class="field"><label>Вечером</label><input id="day-review-evening" type="time" value="20:30" onchange="saveDayReviewTimes()"></div></div>
+      <div class="chk-toggle" onclick="toggleHabitAdaptive()"><div class="box" id="habit-adaptive-box"></div><div class="lbl">Адаптивно напоминать о пропущенных привычках</div></div>
+      <div class="ai-hint" id="habit-adaptive-hint">Lumo усилит напоминание только для привычек, которые начали регулярно пропускаться.</div>
       <div class="ai-hint">Lumo напомнит только о полезном: просрочках, превышениях бюджета, платежах, покупках и незавершённых привычках.</div>
     </div></details>
     <details class="settings-group"><summary><span class="settings-icon"><svg viewBox="0 0 24 24"><path d="M12 3v3"/><rect x="5" y="6" width="14" height="12" rx="3"/><circle cx="9" cy="12" r="1"/><circle cx="15" cy="12" r="1"/></svg></span><span><b>Помощник</b><small>Локальные правила и память</small></span></summary><div class="settings-content">
@@ -318,14 +328,15 @@
       <div class="ai-hint" id="local-memory-info"></div><button class="btn" onclick="openAssistantRules()">Редактировать правила помощника</button><button class="btn ghost" onclick="clearLocalAssistantMemory()">Очистить изученные правила</button>
       <button class="btn ghost" onclick="clearAIChatHistory()">Очистить историю помощника</button>
     </div></details>
-    <details class="settings-group"><summary><span class="settings-icon"><svg viewBox="0 0 24 24"><path d="M20 7h-6V1M4 17h6v6M20 7a9 9 0 00-15-2M4 17a9 9 0 0015 2"/></svg></span><span><b>Синхронизация</b><small>Одинаковые данные на всех устройствах</small></span></summary><div class="settings-content">
+    <details class="settings-group" id="settings-sync"><summary><span class="settings-icon"><svg viewBox="0 0 24 24"><path d="M20 7h-6V1M4 17h6v6M20 7a9 9 0 00-15-2M4 17a9 9 0 0015 2"/></svg></span><span><b>Синхронизация и копия</b><small>Защита данных и второе устройство</small></span></summary><div class="settings-content">
       <div class="sync-status" id="cloud-sync-status">Синхронизация не подключена</div>
-      <button class="btn" id="cloud-create-btn" onclick="createCloudSync()">Создать ключ восстановления</button>
+      <button class="btn cloud-primary-action" id="cloud-create-btn" onclick="createCloudSync()">Загрузить данные в облако</button>
+      <div class="ai-hint cloud-upload-hint">Lumo создаст защищённую серверную копию и покажет ключ восстановления. Новые изменения будут синхронизироваться автоматически.</div>
       <div class="field"><label>Код с другого устройства</label><input id="cloud-code-input" maxlength="14" placeholder="Например: AB12CD34EF56" autocapitalize="characters"></div>
       <button class="btn ghost" onclick="connectCloudSync()">Восстановить по ключу</button><button class="btn ghost" onclick="shareRecoveryKey()">Поделиться ключом</button><button class="btn ghost" onclick="createDeviceInvite()">Добавить второе устройство</button><button class="btn ghost" onclick="cloudSyncNow(true)">Синхронизировать сейчас</button><button class="btn danger-soft" onclick="disconnectCloudSync()">Отключить это устройство</button>
       <div class="ai-hint">Ключ восстанавливает данные после удаления Lumo. Для второго телефона создай одноразовый QR: он действует 15 минут и срабатывает один раз.</div>
     </div></details>
-    <details class="settings-group"><summary><span class="settings-icon"><svg viewBox="0 0 24 24"><path d="M14 5h5v5M19 5l-8 8"/><path d="M19 13v6H5V5h6"/></svg></span><span><b>Уведомления PWA</b><small>Разрешения и диагностика</small></span></summary><div class="settings-content">
+    <details class="settings-group" id="settings-push"><summary><span class="settings-icon"><svg viewBox="0 0 24 24"><path d="M14 5h5v5M19 5l-8 8"/><path d="M19 13v6H5V5h6"/></svg></span><span><b>Уведомления PWA</b><small>Разрешения и диагностика</small></span></summary><div class="settings-content">
       <div class="local-edit-note" id="push-health">Проверяю состояние…</div><button class="btn ghost" onclick="subscribePush()">Включить фоновые push</button><button class="btn ghost" onclick="requestNotify()">Разрешить уведомления</button><button class="btn ghost" onclick="checkPushHealth(true)">Проверить состояние</button><button class="btn ghost" onclick="testPush()">Отправить тестовый push</button>
     </div></details>
     <details class="settings-group"><summary><span class="settings-icon"><svg viewBox="0 0 24 24"><path d="M12 3v12M8 11l4 4 4-4"/><path d="M5 17v3h14v-3"/></svg></span><span><b>Данные</b><small>Резервная копия и восстановление</small></span></summary><div class="settings-content"><button class="btn" onclick="exportData()">Скачать резервную копию</button><button class="btn ghost" onclick="document.getElementById('import-file').click()">Загрузить копию</button></div></details>
@@ -444,7 +455,7 @@
 <div id="tour-layer" style="display:none"></div>
 
 <div class="toast" id="toast"></div>
-<script src="assets/js/app.js?v=103"></script>
+<script src="assets/js/app.js?v=116"></script>
 
   <!-- МОДАЛКА АВТО-ПЛАТЕЖЕЙ -->
 <div class="modal" id="modal-autopay">

@@ -1,0 +1,17 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>Finance period consistency regression</title>
+<pre id="result">Loading…</pre>
+<iframe id="app" src="../app/index.html?finance-consistency=109" style="position:fixed;left:-10000px;width:390px;height:844px;border:0"></iframe>
+<script>
+document.getElementById('app').addEventListener('load',()=>{
+  const w=document.getElementById('app').contentWindow,d=w.load(),previous=new Date();
+  previous.setMonth(previous.getMonth()-1,15);
+  d.finance=[{id:991,amount:1700,category:'Прочее',date:w.dateKeyOf(previous),desc:'Прошлый месяц'}];
+  d.income=[];w.save(d);w.renderFinance();
+  const text=w.document.getElementById('view').textContent;
+  const noOperations=/Операций пока нет/.test(text),falseWeek=/За 7 дней:\s*1\s*700/.test(text);
+  const pass=noOperations&&!falseWeek;
+  document.getElementById('result').textContent=(pass?'PASS':'FAIL')+` empty=${noOperations} falseWeek=${falseWeek}`;
+});
+</script>

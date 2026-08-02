@@ -18,6 +18,8 @@ document.getElementById('app').addEventListener('load',()=>{
   });
   check('Приветствие — диалог, не обучение',/Привет/.test(w.tryLocalDialogue('Привет')||''));
   check('Вопрос о делах понятен',typeof w.tryLocalAnswer('Что у нас сегодня по делам?')==='string');
+  const habitPlanReply=w.tryLocalDialogue('Покажи невыполненные привычки сегодня и помоги составить короткий план на день')||'';
+  check('План привычек не подменяется планом дел',/привыч/i.test(habitPlanReply)&&!/текущем плане/i.test(habitPlanReply),habitPlanReply);
   check('Просьба объяснить даёт понятные примеры',/добавить привычку/i.test(w.tryLocalDialogue('Я не понял что ты сказал давай ты меня обучишь')||''));
   const failed=rows.filter(x=>!x.pass);
   document.getElementById('result').textContent=(failed.length?'FAIL':'PASS')+` · ${rows.length-failed.length}/${rows.length}\n`+rows.map(x=>`${x.pass?'✓':'✗'} ${x.name}${x.detail?' — '+x.detail:''}`).join('\n');

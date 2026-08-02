@@ -7,14 +7,22 @@ import TelegramBot from 'node-telegram-bot-api';
 import QRCode from 'qrcode';
 import { setDefaultResultOrder } from 'node:dns';
 import { spawn } from 'node:child_process';
-import { randomUUID, timingSafeEqual } from 'node:crypto';
+import { createHash, randomUUID, timingSafeEqual } from 'node:crypto';
 import { existsSync, mkdirSync, readFileSync, readdirSync, statfsSync, statSync, unlinkSync, writeFileSync } from 'node:fs';
 import { cpus, freemem, loadavg, tmpdir, totalmem } from 'node:os';
 import path from 'node:path';
 setDefaultResultOrder('ipv4first');
 
 const app = express();
-app.use(cors());
+const CLIENT_URL = String(process.env.CLIENT_URL || 'https://cmetanagames-beep.github.io/planner-/app/').trim();
+const CLIENT_ORIGINS = new Set(String(process.env.CLIENT_ORIGINS || 'https://cmetanagames-beep.github.io,https://pushevgen.duckdns.org,http://127.0.0.1:4177,http://localhost:4177')
+  .split(',').map(value => value.trim().replace(/\/$/, '')).filter(Boolean));
+app.use(cors({
+  origin(origin, done) { done(null, !origin || CLIENT_ORIGINS.has(String(origin).replace(/\/$/, ''))); },
+  methods: ['GET', 'POST', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'X-Lumo-User', 'X-Lumo-Device-Token', 'X-Developer-Token'],
+  maxAge: 86400
+}));
 app.use(express.json({ limit: '8mb' }));
 const DEVELOPER_UI_DIR = process.env.DEVELOPER_UI_DIR || path.join(process.cwd(), 'dev');
 app.use('/dev', express.static(DEVELOPER_UI_DIR, { index: 'index.html', maxAge: '5m', fallthrough: true }));
@@ -52,6 +60,7 @@ db.prepare('DELETE FROM cloudInvites WHERE expiresAt < ? OR usedAt IS NOT NULL')
 db.exec(`CREATE TABLE IF NOT EXISTS eventFeed (id TEXT PRIMARY KEY, targetUserId TEXT NOT NULL, familyCode TEXT, type TEXT, title TEXT, body TEXT, data TEXT, ts INTEGER, readAt INTEGER)`);
 db.exec(`CREATE TABLE IF NOT EXISTS userAccess (userId TEXT PRIMARY KEY, blocked INTEGER NOT NULL DEFAULT 0, reason TEXT, updatedAt INTEGER NOT NULL)`);
 db.exec(`CREATE TABLE IF NOT EXISTS adminAudit (id INTEGER PRIMARY KEY AUTOINCREMENT, supportCode TEXT, action TEXT NOT NULL, detail TEXT, ts INTEGER NOT NULL)`);
+db.exec(`CREATE TABLE IF NOT EXISTS deviceAuth (userId TEXT PRIMARY KEY, tokenHash TEXT NOT NULL, createdAt INTEGER NOT NULL, lastSeen INTEGER NOT NULL)`);
 try { db.exec(`ALTER TABLE inbox ADD COLUMN status TEXT DEFAULT 'pending'`); } catch (e) {}
 try { db.exec(`ALTER TABLE inbox ADD COLUMN comment TEXT DEFAULT ''`); } catch (e) {}
 try { db.exec(`ALTER TABLE inbox ADD COLUMN respondedAt INTEGER`); } catch (e) {}
@@ -76,7 +85,38 @@ function userAccessState(userId) {
   const row = db.prepare('SELECT blocked,reason,updatedAt FROM userAccess WHERE userId=?').get(String(userId));
   return row ? { blocked: !!row.blocked, reason: row.reason || '', updatedAt: row.updatedAt } : { blocked: false, reason: '' };
 }
-function requestUserId(req) { return String(req.body?.userId || req.query?.userId || '').slice(0, 160); }
+function requestUserId(req) { return String(req.get('x-lumo-user') || req.body?.userId || req.query?.userId || '').slice(0, 160); }
+function validDeviceCredential(userId, token) {
+  return /^u_[A-Za-z0-9_-]{8,150}$/.test(userId) && /^[a-f0-9]{64}$/i.test(token);
+}
+function deviceTokenHash(token) { return createHash('sha256').update(String(token)).digest('hex'); }
+function sameSecret(a, b) {
+  const left = Buffer.from(String(a || '')), right = Buffer.from(String(b || ''));
+  return left.length === right.length && left.length > 0 && timingSafeEqual(left, right);
+}
+app.post('/device/register', (req, res) => {
+  const userId = String(req.body?.userId || '').slice(0, 160), token = String(req.body?.token || '');
+  if (!validDeviceCredential(userId, token)) return res.status(400).json({ ok: false, error: 'invalid device credential' });
+  const tokenHash = deviceTokenHash(token), existing = db.prepare('SELECT tokenHash FROM deviceAuth WHERE userId=?').get(userId), now = Date.now();
+  if (existing && !sameSecret(existing.tokenHash, tokenHash)) return res.status(409).json({ ok: false, error: 'device credential mismatch' });
+  db.prepare(`INSERT INTO deviceAuth(userId,tokenHash,createdAt,lastSeen) VALUES(?,?,?,?)
+    ON CONFLICT(userId) DO UPDATE SET lastSeen=excluded.lastSeen`).run(userId, tokenHash, now, now);
+  res.json({ ok: true });
+});
+function requireDevice(req, res, next) {
+  const headerUserId = String(req.get('x-lumo-user') || '').slice(0, 160), claimedUserId = String(req.body?.userId || req.query?.userId || '').slice(0, 160);
+  const userId = headerUserId, token = String(req.get('x-lumo-device-token') || '');
+  if (!validDeviceCredential(userId, token)) return res.status(401).json({ ok: false, error: 'device authentication required' });
+  if (claimedUserId && claimedUserId !== headerUserId) return res.status(403).json({ ok: false, error: 'device identity mismatch' });
+  const row = db.prepare('SELECT tokenHash FROM deviceAuth WHERE userId=?').get(userId);
+  if (!row || !sameSecret(row.tokenHash, deviceTokenHash(token))) return res.status(401).json({ ok: false, error: 'device authentication failed' });
+  db.prepare('UPDATE deviceAuth SET lastSeen=? WHERE userId=?').run(Date.now(), userId);
+  next();
+}
+app.use((req, res, next) => {
+  if (req.method === 'OPTIONS' || req.path === '/' || req.path === '/health' || req.path === '/key' || req.path === '/voice/status' || req.path === '/device/register' || req.path === '/telemetry/push-state' || req.path.startsWith('/developer')) return next();
+  requireDevice(req, res, next);
+});
 function auditAdmin(supportCode, action, detail = '') {
   db.prepare('INSERT INTO adminAudit(supportCode,action,detail,ts) VALUES(?,?,?,?)').run(String(supportCode || '').slice(0, 16), String(action || '').slice(0, 80), String(detail || '').slice(0, 500), Date.now());
 }
@@ -269,7 +309,7 @@ async function sendPush(userId, titleOrPayload, body, taskId) {
 app.get('/key', (req, res) => res.json({ key: PUBLIC_KEY }));
 app.get('/app-status', (req, res) => {
   const maintenance = getMaintenance();
-  const access=userAccessState(String(req.query?.userId||''));
+  const access=userAccessState(requestUserId(req));
   res.set('Cache-Control', 'no-store').json({ ok: !maintenance.enabled&&!access.blocked, maintenance, blocked:access.blocked, reason:access.reason||'' });
 });
 
@@ -348,7 +388,7 @@ app.post('/cloud/invite/create', async (req, res) => {
   if(!device)return res.status(403).json({ok:false,err:'Сначала включи облачную защиту'});
   const token=randomUUID().replace(/-/g,'').slice(0,20), expiresAt=Date.now()+15*60*1000;
   db.prepare('INSERT INTO cloudInvites (token,code,createdBy,expiresAt) VALUES (?,?,?,?)').run(token,device.code,userId,expiresAt);
-  const url=`${String(req.headers.origin||'').replace(/\/$/,'')||'https://evgenakfix.github.io/planner'}/?cloudInvite=${token}`;
+  const url=`${CLIENT_URL.replace(/\/$/,'')}?cloudInvite=${token}`;
   const qr=await QRCode.toDataURL(url,{width:360,margin:2,errorCorrectionLevel:'M'});
   res.json({ok:true,token,url,qr,expiresAt});
 });

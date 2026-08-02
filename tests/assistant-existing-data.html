@@ -16,7 +16,7 @@ document.getElementById('app').addEventListener('load',()=>{
   rows.push({name:'выбранная запись изменяется',pass:picked?.ops?.[0]?.id===102&&picked.ops[0].patch.time==='09:00',value:picked});
   w.setTasks([{id:103,title:'Созвониться с Егором',date:'2026-08-01',time:'08:00',module:'personal',done:false}]);
   const moved=w.parseLocalManagement('созвон с Егором перенеси за 02');
-  rows.push({name:'разговорный перенос с датой 02',pass:moved?.ops?.[0]?.id===103&&moved.ops[0].patch.date==='2026-08-02'&&moved.ops[0].patch.time==='08:00',value:moved});
+  rows.push({name:'разговорный перенос с датой 02 безопасно убирает прошедшее время',pass:moved?.ops?.[0]?.id===103&&moved.ops[0].patch.date==='2026-08-02'&&moved.ops[0].patch.time==='',value:moved});
   w.eval("assistantDialogue.pendingTeachPhrase='созвон Егора за 02'");w.finishAssistantTeaching('перенеси созвон с Егором на 02');
   rows.push({name:'непонятная фраза запоминает объяснение',pass:w.learnedAssistantPhrase('созвон Егора за 02')==='перенеси созвон с Егором на 02',value:w.getLocalMemory()});
   const failed=rows.filter(x=>!x.pass);document.getElementById('result').textContent=(failed.length?'FAIL':'PASS')+` · ${rows.length-failed.length}/${rows.length}\n`+rows.map(x=>`${x.pass?'✓':'✗'} ${x.name}${x.pass?'':'\n'+JSON.stringify(x.value,null,2)}`).join('\n');
