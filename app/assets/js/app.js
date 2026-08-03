@@ -2320,7 +2320,7 @@ async function resolveCloudConflict(choice){if(!cloudConflict)return;let data=ch
 
 /* ===== СЕМЬЯ + ПУШИ (сервер) ===== */
 const FAMILY_SERVER='https://pushevgen.duckdns.org'; // без слэша на конце, через https!
-const LUMO_APP_VERSION='v119';
+const LUMO_APP_VERSION='v120';
 const LUMO_DEVICE_ID=(()=>{let id=localStorage.getItem('lumo_device_id_v1');if(!id){id='dev_'+Date.now().toString(36)+'_'+Math.random().toString(36).slice(2,10);localStorage.setItem('lumo_device_id_v1',id)}return id})();
 const LUMO_SUPPORT_CODE=(()=>{let code=localStorage.getItem('lumo_support_code_v1');if(!code){const chars='ABCDEFGHJKLMNPQRSTUVWXYZ23456789';code='';for(let i=0;i<8;i++)code+=chars[Math.floor(Math.random()*chars.length)];localStorage.setItem('lumo_support_code_v1',code)}return code})();
 function diagnosticPlatform(){const ua=navigator.userAgent||'';if(/android/i.test(ua))return'Android';if(/iphone|ipad|ipod/i.test(ua))return'iOS';if(/windows/i.test(ua))return'Windows';if(/macintosh|mac os/i.test(ua))return'macOS';return'Web'}
@@ -2369,6 +2369,9 @@ async function checkServerAccess(force=false){
   try{const r=await fetch(`${FAMILY_SERVER}/app-status?userId=${encodeURIComponent(PUSH_USER_ID)}`,{cache:'no-store'}),state=await r.json();renderServerAccess(state);}catch(_){}
 }
 const VAPID_PUBLIC=localStorage.getItem('vapid_public')||''; // подставится с сервера при подписке
+function lumoTimeout(promise,ms=5000,label='Операция не ответила'){
+  let timer;return Promise.race([promise,new Promise((_,reject)=>{timer=setTimeout(()=>reject(new Error(label)),ms)})]).finally(()=>clearTimeout(timer));
+}
 
 function getMyName(){return load().myName||'';}
 function getMyRole(){return load().myRole||'other';}
@@ -2435,7 +2438,7 @@ async function subscribePush(){
     if(!('serviceWorker'in navigator)||!('PushManager'in window)){toast('Пуши не поддерживаются этим браузером');return;}
     const perm=await Notification.requestPermission();
     if(perm!=='granted'){toast('Разреши уведомления для пушей');return;}
-    const reg=await navigator.serviceWorker.ready;
+    const reg=await lumoTimeout(navigator.serviceWorker.ready,5000,'Service worker не ответил');
     const old=await reg.pushManager.getSubscription();
     if(old)await old.unsubscribe();
     const keyResp=await fetch(FAMILY_SERVER+'/key').then(r=>r.json()).catch(()=>null);
@@ -2445,6 +2448,8 @@ async function subscribePush(){
     const sub=await reg.pushManager.subscribe({userVisibleOnly:true,applicationServerKey:urlB64ToUint8(pub)});
     await fetch(FAMILY_SERVER+'/subscribe',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({userId:PUSH_USER_ID,subscription:sub,name:getMyName(),role:getMyRole()})});
     localStorage.setItem(PUSH_READY_KEY,'1');
+    updateSettingsOverview(true);
+    if(currentTab==='today')renderToday();
     toast('📲 Фоновые пуши включены!');
     syncPushData();scheduleShoppingPushServer(true);
   }catch(e){toast('Не вышло подписаться на пуши');}
@@ -2464,20 +2469,21 @@ async function testPush(){
 }
 async function checkPushHealth(showToast=false){
   const el=document.getElementById('push-health');if(!el)return;
+  el.textContent='Проверяю состояние…';
   const lines=[];let ok=true;
   lines.push(`🆔 Код поддержки: <b>${esc(LUMO_SUPPORT_CODE)}</b> · версия ${esc(LUMO_APP_VERSION)}`);
   const permission=('Notification'in window)?Notification.permission:'unsupported';
   lines.push(permission==='granted'?'✅ Уведомления разрешены':'❌ Уведомления не разрешены');if(permission!=='granted')ok=false;
   try{
-    if(!('serviceWorker'in navigator)||!('PushManager'in window))throw new Error();
-    const reg=await navigator.serviceWorker.ready;lines.push(reg.active?'✅ Service worker активен':'❌ Service worker не активен');if(!reg.active)ok=false;
+    if(!('serviceWorker'in navigator)||!('PushManager'in window))throw new Error('Push не поддерживается этим браузером');
+    const reg=await lumoTimeout(navigator.serviceWorker.ready,5000,'Service worker не ответил за 5 секунд');lines.push(reg.active?'✅ Service worker активен':'❌ Service worker не активен');if(!reg.active)ok=false;
     const sub=await reg.pushManager.getSubscription();lines.push(sub?'✅ Фоновая push-подписка активна':'❌ Нет фоновой push-подписки');if(!sub)ok=false;
-    const server=await fetch(FAMILY_SERVER+'/key',{cache:'no-store'});lines.push(server.ok?'✅ Push-сервер доступен':'❌ Push-сервер вернул '+server.status);if(!server.ok)ok=false;
-  }catch(e){lines.push('❌ Не удалось проверить push-службу');ok=false;}
+    const server=await lumoTimeout(fetch(FAMILY_SERVER+'/key',{cache:'no-store'}),5000,'Push-сервер не ответил за 5 секунд');lines.push(server.ok?'✅ Push-сервер доступен':'❌ Push-сервер вернул '+server.status);if(!server.ok)ok=false;
+  }catch(e){lines.push(`❌ ${esc(e&&e.message?e.message:'Не удалось проверить push-службу')}`);lines.push('ℹ️ Попробуй закрыть настройки и открыть их снова');ok=false;}
   const now=Date.now(),next=getTasks().filter(t=>!t.done&&t.date&&t.time).map(t=>({...t,_at:new Date(t.date+'T'+t.time).getTime()})).filter(t=>t._at>now).sort((a,b)=>a._at-b._at)[0];
   lines.push(next?`🕒 Запланировано: ${esc(next.title)} — ${fmtDate(next.date)}, ${esc(next.time)}`:'ℹ️ Нет будущих дел с точным временем');
   try{const cache=await caches.open('lumo-push-state-v1'),response=await cache.match('./__last_push_journey__');if(response){const journey=await response.json(),labels={displayed:'показано',opened:'открыто',action:'действие выполнено',suppressed:'повтор отменён'};lines.push(`📡 Последний путь: ${esc(journey.title||journey.type||'уведомление')} · ${esc(labels[journey.stage]||journey.stage)} · ${new Date(journey.updatedAt).toLocaleString('ru-RU')}`)}}catch(_){}
-  localStorage.setItem(PUSH_READY_KEY,ok?'1':'0');el.innerHTML=lines.join('<br>');updateSettingsOverview(ok);if(showToast)toast(ok?'✅ Push-цепочка готова':'Есть проблема в push-настройках');
+  localStorage.setItem(PUSH_READY_KEY,ok?'1':'0');el.innerHTML=lines.join('<br>');updateSettingsOverview(ok);if(currentTab==='today')renderToday();if(showToast)toast(ok?'✅ Push-цепочка готова':'Есть проблема в push-настройках');
 }
 async function scheduleHabitPushServer(force=false){
   const r=getHabitReminder();if(!('serviceWorker'in navigator))return;
@@ -3983,11 +3989,12 @@ function pendingAssignmentsHomeHTML(){
 }
 function todayTaskCategory(task){return String(modLabel[task.module]||'Личное').replace(/^[^\p{L}\p{N}]+/u,'').trim()||'Личное';}
 function todayTaskCountdown(task){
-  if(!task.date||!task.time)return {value:'Сегодня',label:'без времени',late:false};
+  if(!task.date||!task.time)return {value:'Сегодня',label:'без времени',late:false,progress:0};
   const target=new Date(`${task.date}T${task.time}:00`),minutes=Math.round((target-Date.now())/60000);
-  if(minutes<0){const passed=Math.abs(minutes),hours=Math.floor(passed/60),rest=passed%60;return {value:hours?(rest?`${hours} ч ${rest} мин`:`${hours} ч`):`${passed} мин`,label:'просрочено',late:true};}
-  if(minutes<1)return {value:'Сейчас',label:'начинается',late:false};if(minutes<60)return {value:`${minutes} мин`,label:'до начала',late:false};
-  const hours=Math.floor(minutes/60),rest=minutes%60;return {value:rest?`${hours} ч ${rest} мин`:`${hours} ч`,label:'до начала',late:false};
+  if(minutes<0){const passed=Math.abs(minutes),hours=Math.floor(passed/60),rest=passed%60;return {value:hours?(rest?`${hours} ч ${rest} мин`:`${hours} ч`):`${passed} мин`,label:'просрочено',late:true,progress:100};}
+  const progress=Math.max(6,Math.min(100,Math.round(minutes/720*100)));
+  if(minutes<1)return {value:'Сейчас',label:'начинается',late:false,progress:4};if(minutes<60)return {value:`${minutes} мин`,label:'до начала',late:false,progress};
+  const hours=Math.floor(minutes/60),rest=minutes%60;return {value:rest?`${hours} ч ${rest} мин`:`${hours} ч`,label:'до начала',late:false,progress};
 }
 function todayBentoTaskHTML(task,featured=false){
   const icon=task.module==='shopping'?ICONS.shopping:task.module==='work'?ICONS.calendar:ICONS.all;
@@ -3996,7 +4003,7 @@ function todayBentoTaskHTML(task,featured=false){
     <button class="day-task-main" onclick="editTask(${id})" aria-label="Открыть дело ${esc(task.title)}">
       <span class="day-task-icon">${icon}</span>
       <span class="day-task-copy"><b>${esc(task.title)}</b><small>${task.time?`<span class="day-task-time">${esc(task.time)}</span>`:''}<span>${esc(category)}</span></small></span>
-      ${featured?`<span class="day-task-countdown ${countdown.late?'late':''}"><strong>${esc(countdown.value)}</strong><small>${esc(countdown.label)}</small></span>`:''}
+      ${featured?`<span class="day-task-countdown ${countdown.late?'late':''}" style="--countdown:${countdown.progress}%"><strong>${esc(countdown.value)}</strong><small>${esc(countdown.label)}</small></span>`:''}
     </button>
     <button class="day-task-complete" onclick="toggleTask(${id})" aria-label="Отметить выполненным">${ICONS.habits}<span>Отметить выполненным</span></button>
   </article>`;
@@ -4009,7 +4016,7 @@ function homeConnectionState(){
   if(connected)return {tone:'ready',text:at?`Синхронизировано · ${new Date(at).toLocaleTimeString('ru-RU',{hour:'2-digit',minute:'2-digit'})}`:'Облако подключено'};
   return {tone:'local',text:'Данные только на этом телефоне'};
 }
-function homeConnectionHTML(){const state=homeConnectionState();return `<button class="home-connection ${state.tone}" onclick="openReadinessStep('sync')"><span></span>${esc(state.text)}<b>›</b></button>`}
+function homeConnectionHTML(){const state=homeConnectionState();if(state.tone==='ready')return '';return `<button class="home-connection ${state.tone}" onclick="openReadinessStep('sync')"><span></span>${esc(state.text)}<b>›</b></button>`}
 function homeReadinessHTML(){
   const push=('Notification'in window)&&Notification.permission==='granted'&&localStorage.getItem(PUSH_READY_KEY)==='1',sync=!!localStorage.getItem(CLOUD_CODE_KEY),weather=!!getWeatherCache()?.ok,items=[['push','Push',push],['sync','Резервная копия',sync],['weather','Погода',weather]],done=items.filter(x=>x[2]).length;
   if(done===items.length)return '';
@@ -5007,7 +5014,7 @@ async function scheduleMorningPush(){
   try{
     const migrationKey='legacy_morning_disabled_v114';
     if(localStorage.getItem(migrationKey)==='1')return scheduleDayReviewPush(false);
-    const reg=await navigator.serviceWorker.ready;
+    const reg=await lumoTimeout(navigator.serviceWorker.ready,5000,'Service worker не ответил');
     const sub=await reg.pushManager.getSubscription();
     if(!sub)return;
     const resp=await fetch(FAMILY_SERVER+'/schedule-morning',{
