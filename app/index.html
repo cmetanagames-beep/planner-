@@ -15,7 +15,7 @@
 <link rel="manifest" href="manifest.json">
 <link rel="apple-touch-icon" sizes="512x512" href="assets/icons/icon.png">
 <link rel="icon" type="image/svg+xml" href="assets/icons/icon.svg">
-<link rel="stylesheet" href="assets/css/app.css?v=117">
+<link rel="stylesheet" href="assets/css/app.css?v=119">
 </head>
 <body>
   <svg width="0" height="0" style="position:absolute"><defs>
@@ -67,7 +67,7 @@
 <div id="view"></div>
 
 <div id="ai-view" style="display:none">
-  <div id="ai-chat"></div>
+  <div id="ai-chat" role="log" aria-live="polite" aria-relevant="additions"></div>
   <div id="ai-suggest" class="ai-suggest"></div>
 </div>
 <div class="ai-input-bar" id="ai-bar" style="display:none">
@@ -454,8 +454,8 @@
 </div>
 <div id="tour-layer" style="display:none"></div>
 
-<div class="toast" id="toast"></div>
-<script src="assets/js/app.js?v=117"></script>
+<div class="toast" id="toast" role="status" aria-live="polite" aria-atomic="true"></div>
+<script src="assets/js/app.js?v=119"></script>
 
   <!-- МОДАЛКА АВТО-ПЛАТЕЖЕЙ -->
 <div class="modal" id="modal-autopay">

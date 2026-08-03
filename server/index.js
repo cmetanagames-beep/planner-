@@ -923,9 +923,16 @@ async function createDatabaseBackup(reason = 'manual') {
   if (String(integrity).toLowerCase() !== 'ok') throw new Error(`database integrity: ${integrity}`);
   await db.backup(destination);
   const restored=new Database(destination,{readonly:true});
-  try{const check=restored.pragma('quick_check',{simple:true});if(String(check).toLowerCase()!=='ok')throw new Error(`backup restore check: ${check}`);}finally{restored.close();}
-  setSystemState('lastBackup', JSON.stringify({ name, reason, createdAt: Date.now() }));
+  let restoreTest;
+  try{const check=restored.pragma('quick_check',{simple:true});if(String(check).toLowerCase()!=='ok')throw new Error(`backup restore check: ${check}`);restoreTest={ok:true,name,checkedAt:Date.now(),profiles:Number(restored.prepare('SELECT COUNT(*) n FROM userData').get()?.n||0),cloudCopies:Number(restored.prepare('SELECT COUNT(*) n FROM cloudData').get()?.n||0)};}finally{restored.close();}
+  setSystemState('lastBackup', JSON.stringify({ name, reason, createdAt: Date.now() }));setSystemState('lastRestoreTest',JSON.stringify(restoreTest));
   return backupList().find(item => item.name === name);
+}
+function testDatabaseBackup(name=''){
+  const backups=backupList(),selected=backups.find(item=>item.name===name)||backups[0];if(!selected)throw new Error('Резервных копий пока нет');
+  const restored=new Database(path.join(BACKUP_DIR,selected.name),{readonly:true});let result;
+  try{const check=restored.pragma('quick_check',{simple:true});if(String(check).toLowerCase()!=='ok')throw new Error(`backup restore check: ${check}`);result={ok:true,name:selected.name,checkedAt:Date.now(),profiles:Number(restored.prepare('SELECT COUNT(*) n FROM userData').get()?.n||0),cloudCopies:Number(restored.prepare('SELECT COUNT(*) n FROM cloudData').get()?.n||0)};}finally{restored.close();}
+  setSystemState('lastRestoreTest',JSON.stringify(result));return result;
 }
 
 app.get('/health', (req, res) => res.json({ ok: true, service: 'lumo-push', time: Date.now() }));
@@ -952,6 +959,8 @@ app.get('/developer/status', requireDeveloper, (req, res) => {
   let disk={total:0,free:0,used:0};
   try{const s=statfsSync(process.cwd()),total=Number(s.blocks)*Number(s.bsize),free=Number(s.bavail)*Number(s.bsize);disk={total,free,used:total-free};}catch(_){}
   const hostTotal=totalmem(),hostFree=freemem();
+  const weekAgo=now-7*24*60*60*1000,activity={activeDevices24h:Number(db.prepare('SELECT COUNT(*) n FROM deviceHealth WHERE lastSeen>=?').get(dayAgo)?.n||0),activeDevices7d:Number(db.prepare('SELECT COUNT(*) n FROM deviceHealth WHERE lastSeen>=?').get(weekAgo)?.n||0),activeUsers24h:Number(db.prepare('SELECT COUNT(DISTINCT userId) n FROM deviceHealth WHERE lastSeen>=?').get(dayAgo)?.n||0),activeUsers7d:Number(db.prepare('SELECT COUNT(DISTINCT userId) n FROM deviceHealth WHERE lastSeen>=?').get(weekAgo)?.n||0),cloudSyncs24h:Number(db.prepare('SELECT COUNT(*) n FROM cloudData WHERE updatedAt>=?').get(dayAgo)?.n||0)};
+  let restoreTest=null;try{restoreTest=JSON.parse(getSystemState('lastRestoreTest','null'));}catch(_){}
   res.json({
     ok: true,
     generatedAt: now,
@@ -971,7 +980,7 @@ app.get('/developer/status', requireDeveloper, (req, res) => {
       blockedUsers: scalar('SELECT COUNT(*) count FROM userAccess WHERE blocked=1')
     },
     delivery24h: { total: Number(delivery?.count || 0), sent: Number(delivery?.sent || 0), failed: Number(delivery?.failed || 0) },
-    schedules, recentPush, devices, versions, errors, recentTrace, telegramLog, accessLog, adminAudit,
+    schedules, recentPush, devices, versions, errors, recentTrace, telegramLog, accessLog, adminAudit,activity,restoreTest,
     upcoming: upcomingNotifications(24),
     backups: backupList().slice(0, 30),
     maintenance: getMaintenance(),
@@ -1034,6 +1043,7 @@ app.post('/developer/backups', requireDeveloper, async (req, res) => {
   try { const backup = await createDatabaseBackup('manual'); res.json({ ok: true, backup }); }
   catch (error) { raiseAlert('backup-failed', `Ошибка резервной копии: ${error.message}`, 10 * 60 * 1000); res.status(500).json({ ok: false, error: error.message }); }
 });
+app.post('/developer/backups/test',requireDeveloper,(req,res)=>{try{const restoreTest=testDatabaseBackup(String(req.body?.name||''));auditAdmin('SYSTEM','backup-restore-test',`${restoreTest.name} · profiles ${restoreTest.profiles} · cloud ${restoreTest.cloudCopies}`);res.json({ok:true,restoreTest});}catch(error){raiseAlert('backup-restore-failed',`Ошибка теста восстановления: ${error.message}`,10*60*1000);res.status(500).json({ok:false,error:error.message});}});
 
 app.post('/voice/transcribe', express.raw({ type: ['audio/wav', 'audio/x-wav', 'application/octet-stream'], limit: VOICE_MAX_BYTES }), async (req, res) => {
   if (!Buffer.isBuffer(req.body) || req.body.length < 48 || req.body.length > VOICE_MAX_BYTES) {

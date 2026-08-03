@@ -1,14 +1,17 @@
-const CACHE = 'planner-v117';
+const CACHE = 'planner-v119';
 const PUSH_STATE_CACHE = 'lumo-push-state-v1';
 const PUSH_TRACE_API='https://pushevgen.duckdns.org/telemetry/push-state';
 function tracePush(d,stage,detail=''){if(!d?.traceKey)return Promise.resolve();return fetch(PUSH_TRACE_API,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({traceKey:d.traceKey,type:d.type||'',stage,detail}),keepalive:true}).catch(()=>{});}
+async function saveLocalPushJourney(d,stage,detail=''){
+  try{const cache=await caches.open(PUSH_STATE_CACHE),previousResponse=await cache.match('./__last_push_journey__'),previous=previousResponse?await previousResponse.json():{};const journey={...previous,type:d?.type||previous.type||'',title:d?.title||previous.title||'',traceKey:d?.traceKey||previous.traceKey||'',scheduledAt:d?.scheduledAt||previous.scheduledAt||0,stage,detail,updatedAt:Date.now()};await cache.put('./__last_push_journey__',new Response(JSON.stringify(journey),{headers:{'Content-Type':'application/json'}}));}catch(_){}
+}
 
 const ASSETS = [
   './',
   './index.html',
   './manifest.json',
-  './assets/css/app.css?v=117',
-  './assets/js/app.js?v=117',
+  './assets/css/app.css?v=119',
+  './assets/js/app.js?v=119',
   './assets/icons/icon.svg',
   './assets/icons/icon.png'
 ];
@@ -122,8 +125,8 @@ async function currentShoppingBody(fallback){
 
 async function showPush(d){
   d.type=familyPushKind(d);
-  if(!(await pushAllowed(d))){await tracePush(d,'suppressed','client policy');return;}
-  await tracePush(d,'displayed',d.stage||'');
+  if(!(await pushAllowed(d))){await Promise.all([tracePush(d,'suppressed','client policy'),saveLocalPushJourney(d,'suppressed','Повтор или устаревшее уведомление отменено')]);return;}
+  await Promise.all([tracePush(d,'displayed',d.stage||''),saveLocalPushJourney(d,'displayed',d.stage||'')]);
   if(self.registration.setAppBadge){
     await self.registration.setAppBadge(d.badgeCount||undefined).catch(()=>{});
   }
@@ -201,7 +204,7 @@ self.addEventListener('notificationclick', e => {
   e.notification.close();
   const action = e.action;
   const data   = e.notification.data || {};
-  e.waitUntil(tracePush(data,action?'action':'opened',action||'open'));
+  e.waitUntil(Promise.all([tracePush(data,action?'action':'opened',action||'open'),saveLocalPushJourney(data,action?'action':'opened',action||'open')]));
 
   if(data.type === 'insight'){
     if(action==='later')return;

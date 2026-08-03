@@ -53,10 +53,11 @@ function closeSheetFromHeader(button){
 }
 function enhanceModalSheets(){
   document.querySelectorAll('.modal').forEach(modal=>{
-    const sheet=modal.querySelector(':scope > .sheet');if(!sheet||sheet.dataset.enhanced)return;sheet.dataset.enhanced='1';sheet.classList.add('lumo-sheet');
+    const sheet=modal.querySelector(':scope > .sheet');if(!sheet||sheet.dataset.enhanced)return;sheet.dataset.enhanced='1';sheet.classList.add('lumo-sheet');modal.setAttribute('role','dialog');modal.setAttribute('aria-modal','true');sheet.tabIndex=-1;
     const directTitle=sheet.querySelector(':scope > h3'),meta=SHEET_MODAL_META[modal.id]||['more','Окно Lumo'];
     if(directTitle){
       directTitle.textContent=stripSheetTitleEmoji(directTitle.textContent);
+      if(!directTitle.id)directTitle.id=`${modal.id}-title`;modal.setAttribute('aria-labelledby',directTitle.id);
       const top=document.createElement('div');top.className='sheet-topbar';
       const icon=document.createElement('span');icon.className='sheet-title-icon';icon.innerHTML=ICONS[meta[0]]||ICONS.more;
       const copy=document.createElement('div');copy.className='sheet-title-copy';const sub=document.createElement('small');sub.textContent=meta[1];
@@ -68,7 +69,7 @@ function enhanceModalSheets(){
     if(tailButtons.length===2){const actions=document.createElement('div');actions.className='sheet-actions';sheet.insertBefore(actions,tailButtons[0]);tailButtons.forEach(x=>actions.append(x));}
     const lastButton=[...sheet.querySelectorAll(':scope > .btn')].at(-1);if(lastButton&&directTitle&&!['modal-help','modal-sync-conflict'].includes(modal.id)&&/^(?:отмена|закрыть|готово|не сейчас)(?:\s|$)/i.test(lastButton.textContent.trim()))lastButton.classList.add('sheet-redundant-close');
   });
-  const taskHead=document.querySelector('#modal .task-form-head');if(taskHead&&!taskHead.querySelector('.sheet-close')){const close=document.createElement('button');close.type='button';close.className='sheet-close';close.setAttribute('aria-label','Закрыть');close.innerHTML='<svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg>';close.onclick=()=>closeSheetFromHeader(close);taskHead.append(close);taskHead.classList.add('has-close');}
+  const taskHead=document.querySelector('#modal .task-form-head');if(taskHead){const title=taskHead.querySelector('h3'),modal=document.getElementById('modal');if(title){title.id=title.id||'modal-task-title';modal?.setAttribute('aria-labelledby',title.id);}if(!taskHead.querySelector('.sheet-close')){const close=document.createElement('button');close.type='button';close.className='sheet-close';close.setAttribute('aria-label','Закрыть');close.innerHTML='<svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg>';close.onclick=()=>closeSheetFromHeader(close);taskHead.append(close);taskHead.classList.add('has-close');}}
 }
 let lumoDialogDone=null;
 function showLumoDialog({title='Подтверждение',message='',confirmText='Продолжить',cancelText='Отмена',input=false,value='',label='Значение',danger=false}={}){
@@ -561,7 +562,7 @@ function taskCardHTML(t, isFam){
   const sdone=subs.filter(s=>s.done).length;
   const over=isOverdue(t);
   const fromBadge=t.fromName?`<span class="assign-badge">📥 от ${esc(t.fromName)}</span>`:'';
-  return `<div class="task ${t.done?'done':''} ${over?'overdue':''} ${bulkSelected.has(String(t.id))?'bulk-selected':''}" data-id="${t.id}">
+  return `<div class="task priority-${String(t.pri||'Y').toLowerCase()} ${t.done?'done':''} ${over?'overdue':''} ${bulkSelected.has(String(t.id))?'bulk-selected':''}" data-id="${t.id}">
     <div class="bar" style="background:${over?'var(--bad)':(priColor[t.pri]||priColor.Y)}"></div>
     <div class="chk ${t.done?'on':''}" onclick="${bulkMode?`toggleBulkTask(${jsArg(t.id)})`:`toggleTask(${t.id})`}">${bulkMode?(bulkSelected.has(String(t.id))?'✓':''):t.done?'✓':''}</div>
     <div class="t-body">
@@ -1605,7 +1606,7 @@ function renderFinance(){
   const ym=y+'-'+String(m+1).padStart(2,'0');
   const s=finStats(y,m);
   const prevDate=new Date(y,m-1,1),prev=finStats(prevDate.getFullYear(),prevDate.getMonth());
-  const delta=prev.total?Math.round((s.total-prev.total)/prev.total*100):null;
+  const delta=s.total>0&&prev.total>0?Math.round((s.total-prev.total)/prev.total*100):null;
   const monthLbl=monthFull[m]+' '+y;
   let html=`<div class="finance-page"><div class="fin-hero">
     <div class="fin-monthnav"><button onclick="finNav(-1)">‹</button><span>${monthLbl}</span><button onclick="finNav(1)">›</button></div>
@@ -2319,7 +2320,7 @@ async function resolveCloudConflict(choice){if(!cloudConflict)return;let data=ch
 
 /* ===== СЕМЬЯ + ПУШИ (сервер) ===== */
 const FAMILY_SERVER='https://pushevgen.duckdns.org'; // без слэша на конце, через https!
-const LUMO_APP_VERSION='v117';
+const LUMO_APP_VERSION='v119';
 const LUMO_DEVICE_ID=(()=>{let id=localStorage.getItem('lumo_device_id_v1');if(!id){id='dev_'+Date.now().toString(36)+'_'+Math.random().toString(36).slice(2,10);localStorage.setItem('lumo_device_id_v1',id)}return id})();
 const LUMO_SUPPORT_CODE=(()=>{let code=localStorage.getItem('lumo_support_code_v1');if(!code){const chars='ABCDEFGHJKLMNPQRSTUVWXYZ23456789';code='';for(let i=0;i<8;i++)code+=chars[Math.floor(Math.random()*chars.length)];localStorage.setItem('lumo_support_code_v1',code)}return code})();
 function diagnosticPlatform(){const ua=navigator.userAgent||'';if(/android/i.test(ua))return'Android';if(/iphone|ipad|ipod/i.test(ua))return'iOS';if(/windows/i.test(ua))return'Windows';if(/macintosh|mac os/i.test(ua))return'macOS';return'Web'}
@@ -2327,7 +2328,7 @@ function diagnosticDisplayMode(){return window.matchMedia?.('(display-mode: stan
 async function reportDeviceHealth(force=false){
   const last=Number(localStorage.getItem('lumo_device_health_at')||0);if(!force&&Date.now()-last<6*60*60*1000)return;
   try{let subscribed=false,swVersion='none';if('serviceWorker'in navigator){const reg=await navigator.serviceWorker.ready.catch(()=>null);subscribed=!!(await reg?.pushManager?.getSubscription().catch(()=>null));swVersion=reg?.active?.scriptURL?.split('/').pop()||'none'}
-    await fetch(FAMILY_SERVER+'/telemetry/device',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({userId:PUSH_USER_ID,deviceId:LUMO_DEVICE_ID,supportCode:LUMO_SUPPORT_CODE,platform:diagnosticPlatform(),appVersion:LUMO_APP_VERSION,swVersion,displayMode:diagnosticDisplayMode(),pushPermission:typeof Notification==='undefined'?'unsupported':Notification.permission,pushSubscribed:subscribed}),keepalive:true});localStorage.setItem('lumo_device_health_at',Date.now())
+    await fetch(FAMILY_SERVER+'/telemetry/device',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({userId:PUSH_USER_ID,deviceId:LUMO_DEVICE_ID,supportCode:LUMO_SUPPORT_CODE,platform:diagnosticPlatform(),appVersion:LUMO_APP_VERSION,swVersion,displayMode:diagnosticDisplayMode(),pushPermission:typeof Notification==='undefined'?'unsupported':Notification.permission,pushSubscribed:subscribed}),keepalive:true});localStorage.setItem('lumo_device_health_at',Date.now());localStorage.setItem(PUSH_READY_KEY,subscribed?'1':'0')
   }catch(_){}
 }
 let diagnosticErrorSending=false;
@@ -2374,7 +2375,7 @@ function getMyRole(){return load().myRole||'other';}
 function getFamilyState(){return load().familyId||null;}
 function isIOSDevice(){return /iPad|iPhone|iPod/.test(navigator.userAgent)||(navigator.platform==='MacIntel'&&navigator.maxTouchPoints>1);}
 function isStandalonePWA(){return window.matchMedia('(display-mode: standalone)').matches||window.navigator.standalone===true;}
-const OFFLINE_QUEUE_KEY='offline_changes_v1';
+const OFFLINE_QUEUE_KEY='offline_changes_v1',PUSH_READY_KEY='lumo_push_ready_v1';
 function getOfflineQueue(){
   try{const q=JSON.parse(localStorage.getItem(OFFLINE_QUEUE_KEY));return Array.isArray(q)?q:[];}catch(e){return[];}
 }
@@ -2443,6 +2444,7 @@ async function subscribePush(){
     localStorage.setItem('vapid_public',pub);
     const sub=await reg.pushManager.subscribe({userVisibleOnly:true,applicationServerKey:urlB64ToUint8(pub)});
     await fetch(FAMILY_SERVER+'/subscribe',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({userId:PUSH_USER_ID,subscription:sub,name:getMyName(),role:getMyRole()})});
+    localStorage.setItem(PUSH_READY_KEY,'1');
     toast('📲 Фоновые пуши включены!');
     syncPushData();scheduleShoppingPushServer(true);
   }catch(e){toast('Не вышло подписаться на пуши');}
@@ -2473,8 +2475,9 @@ async function checkPushHealth(showToast=false){
     const server=await fetch(FAMILY_SERVER+'/key',{cache:'no-store'});lines.push(server.ok?'✅ Push-сервер доступен':'❌ Push-сервер вернул '+server.status);if(!server.ok)ok=false;
   }catch(e){lines.push('❌ Не удалось проверить push-службу');ok=false;}
   const now=Date.now(),next=getTasks().filter(t=>!t.done&&t.date&&t.time).map(t=>({...t,_at:new Date(t.date+'T'+t.time).getTime()})).filter(t=>t._at>now).sort((a,b)=>a._at-b._at)[0];
-  lines.push(next?`🕒 Ближайшее: ${esc(next.title)} — ${fmtDate(next.date)}, ${esc(next.time)}`:'ℹ️ Нет будущих дел с точным временем');
-  el.innerHTML=lines.join('<br>');updateSettingsOverview(ok);if(showToast)toast(ok?'✅ Push-цепочка готова':'Есть проблема в push-настройках');
+  lines.push(next?`🕒 Запланировано: ${esc(next.title)} — ${fmtDate(next.date)}, ${esc(next.time)}`:'ℹ️ Нет будущих дел с точным временем');
+  try{const cache=await caches.open('lumo-push-state-v1'),response=await cache.match('./__last_push_journey__');if(response){const journey=await response.json(),labels={displayed:'показано',opened:'открыто',action:'действие выполнено',suppressed:'повтор отменён'};lines.push(`📡 Последний путь: ${esc(journey.title||journey.type||'уведомление')} · ${esc(labels[journey.stage]||journey.stage)} · ${new Date(journey.updatedAt).toLocaleString('ru-RU')}`)}}catch(_){}
+  localStorage.setItem(PUSH_READY_KEY,ok?'1':'0');el.innerHTML=lines.join('<br>');updateSettingsOverview(ok);if(showToast)toast(ok?'✅ Push-цепочка готова':'Есть проблема в push-настройках');
 }
 async function scheduleHabitPushServer(force=false){
   const r=getHabitReminder();if(!('serviceWorker'in navigator))return;
@@ -2787,6 +2790,18 @@ let pendingLocalPlan=null;
 let pendingLocalOps=null;
 let pendingLocalChoice=null;
 const LOCAL_MEMORY_KEY='lumo_local_memory_v1';
+let assistantUndo=null,assistantUndoTimer=null;
+function armAssistantUndo(snapshot,count){
+  clearTimeout(assistantUndoTimer);assistantUndo={planner:snapshot.planner,memory:snapshot.memory,expiresAt:Date.now()+30000,count};
+  assistantUndoTimer=setTimeout(()=>{assistantUndo=null;},30000);
+}
+function assistantUndoHTML(){return '<button class="assistant-undo" type="button" onclick="undoAssistantAction()">Отменить последнее действие</button>'}
+function assistantUndoSnapshot(){return {planner:localStorage.getItem(KEY)||JSON.stringify(load()),memory:localStorage.getItem(LOCAL_MEMORY_KEY)}}
+function undoAssistantAction(){
+  if(!assistantUndo||Date.now()>assistantUndo.expiresAt){assistantUndo=null;return toast('Время отмены уже прошло');}
+  window.__lumoCloudApplying=true;try{localStorage.setItem(KEY,assistantUndo.planner);if(assistantUndo.memory===null)localStorage.removeItem(LOCAL_MEMORY_KEY);else localStorage.setItem(LOCAL_MEMORY_KEY,assistantUndo.memory);}finally{window.__lumoCloudApplying=false;}
+  clearTimeout(assistantUndoTimer);assistantUndo=null;localStorage.setItem('lumo_cloud_dirty_v1','1');scheduleCloudSync();syncPushData();scheduleAllTimeouts();updateAppBadge();refreshCurrentTab();aiAddMsg('ai','↩️ Последнее действие отменено. Данные возвращены.');toast('Действие отменено');
+}
 function getLocalMemory(){
   try{
     const m=JSON.parse(localStorage.getItem(LOCAL_MEMORY_KEY)||'{}');
@@ -3351,7 +3366,7 @@ async function confirmLocalPlan(){
   if(!pendingLocalPlan)return;
   const plan=annotatePlanConflicts(pendingLocalPlan),conflicts=plan.actions.filter(a=>!a._removed&&a._conflicts?.length);
   if(conflicts.length&&!await lumoConfirm(`Обнаружено пересечений: ${conflicts.map(a=>a.title+' — '+a._conflicts.map(x=>x.time+' '+x.title).join(', ')).join(' · ')}. Сохранить план?`,'Конфликт в расписании','Всё равно сохранить'))return;
-  pendingLocalPlan=null;
+  const undoSnapshot=assistantUndoSnapshot();pendingLocalPlan=null;
   const created=[];
   plan.actions.filter(a=>!a._removed).forEach(a=>{
     learnLocalAction(a);
@@ -3366,7 +3381,7 @@ async function confirmLocalPlan(){
     const id=applyActionReturn(a);created.push({type:a.type,id,data:a});
   });
   document.querySelector('.local-plan')?.closest('.ai-msg')?.remove();confetti();vibrate([30,50,30]);checkAchievements();
-  aiAddMsg('ai',`✅ Готово. Сохранено действий: <b>${created.length}</b>`);
+  armAssistantUndo(undoSnapshot,created.length);aiAddMsg('ai',`✅ Готово. Сохранено действий: <b>${created.length}</b>${assistantUndoHTML()}`);
   refreshCurrentTab();
 }
 
@@ -3509,7 +3524,7 @@ function showLocalOps(plan){pendingLocalOps=plan;const op=plan?.ops?.find(x=>x.i
 function cancelLocalOps(){if(!pendingLocalOps)return;pendingLocalOps=null;document.querySelector('.local-ops')?.closest('.ai-msg')?.remove();aiAddMsg('ai','Изменения отменены.');}
 function confirmLocalOps(){
   if(!pendingLocalOps||!Array.isArray(pendingLocalOps.ops))return;
-  let tasks=getTasks(),data=load();
+  const undoSnapshot=assistantUndoSnapshot();let tasks=getTasks(),data=load();
   pendingLocalOps.ops.forEach(op=>{
     if(op.kind==='task_update'){const t=tasks.find(x=>x.id===op.id);if(t)Object.assign(t,op.patch);}
     else if(op.kind==='task_delete')tasks=tasks.filter(x=>x.id!==op.id);
@@ -3519,7 +3534,7 @@ function confirmLocalOps(){
   });
   data.tasks=tasks;save(data);syncPushData();scheduleAllTimeouts();updateAppBadge();
   const n=pendingLocalOps.ops.length;pendingLocalOps=null;confetti();vibrate([30,40,30]);
-  aiAddMsg('ai',`✅ Изменения применены: <b>${n}</b>`);refreshCurrentTab();
+  armAssistantUndo(undoSnapshot,n);aiAddMsg('ai',`✅ Изменения применены: <b>${n}</b>${assistantUndoHTML()}`);refreshCurrentTab();
 }
 
 function tryLocalCommand(text){
@@ -3977,7 +3992,7 @@ function todayTaskCountdown(task){
 function todayBentoTaskHTML(task,featured=false){
   const icon=task.module==='shopping'?ICONS.shopping:task.module==='work'?ICONS.calendar:ICONS.all;
   const id=jsArg(task.id),category=todayTaskCategory(task),countdown=todayTaskCountdown(task);
-  return `<article class="day-task-card ${featured?'featured':'compact'}" data-id="${esc(String(task.id))}">
+  return `<article class="day-task-card priority-${String(task.pri||'Y').toLowerCase()} ${featured?'featured':'compact'}" data-id="${esc(String(task.id))}">
     <button class="day-task-main" onclick="editTask(${id})" aria-label="Открыть дело ${esc(task.title)}">
       <span class="day-task-icon">${icon}</span>
       <span class="day-task-copy"><b>${esc(task.title)}</b><small>${task.time?`<span class="day-task-time">${esc(task.time)}</span>`:''}<span>${esc(category)}</span></small></span>
@@ -3986,6 +4001,25 @@ function todayBentoTaskHTML(task,featured=false){
     <button class="day-task-complete" onclick="toggleTask(${id})" aria-label="Отметить выполненным">${ICONS.habits}<span>Отметить выполненным</span></button>
   </article>`;
 }
+function homeConnectionState(){
+  const queue=getOfflineQueue().length,connected=!!localStorage.getItem(CLOUD_CODE_KEY),dirty=localStorage.getItem('lumo_cloud_dirty_v1')==='1',at=Number(localStorage.getItem('lumo_cloud_at_v1')||0);
+  if(!navigator.onLine)return {tone:'offline',text:'Нет сети · изменения сохраняются на телефоне'};
+  if(queue)return {tone:'pending',text:`Ждут отправки: ${queue}`};
+  if(connected&&dirty)return {tone:'pending',text:'Облачная копия ждёт синхронизации'};
+  if(connected)return {tone:'ready',text:at?`Синхронизировано · ${new Date(at).toLocaleTimeString('ru-RU',{hour:'2-digit',minute:'2-digit'})}`:'Облако подключено'};
+  return {tone:'local',text:'Данные только на этом телефоне'};
+}
+function homeConnectionHTML(){const state=homeConnectionState();return `<button class="home-connection ${state.tone}" onclick="openReadinessStep('sync')"><span></span>${esc(state.text)}<b>›</b></button>`}
+function homeReadinessHTML(){
+  const push=('Notification'in window)&&Notification.permission==='granted'&&localStorage.getItem(PUSH_READY_KEY)==='1',sync=!!localStorage.getItem(CLOUD_CODE_KEY),weather=!!getWeatherCache()?.ok,items=[['push','Push',push],['sync','Резервная копия',sync],['weather','Погода',weather]],done=items.filter(x=>x[2]).length;
+  if(done===items.length)return '';
+  return `<section class="home-readiness"><div class="home-readiness-head"><div><small>ЗАЩИТА И НАПОМИНАНИЯ</small><b>Завершим настройку</b></div><strong>${done}/3</strong></div><div class="home-readiness-list">${items.map(x=>`<button class="${x[2]?'done':''}" onclick="openReadinessStep('${x[0]}')"><span>${x[2]?'✓':'·'}</span>${x[1]}<b>${x[2]?'Готово':'Настроить'}</b></button>`).join('')}</div></section>`;
+}
+function openReadinessStep(step){
+  if(step==='weather'){refreshWeather(true);return;}
+  openSettings();setTimeout(()=>openSettingsSection(step==='push'?'settings-push':'settings-sync'),80);
+}
+function refreshConnectionState(){if(currentTab==='today')renderToday();}
 function renderToday(){
   document.getElementById('filters').style.display='none';
   const view=document.getElementById('view'),tk=todayKey(),tasks=getTasks();
@@ -4000,6 +4034,7 @@ function renderToday(){
       <button class="home-mic" onclick="homeAssistantVoice()" aria-label="Голосовой ввод">${'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="3" width="6" height="12" rx="3"/><path d="M5 11a7 7 0 0014 0M12 18v3M8 21h8"/></svg>'}</button>
       <button class="home-send" onclick="homeAssistantSubmit()" aria-label="Отправить">${'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg>'}</button>
     </div>
+    ${homeConnectionHTML()}${homeReadinessHTML()}
     <div class="today-head"><div><div class="today-greeting">Ваш день</div><div class="today-date">${doneToday} из ${totalToday||0} сегодня · ${activeTotal} активных всего</div></div>${weatherLine}</div>`;
 
   html+=pendingAssignmentsHomeHTML();
@@ -4894,6 +4929,8 @@ if('serviceWorker' in navigator){
   document.addEventListener('visibilitychange',()=>resumeForegroundServices(false));
   window.addEventListener('pageshow',()=>resumeForegroundServices(false));
   window.addEventListener('online',()=>resumeForegroundServices(true));
+  window.addEventListener('offline',refreshConnectionState);
+  window.addEventListener('lumo-queue-change',refreshConnectionState);
 
   // клик по погоде — обновить
   const chip=document.getElementById('weatherChip');

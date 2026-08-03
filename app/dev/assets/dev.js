@@ -43,7 +43,8 @@ function renderAttention(data){
   const newestBackup=(data.backups||[]).map(row=>new Date(row.createdAt).getTime()).filter(Number.isFinite).sort((a,b)=>b-a)[0]||0;
   const backupHours=newestBackup?Math.max(0,Math.floor((now-newestBackup)/3600000)):null;
   const backupBad=backupHours===null||backupHours>26;
-  const issues=outdated+noPush+openErrors+failedPush+(backupBad?1:0);
+  const restore=data.restoreTest||null,restoreHours=restore?.checkedAt?Math.max(0,Math.floor((now-restore.checkedAt)/3600000)):null,restoreBad=!restore?.ok||restoreHours===null||restoreHours>24*7;
+  const issues=outdated+noPush+openErrors+failedPush+(backupBad?1:0)+(restoreBad?1:0);
   $('attentionBadge').textContent=issues?String(issues):'всё чисто';
   $('attentionBadge').className=`badge ${issues?'danger':''}`;
   $('attentionGrid').innerHTML=[
@@ -51,7 +52,8 @@ function renderAttention(data){
     attentionCard({label:'Устройства без push',value:noPush,detail:'активные клиенты без подписки',page:'users',filter:'no-push',tone:noPush?'warn':'good'}),
     attentionCard({label:'Новые ошибки',value:openErrors,detail:'ещё не отмечены исправленными',page:'errors',tone:openErrors?'danger':'good'}),
     attentionCard({label:'Ошибки доставки',value:failedPush,detail:'за последние 24 часа',page:'push',tone:failedPush?'danger':'good'}),
-    attentionCard({label:'Резервная копия',value:backupHours===null?'нет':`${backupHours} ч`,detail:backupBad?'нужно создать свежую копию':'копия актуальна',page:'system',tone:backupBad?'warn':'good'})
+    attentionCard({label:'Резервная копия',value:backupHours===null?'нет':`${backupHours} ч`,detail:backupBad?'нужно создать свежую копию':'копия актуальна',page:'system',tone:backupBad?'warn':'good'}),
+    attentionCard({label:'Проверка восстановления',value:restore?.ok?'пройдена':'нет',detail:restoreBad?'нужно проверить копию':`проверено ${restoreHours} ч назад`,page:'system',tone:restoreBad?'warn':'good'})
   ].join('');
 }
 
@@ -71,7 +73,7 @@ function render(data) {
   const allOk=Object.entries(data.services).filter(([key])=>!['whisperBusy','telegramLinked'].includes(key)).every(([,value])=>value!==false);
   $('overallDot').className=`dot ${allOk?'ok':'bad'}`; $('overallText').textContent=allOk?'Все основные сервисы работают':'Есть сервис, требующий внимания'; $('updatedAt').textContent=`Обновлено ${formatTime(data.generatedAt)} · uptime ${Math.floor(data.server.uptimeSec/3600)} ч`;
   $('serviceGrid').innerHTML=service('Push',data.services.push,`${data.database.subscriptions} подписок`)+service('Whisper',data.services.whisper,data.services.whisperBusy?'распознаёт аудио':'свободен')+service('SQLite',data.services.database,formatBytes(data.database.bytes))+service('Telegram',data.services.telegram,data.services.telegramLinked?'чат подключён':'нажмите /start');
-  $('metricGrid').innerHTML=metric('Пользователи',data.database.users)+metric('Заблокировано',data.database.blockedUsers||0)+metric('Облачные копии',data.database.cloudCopies)+metric('Активные расписания',data.database.activeSchedules,`из ${data.database.schedules}`);
+  const activity=data.activity||{};$('metricGrid').innerHTML=metric('Профили',data.database.users)+metric('Активные пользователи 24ч',activity.activeUsers24h||0,`${activity.activeUsers7d||0} за 7 дней`)+metric('Активные устройства 24ч',activity.activeDevices24h||0,`${activity.activeDevices7d||0} за 7 дней`)+metric('Облачные копии',data.database.cloudCopies,`${activity.cloudSyncs24h||0} обновлено за 24ч`)+metric('Push-подписки',data.database.subscriptions)+metric('Активные расписания',data.database.activeSchedules,`из ${data.database.schedules}`);
   renderAttention(data);
   const host=data.host||{},hm=host.memory||{},disk=host.disk||{},proc=data.server.memory||{};$('serverNode').textContent=`${data.server.node} · PID ${data.server.pid}`;$('serverMetricGrid').innerHTML=metric('Процесс',formatBytes(proc.rss),`heap ${formatBytes(proc.heapUsed)}`)+metric('Память VPS',formatBytes(hm.used),`свободно ${formatBytes(hm.free)}`)+metric('Диск',formatBytes(disk.used),`свободно ${formatBytes(disk.free)}`)+metric('Load average',Number(host.load?.[0]||0).toFixed(2),`${host.cpuCores||0} CPU`);
 
@@ -90,7 +92,7 @@ function render(data) {
 
   const maintenance=data.maintenance||{enabled:false,features:{}}; $('maintenanceEnabled').checked=!!maintenance.enabled; $('maintenanceMessage').value=maintenance.message||''; $('maintenanceState').textContent=maintenance.enabled?'включён':'выключен'; $('maintenanceState').className=`badge ${maintenance.enabled?'danger':''}`; document.querySelectorAll('.feature-toggle').forEach(input=>input.checked=maintenance.features?.[input.dataset.feature]!==false);
   $('telegramState').innerHTML=`<span class="${data.telegram?.linked?'good':'fail'}">${data.telegram?.linked?'● чат подключён':'● ожидается /start'}</span> <small>${escapeHtml(data.telegram?.username||'')}</small>`; const telegramList=$('telegramList'), telegramRows=data.telegramLog||[]; telegramList.className=`table-list${telegramRows.length?'':' empty'}`; telegramList.innerHTML=telegramRows.length?telegramRows.map(row=>`<div class="compact-row"><span class="${row.ok?'good':'fail'}">${row.ok?'✓':'!'}</span><div class="truncate">${escapeHtml(row.message)}</div><small>${formatTime(row.ts)}</small></div>`).join(''):'История пуста';
-  const backups=data.backups||[], backupList=$('backupList'); backupList.className=`table-list${backups.length?'':' empty'}`; backupList.innerHTML=backups.length?backups.map(row=>`<div class="compact-row"><span>◫</span><div><strong>${escapeHtml(row.name)}</strong><br><small>${formatBytes(row.bytes)}</small></div><small>${formatTime(row.createdAt)}</small></div>`).join(''):'Копий пока нет';
+  const restore=data.restoreTest||null;$('restoreTestState').innerHTML=restore?.ok?`<span class="good">✓ восстановление проверено</span> <small>${escapeHtml(restore.name)} · ${formatTime(restore.checkedAt)} · профилей ${restore.profiles||0}, облачных копий ${restore.cloudCopies||0}</small>`:'<span class="fail">! восстановление ещё не проверено</span>';const backups=data.backups||[], backupList=$('backupList'); backupList.className=`table-list${backups.length?'':' empty'}`; backupList.innerHTML=backups.length?backups.map(row=>`<div class="compact-row"><span>◫</span><div><strong>${escapeHtml(row.name)}</strong><br><small>${formatBytes(row.bytes)}</small></div><small>${formatTime(row.createdAt)}</small></div>`).join(''):'Копий пока нет';
   const access=data.accessLog||[], accessList=$('accessList'); accessList.className=`table-list${access.length?'':' empty'}`; accessList.innerHTML=access.length?access.map(row=>`<div class="compact-row"><span class="${row.ok?'good':'fail'}">${row.ok?'✓':'!'}</span><div><strong>${escapeHtml(row.ip)}</strong><br><small>${escapeHtml(row.path)}</small></div><small>${formatTime(row.ts)}</small></div>`).join(''):'Журнал пуст';
   const audit=data.adminAudit||[],auditList=$('adminAuditList');auditList.className=`table-list${audit.length?'':' empty'}`;auditList.innerHTML=audit.length?audit.map(row=>`<div class="compact-row"><span>⌁</span><div class="truncate"><strong>${escapeHtml(row.action)}</strong> · ${escapeHtml(row.supportCode||'—')}<br><small>${escapeHtml(row.detail||'')}</small></div><small>${formatTime(row.ts)}</small></div>`).join(''):'Действий пока нет';
 }
@@ -147,6 +149,7 @@ $('supportResult').addEventListener('click',async event=>{
 $('errorList').addEventListener('click',async event=>{const button=event.target.closest('.resolve-error');if(!button)return;try{await action(`/developer/errors/${button.dataset.errorId}/resolve`,{resolved:button.dataset.resolved!=='1'});await refresh();}catch(error){toast(error.message,true);}});
 $('testTelegram').addEventListener('click',async()=>{try{await action('/developer/telegram/test');toast('Тест отправлен в Telegram');await refresh();}catch(error){toast(error.message,true);}});
 $('createBackup').addEventListener('click',async()=>{try{await action('/developer/backups');toast('Резервная копия создана');await refresh();}catch(error){toast(error.message,true);}});
+$('testBackup').addEventListener('click',async()=>{try{await action('/developer/backups/test');toast('Копия открылась и прошла проверку восстановления');await refresh();}catch(error){toast(error.message,true);}});
 $('saveMaintenance').addEventListener('click',async()=>{const features={};document.querySelectorAll('.feature-toggle').forEach(input=>features[input.dataset.feature]=input.checked);try{await action('/developer/maintenance',{enabled:$('maintenanceEnabled').checked,message:$('maintenanceMessage').value,features});toast('Режим обслуживания сохранён');await refresh();}catch(error){toast(error.message,true);}});
 document.querySelectorAll('.console-nav button').forEach(button=>button.addEventListener('click',()=>showPage(button.dataset.page)));
 window.addEventListener('hashchange',()=>showPage(location.hash.slice(1),false));showPage(location.hash.slice(1)||'overview',false);

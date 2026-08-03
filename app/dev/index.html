@@ -9,8 +9,8 @@
   <link rel="manifest" href="manifest.json">
   <link rel="icon" href="assets/developer.svg" type="image/svg+xml">
   <link rel="apple-touch-icon" href="assets/developer.png">
-  <link rel="stylesheet" href="assets/dev.css?v=6">
-  <link rel="stylesheet" href="assets/console.css?v=6">
+  <link rel="stylesheet" href="assets/dev.css?v=7">
+  <link rel="stylesheet" href="assets/console.css?v=7">
 </head>
 <body>
   <main class="shell">
@@ -71,7 +71,7 @@
           <section class="console-page" data-page-view="system">
             <div class="page-heading"><div><p class="eyebrow">ИНФРАСТРУКТУРА</p><h1>Система</h1><p>Обслуживание, Telegram и резервные копии.</p></div></div>
             <section id="maintenancePanel" class="panel"><div class="panel-title"><div><p class="eyebrow">УПРАВЛЕНИЕ</p><h2>Режим обслуживания</h2></div><span id="maintenanceState" class="badge">выключен</span></div><div class="maintenance-grid"><label class="switch"><input id="maintenanceEnabled" type="checkbox"> Всё приложение</label><label class="switch"><input class="feature-toggle" data-feature="voice" type="checkbox"> Голос</label><label class="switch"><input class="feature-toggle" data-feature="push" type="checkbox"> Push</label><label class="switch"><input class="feature-toggle" data-feature="family" type="checkbox"> Семья</label><label class="switch"><input class="feature-toggle" data-feature="sync" type="checkbox"> Синхронизация</label></div><div class="action-row"><input id="maintenanceMessage" placeholder="Сообщение пользователям"><button id="saveMaintenance" class="primary">Сохранить режим</button></div></section>
-            <section class="two-panels"><section class="panel"><div class="panel-title"><div><p class="eyebrow">TELEGRAM</p><h2>Технические тревоги</h2></div><button id="testTelegram" class="quiet">Тест</button></div><div id="telegramState" class="inline-state"></div><div id="telegramList" class="table-list empty">История пуста</div></section><section class="panel"><div class="panel-title"><div><p class="eyebrow">BACKUP</p><h2>Копии SQLite</h2></div><button id="createBackup" class="quiet">Создать</button></div><div id="backupList" class="table-list empty">Копий пока нет</div></section></section>
+            <section class="two-panels"><section class="panel"><div class="panel-title"><div><p class="eyebrow">TELEGRAM</p><h2>Технические тревоги</h2></div><button id="testTelegram" class="quiet">Тест</button></div><div id="telegramState" class="inline-state"></div><div id="telegramList" class="table-list empty">История пуста</div></section><section class="panel"><div class="panel-title"><div><p class="eyebrow">BACKUP</p><h2>Копии SQLite</h2></div><div class="panel-actions"><button id="testBackup" class="quiet">Проверить восстановление</button><button id="createBackup" class="quiet">Создать</button></div></div><div id="restoreTestState" class="inline-state">Тест восстановления ещё не запускался</div><div id="backupList" class="table-list empty">Копий пока нет</div></section></section>
           </section>
 
           <section class="console-page" data-page-view="security">
@@ -83,6 +83,6 @@
       </div>
     </section>
   </main>
-  <script src="assets/dev.js?v=6" type="module"></script>
+  <script src="assets/dev.js?v=7" type="module"></script>
 </body>
 </html>
