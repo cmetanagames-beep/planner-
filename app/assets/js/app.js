@@ -422,13 +422,17 @@ function syncSafeBottomInset(){
   const measured=parseFloat(getComputedStyle(probe).paddingBottom)||0;
   probe.remove();
   const standalone=window.matchMedia?.('(display-mode: standalone)').matches||navigator.standalone===true;
-  const safe=standalone?Math.max(0,Math.min(20,measured)):Math.max(0,Math.min(16,measured));
+  const safe=standalone?Math.max(0,Math.min(40,measured)):Math.max(0,Math.min(20,measured));
+  const vv=window.visualViewport,layoutHeight=Math.max(window.innerHeight||0,document.documentElement.clientHeight||0,window.screen?.height||0),visualBottom=vv?(vv.offsetTop+vv.height):layoutHeight,rawGap=Math.max(0,layoutHeight-visualBottom);
+  const standaloneGap=standalone&&rawGap>48?Math.min(240,Math.round(rawGap)):0;
   document.documentElement.style.setProperty('--lumo-safe-bottom',safe+'px');
+  document.documentElement.style.setProperty('--lumo-standalone-vv-gap',standaloneGap+'px');
 }
 syncSafeBottomInset();
 window.addEventListener('pageshow',syncSafeBottomInset);
 window.addEventListener('resize',()=>setTimeout(syncSafeBottomInset,40));
 if(window.visualViewport)window.visualViewport.addEventListener('resize',()=>{setTimeout(alignFloatingControls,60);setTimeout(syncSafeBottomInset,40)});
+window.addEventListener('focusout',()=>setTimeout(syncSafeBottomInset,320));
 function fabRipple(e){
   const fab=document.getElementById('fab');
   if(!fab)return;
@@ -712,6 +716,9 @@ function toggleHabitComposer(force){
   box.classList.toggle('on',open);
   if(open)setTimeout(()=>document.getElementById('habit-name')?.focus(),80);
 }
+function toggleHabitEmojiPicker(){document.getElementById('habit-emoji-picker')?.classList.toggle('on');}
+function selectHabitEmoji(icon){const input=document.getElementById('habit-icon'),button=document.getElementById('habit-icon-button');if(input)input.value=icon;if(button)button.textContent=icon;document.getElementById('habit-emoji-picker')?.classList.remove('on');}
+async function enterCustomHabitEmoji(){const value=await lumoPrompt('Свой значок','Открой эмодзи на клавиатуре и вставь один символ.','⭐','Эмодзи');if(value)selectHabitEmoji(String(value).trim().slice(0,4)||'⭐');}
 function addHabit(){
   const name=(document.getElementById('habit-name')?.value||'').trim();
   const icon=(document.getElementById('habit-icon')?.value||'').trim()||'⭐';
@@ -785,9 +792,11 @@ function renderHabits(){
       <button class="habit-add-btn" onclick="toggleHabitComposer()">${ICONS.plus}<span>Новая</span></button>
     </div>
     <div class="habit-composer" id="habit-composer">
-      <input id="habit-icon" placeholder="⭐" maxlength="4" aria-label="Иконка">
+      <input id="habit-icon" type="hidden" value="⭐">
+      <button type="button" class="habit-icon-button" id="habit-icon-button" onclick="toggleHabitEmojiPicker()" aria-label="Выбрать эмодзи">⭐</button>
       <input id="habit-name" placeholder="Например, читать 20 минут" onkeydown="if(event.key==='Enter')addHabit()">
       <button onclick="addHabit()" aria-label="Добавить">+</button>
+      <div class="habit-emoji-picker" id="habit-emoji-picker">${['⭐','💧','🏃','📖','🧘','💊','🥗','🚶','🛏️','🧠','💪','☀️'].map(icon=>`<button type="button" onclick="selectHabitEmoji('${icon}')">${icon}</button>`).join('')}<button type="button" class="custom" onclick="enterCustomHabitEmoji()">＋ свой</button></div>
     </div>
     <div class="habit-list">${cards||'<div class="habit-empty"><div>✨</div><b>Здесь появится твой ритм</b><br><small>Добавь одну привычку, с которой легко начать</small></div>'}</div>
   </div>`;
@@ -2320,7 +2329,7 @@ async function resolveCloudConflict(choice){if(!cloudConflict)return;let data=ch
 
 /* ===== СЕМЬЯ + ПУШИ (сервер) ===== */
 const FAMILY_SERVER='https://pushevgen.duckdns.org'; // без слэша на конце, через https!
-const LUMO_APP_VERSION='v121';
+const LUMO_APP_VERSION='v124';
 const LUMO_DEVICE_ID=(()=>{let id=localStorage.getItem('lumo_device_id_v1');if(!id){id='dev_'+Date.now().toString(36)+'_'+Math.random().toString(36).slice(2,10);localStorage.setItem('lumo_device_id_v1',id)}return id})();
 const LUMO_SUPPORT_CODE=(()=>{let code=localStorage.getItem('lumo_support_code_v1');if(!code){const chars='ABCDEFGHJKLMNPQRSTUVWXYZ23456789';code='';for(let i=0;i<8;i++)code+=chars[Math.floor(Math.random()*chars.length)];localStorage.setItem('lumo_support_code_v1',code)}return code})();
 function diagnosticPlatform(){const ua=navigator.userAgent||'';if(/android/i.test(ua))return'Android';if(/iphone|ipad|ipod/i.test(ua))return'iOS';if(/windows/i.test(ua))return'Windows';if(/macintosh|mac os/i.test(ua))return'macOS';return'Web'}
@@ -3970,10 +3979,18 @@ function renderMore(){
       <button onclick="openNotificationCenter()">${ICONS.bell||ICONS.help}<span><b>Уведомления</b><small>Семья, покупки и важные события</small></span><i>›</i></button>
       <button onclick="openAssignmentsInbox()">${ICONS.send}<span><b>Входящие поручения</b><small>Принять, отклонить или ответить</small></span><i>›</i></button>
       <button onclick="openSettings()">${ICONS.settings}<span><b>Настройки</b><small>Оформление, уведомления и данные</small></span><i>›</i></button>
+      <button onclick="openSupportReport()">${ICONS.send}<span><b>Написать разработчику</b><small>Сообщение и скриншот напрямую в поддержку</small></span><i>›</i></button>
       <button onclick="openHelp()">${ICONS.help}<span><b>Обучение</b><small>Повторить интерактивный тур</small></span><i>›</i></button>
     </div>
   </div>`;
 }
+
+let supportScreenshotData='';
+function openSupportReport(){supportScreenshotData='';const message=document.getElementById('support-report-message'),file=document.getElementById('support-report-file'),preview=document.getElementById('support-report-preview'),status=document.getElementById('support-report-status');if(message)message.value='';if(file)file.value='';if(preview){preview.removeAttribute('src');preview.hidden=true;}if(status)status.textContent=`Код поддержки: ${LUMO_SUPPORT_CODE}`;document.getElementById('modal-support-report')?.classList.add('on');setTimeout(()=>message?.focus(),180);}
+function closeSupportReport(){document.getElementById('modal-support-report')?.classList.remove('on');}
+function clearSupportScreenshot(){supportScreenshotData='';const file=document.getElementById('support-report-file'),preview=document.getElementById('support-report-preview');if(file)file.value='';if(preview){preview.removeAttribute('src');preview.hidden=true;}document.getElementById('support-report-remove')?.setAttribute('hidden','');}
+async function supportScreenshotChanged(event){const file=event.target.files?.[0];if(!file)return;if(!/^image\/(png|jpeg|webp)$/i.test(file.type)){event.target.value='';return toast('Выбери PNG, JPG или WebP');}if(file.size>10*1024*1024){event.target.value='';return toast('Скриншот слишком большой');}try{supportScreenshotData=await compressPhoto(file);const approx=Math.ceil((supportScreenshotData.split(',')[1]||'').length*3/4);if(approx>4*1024*1024){clearSupportScreenshot();return toast('Не удалось уменьшить скриншот до 4 МБ');}const preview=document.getElementById('support-report-preview');preview.src=supportScreenshotData;preview.hidden=false;document.getElementById('support-report-remove')?.removeAttribute('hidden');}catch(_){clearSupportScreenshot();toast('Не удалось прочитать скриншот');}}
+async function submitSupportReport(){const message=(document.getElementById('support-report-message')?.value||'').trim(),category=document.getElementById('support-report-category')?.value||'problem',button=document.getElementById('support-report-send'),status=document.getElementById('support-report-status');if(message.length<5)return toast('Опиши проблему чуть подробнее');button.disabled=true;button.textContent='Отправляю…';status.textContent='Передаю обращение разработчику…';try{const response=await lumoTimeout(fetch(FAMILY_SERVER+'/support/report',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({userId:PUSH_USER_ID,deviceId:LUMO_DEVICE_ID,supportCode:LUMO_SUPPORT_CODE,category,message,screenshot:supportScreenshotData,platform:diagnosticPlatform(),appVersion:LUMO_APP_VERSION,page:location.pathname+location.search})}),15000,'Сервер не ответил');const data=await response.json().catch(()=>({}));if(!response.ok||!data.ok)throw new Error(data.error||'Не удалось отправить');status.textContent='✅ Сообщение и скриншот отправлены разработчику';toast('Обращение отправлено в Telegram');setTimeout(closeSupportReport,900);}catch(error){status.textContent=error.message||'Не удалось отправить обращение';toast(status.textContent);}finally{button.disabled=false;button.textContent='Отправить разработчику';}}
 
 
 function homeAssistantSubmit(){

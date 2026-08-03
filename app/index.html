@@ -15,7 +15,7 @@
 <link rel="manifest" href="manifest.json">
 <link rel="apple-touch-icon" sizes="512x512" href="assets/icons/icon.png">
 <link rel="icon" type="image/svg+xml" href="assets/icons/icon.svg">
-<link rel="stylesheet" href="assets/css/app.css?v=121">
+<link rel="stylesheet" href="assets/css/app.css?v=124">
 </head>
 <body>
   <svg width="0" height="0" style="position:absolute"><defs>
@@ -432,6 +432,17 @@
     <button class="btn" onclick="saveDataLink()">Добавить связь</button>
   </div>
 </div>
+<div class="modal" id="modal-support-report">
+  <div class="sheet support-report-sheet">
+    <div class="support-report-head"><span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a4 4 0 01-4 4H8l-5 3V7a4 4 0 014-4h10a4 4 0 014 4z"/><path d="M8 9h8M8 13h5"/></svg></span><div><h3>Написать разработчику</h3><small>Сообщение придёт напрямую в Telegram</small></div></div>
+    <div class="field"><label>Тип обращения</label><select id="support-report-category"><option value="problem">Проблема</option><option value="idea">Идея</option><option value="question">Вопрос</option></select></div>
+    <div class="field"><label>Что случилось?</label><textarea id="support-report-message" maxlength="1400" placeholder="Опиши, что нажал и что ожидал увидеть…"></textarea></div>
+    <div class="field"><label>Скриншот</label><div class="support-shot-actions"><button type="button" onclick="document.getElementById('support-report-file').click()">Прикрепить скриншот</button><button type="button" id="support-report-remove" onclick="clearSupportScreenshot()" hidden aria-label="Удалить скриншот">×</button></div><input id="support-report-file" type="file" accept="image/png,image/jpeg,image/webp" hidden onchange="supportScreenshotChanged(event)"><img class="support-report-preview" id="support-report-preview" alt="Предпросмотр скриншота" hidden></div>
+    <p class="support-report-note">Вместе с сообщением отправятся код поддержки, версия Lumo и тип устройства. Дела, финансы и личные данные не отправляются.</p>
+    <div class="support-report-status" id="support-report-status"></div>
+    <div class="support-report-actions"><button class="btn ghost" onclick="closeSupportReport()">Отмена</button><button class="btn" id="support-report-send" onclick="submitSupportReport()">Отправить разработчику</button></div>
+  </div>
+</div>
 <div class="modal" id="modal-dialog">
   <div class="sheet dialog-sheet">
     <h3 id="dialog-title">Подтверждение</h3>
@@ -455,7 +466,7 @@
 <div id="tour-layer" style="display:none"></div>
 
 <div class="toast" id="toast" role="status" aria-live="polite" aria-atomic="true"></div>
-<script src="assets/js/app.js?v=121"></script>
+<script src="assets/js/app.js?v=124"></script>
 
   <!-- МОДАЛКА АВТО-ПЛАТЕЖЕЙ -->
 <div class="modal" id="modal-autopay">

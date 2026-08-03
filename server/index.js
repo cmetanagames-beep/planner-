@@ -52,6 +52,7 @@ try { db.exec(`ALTER TABLE clientErrors ADD COLUMN resolvedAt INTEGER`); } catch
 db.exec(`CREATE TABLE IF NOT EXISTS systemState (key TEXT PRIMARY KEY, value TEXT, updatedAt INTEGER NOT NULL)`);
 db.exec(`CREATE TABLE IF NOT EXISTS developerAccess (id INTEGER PRIMARY KEY AUTOINCREMENT, ip TEXT, ok INTEGER NOT NULL, path TEXT, ts INTEGER NOT NULL)`);
 db.exec(`CREATE TABLE IF NOT EXISTS telegramLog (id INTEGER PRIMARY KEY AUTOINCREMENT, ok INTEGER NOT NULL, message TEXT, error TEXT, ts INTEGER NOT NULL)`);
+db.exec(`CREATE TABLE IF NOT EXISTS supportReports (id TEXT PRIMARY KEY, userId TEXT NOT NULL, supportCode TEXT, category TEXT, message TEXT NOT NULL, platform TEXT, appVersion TEXT, page TEXT, hasScreenshot INTEGER NOT NULL DEFAULT 0, delivered INTEGER NOT NULL DEFAULT 0, error TEXT, ts INTEGER NOT NULL)`);
 db.exec(`CREATE TABLE IF NOT EXISTS cloudData (code TEXT PRIMARY KEY, data TEXT NOT NULL, revision INTEGER NOT NULL DEFAULT 1, updatedAt INTEGER NOT NULL, updatedBy TEXT)`);
 db.exec(`CREATE TABLE IF NOT EXISTS cloudDevices (userId TEXT PRIMARY KEY, code TEXT NOT NULL)`);
 db.exec(`CREATE TABLE IF NOT EXISTS cloudHistory (id INTEGER PRIMARY KEY AUTOINCREMENT, code TEXT NOT NULL, revision INTEGER NOT NULL, data TEXT NOT NULL, createdAt INTEGER NOT NULL, reason TEXT)`);
@@ -132,7 +133,7 @@ function featureForPath(pathname) {
   return '';
 }
 app.use((req, res, next) => {
-  if (req.path.startsWith('/developer') || req.path.startsWith('/telemetry') || req.path === '/health' || req.path === '/app-status') return next();
+  if (req.path.startsWith('/developer') || req.path.startsWith('/telemetry') || req.path === '/health' || req.path === '/app-status' || req.path === '/support/report') return next();
   const state = getMaintenance(), feature = featureForPath(req.path);
   if (state.enabled || (feature && state.features?.[feature] === false)) {
     return res.status(503).json({ ok: false, maintenance: true, feature, message: state.message || 'Сервис временно обслуживается' });
@@ -140,7 +141,7 @@ app.use((req, res, next) => {
   next();
 });
 app.use((req,res,next)=>{
-  if(req.path.startsWith('/developer')||req.path==='/health'||req.path==='/app-status')return next();
+  if(req.path.startsWith('/developer')||req.path==='/health'||req.path==='/app-status'||req.path==='/support/report')return next();
   const userId=requestUserId(req),access=userAccessState(userId);
   if(access.blocked)return res.status(403).json({ok:false,blocked:true,reason:access.reason||'Доступ временно приостановлен. Обратитесь в поддержку Lumo.'});
   next();
@@ -228,20 +229,70 @@ const TELEGRAM_BOT_TOKEN = String(process.env.TELEGRAM_BOT_TOKEN || '');
 const TELEGRAM_ALLOWED_USERNAME = String(process.env.TELEGRAM_ALLOWED_USERNAME || 'EvgenAkfix').replace(/^@/, '').toLowerCase();
 let telegramBot = null;
 function telegramChatId() { return String(process.env.TELEGRAM_CHAT_ID || getSystemState('telegramChatId', '')); }
+function telegramCurl(args) {
+  return new Promise((resolve, reject) => {
+    const child = spawn('systemd-run', ['--user', '--wait', '--pipe', '--quiet', 'curl', '-4', '--silent', '--show-error', '--max-time', '15', ...args], { stdio: ['ignore', 'pipe', 'pipe'] });
+    const stdout = [], stderr = [];
+    child.stdout.on('data', chunk => stdout.push(chunk));
+    child.stderr.on('data', chunk => stderr.push(chunk));
+    child.on('error', reject);
+    child.on('close', code => {
+      const raw = Buffer.concat(stdout).toString('utf8'), errorText = Buffer.concat(stderr).toString('utf8').trim();
+      let payload = null;
+      try { payload = JSON.parse(raw); } catch (_) {}
+      if (code === 0 && payload?.ok) return resolve(payload.result);
+      reject(new Error(payload?.description || errorText || `Telegram curl ${code}`));
+    });
+  });
+}
+function telegramHttpJson(method, payload) {
+  return telegramCurl([
+    '-H', 'Content-Type: application/json',
+    '--data-binary', JSON.stringify(payload),
+    `https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/${method}`
+  ]);
+}
+async function telegramHttpPhoto(chatId, buffer, caption, mime) {
+  const ext = mime === 'image/png' ? 'png' : mime === 'image/webp' ? 'webp' : 'jpg';
+  const tempPath = path.join(tmpdir(), `lumo-report-${randomUUID()}.${ext}`);
+  writeFileSync(tempPath, buffer, { mode: 0o600 });
+  try {
+    return await telegramCurl([
+      '-F', `chat_id=${chatId}`,
+      '-F', `caption=${caption}`,
+      '-F', `photo=@${tempPath};filename=lumo-report.${ext};type=${mime}`,
+      `https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendPhoto`
+    ]);
+  } finally {
+    try { unlinkSync(tempPath); } catch (_) {}
+  }
+}
 async function telegramSend(text) {
   const chatId = telegramChatId();
   const message = String(text).slice(0, 3900);
-  if (!telegramBot || !chatId) {
+  if (!TELEGRAM_BOT_TOKEN || !chatId) {
     db.prepare('INSERT INTO telegramLog (ok,message,error,ts) VALUES (0,?,?,?)').run(message.slice(0, 240), 'not linked', Date.now());
     return false;
   }
   try {
-    await telegramBot.sendMessage(chatId, message, { disable_web_page_preview: true });
+    await telegramHttpJson('sendMessage', { chat_id: chatId, text: message, disable_web_page_preview: true });
     db.prepare('INSERT INTO telegramLog (ok,message,error,ts) VALUES (1,?,?,?)').run(message.slice(0, 240), '', Date.now());
     return true;
   } catch (error) {
     db.prepare('INSERT INTO telegramLog (ok,message,error,ts) VALUES (0,?,?,?)').run(message.slice(0, 240), String(error.message || '').slice(0, 300), Date.now());
     console.error('telegram alert failed:', error.message); return false;
+  }
+}
+async function telegramSendPhoto(buffer, caption, mime = 'image/jpeg') {
+  const chatId = telegramChatId(), message = String(caption || '').slice(0, 1000);
+  if (!TELEGRAM_BOT_TOKEN || !chatId) return false;
+  try {
+    await telegramHttpPhoto(chatId, buffer, message, mime);
+    db.prepare('INSERT INTO telegramLog (ok,message,error,ts) VALUES (1,?,?,?)').run(`Скриншот обращения · ${message}`.slice(0, 240), '', Date.now());
+    return true;
+  } catch (error) {
+    db.prepare('INSERT INTO telegramLog (ok,message,error,ts) VALUES (0,?,?,?)').run(`Скриншот обращения · ${message}`.slice(0, 240), String(error.message || '').slice(0, 300), Date.now());
+    console.error('telegram photo failed:', error.message); return false;
   }
 }
 async function raiseAlert(key, text, cooldownMs = 60 * 60 * 1000) {
@@ -251,12 +302,14 @@ async function raiseAlert(key, text, cooldownMs = 60 * 60 * 1000) {
   return false;
 }
 if (TELEGRAM_BOT_TOKEN) {
-  telegramBot = new TelegramBot(TELEGRAM_BOT_TOKEN, { polling: true });
+  // После первого /start chatId хранится в БД. Не держим лишний long-polling:
+  // у некоторых VPS его transport создаёт шквал неудачных fetch и мешает отправке.
+  telegramBot = new TelegramBot(TELEGRAM_BOT_TOKEN, { polling: !telegramChatId() });
   telegramBot.onText(/^\/start(?:\s|$)/, async msg => {
     const username = String(msg.from?.username || '').toLowerCase();
     if (username !== TELEGRAM_ALLOWED_USERNAME) return telegramBot.sendMessage(msg.chat.id, 'Доступ запрещён.');
     setSystemState('telegramChatId', msg.chat.id);
-    await telegramBot.sendMessage(msg.chat.id, '✅ Lumo Console подключена. Сюда будут приходить только технические тревоги.');
+    await telegramBot.sendMessage(msg.chat.id, '✅ Lumo Console подключена. Сюда будут приходить технические тревоги и обращения пользователей.');
   });
   telegramBot.on('polling_error', error => console.error('telegram polling:', error.message));
 }
@@ -347,6 +400,49 @@ app.post('/telemetry/push-state', (req, res) => {
   if (!['displayed', 'opened', 'suppressed','action'].includes(stage) || !b.traceKey) return res.status(400).json({ ok: false });
   traceNotification(b.traceKey, '', b.type, stage, cleanDiagnosticText(b.detail, 100));
   res.json({ ok: true });
+});
+
+const supportReportHits = new Map();
+function supportReportAllowed(req) {
+  const now = Date.now(), key = String(req.get('x-lumo-user') || req.ip || 'unknown').slice(0, 160);
+  const recent = (supportReportHits.get(key) || []).filter(ts => now - ts < 30 * 60 * 1000);
+  if (recent.length >= 5) return false;
+  recent.push(now); supportReportHits.set(key, recent); return true;
+}
+function decodeSupportScreenshot(value) {
+  if (!value) return null;
+  const match = String(value).match(/^data:(image\/(?:png|jpeg|webp));base64,([A-Za-z0-9+/=]+)$/i);
+  if (!match) throw Object.assign(new Error('Поддерживаются только PNG, JPG и WebP'), { status: 415 });
+  const buffer = Buffer.from(match[2], 'base64');
+  if (!buffer.length || buffer.length > 4 * 1024 * 1024) throw Object.assign(new Error('Скриншот должен быть меньше 4 МБ'), { status: 413 });
+  return { buffer, mime: match[1].toLowerCase() };
+}
+app.post('/support/report', async (req, res) => {
+  if (!supportReportAllowed(req)) return res.status(429).json({ ok: false, error: 'Слишком много обращений. Попробуй через 30 минут.' });
+  const b = req.body || {}, userId = requestUserId(req), message = cleanDiagnosticText(b.message, 1400);
+  if (message.length < 5) return res.status(400).json({ ok: false, error: 'Опиши проблему чуть подробнее' });
+  const category = ['problem', 'idea', 'question'].includes(String(b.category)) ? String(b.category) : 'problem';
+  const categoryLabel = { problem: 'Проблема', idea: 'Идея', question: 'Вопрос' }[category];
+  const health = db.prepare('SELECT supportCode,platform,appVersion FROM deviceHealth WHERE userId=? ORDER BY lastSeen DESC LIMIT 1').get(userId) || {};
+  const supportCode = String(health.supportCode || b.supportCode || '').toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 10) || 'БЕЗ КОДА';
+  const platform = cleanDiagnosticText(health.platform || b.platform, 80) || 'неизвестное устройство', appVersion = cleanDiagnosticText(health.appVersion || b.appVersion, 30) || 'неизвестна', page = cleanDiagnosticText(b.page, 180) || '/app/';
+  let screenshot = null;
+  try { screenshot = decodeSupportScreenshot(b.screenshot); }
+  catch (error) { return res.status(error.status || 400).json({ ok: false, error: error.message }); }
+  const reportId = randomUUID(), text = `💬 Новое обращение Lumo\nТип: ${categoryLabel}\nКод поддержки: ${supportCode}\nУстройство: ${platform}\nВерсия: ${appVersion}\nЭкран: ${page}\n\n${message}`;
+  let messageSent = false, photoSent = !screenshot, errorText = '';
+  try {
+    if (screenshot) {
+      photoSent = await telegramSendPhoto(screenshot.buffer, text.slice(0, 1000), screenshot.mime);
+      messageSent = photoSent;
+    } else {
+      messageSent = await telegramSend(text);
+    }
+    if (!messageSent || !photoSent) errorText = !telegramBot || !telegramChatId() ? 'Telegram не подключён' : 'Не все части обращения доставлены';
+  } catch (error) { errorText = String(error.message || error).slice(0, 300); }
+  const delivered = messageSent && photoSent;
+  db.prepare('INSERT INTO supportReports (id,userId,supportCode,category,message,platform,appVersion,page,hasScreenshot,delivered,error,ts) VALUES (?,?,?,?,?,?,?,?,?,?,?,?)').run(reportId, userId, supportCode, category, message, platform, appVersion, page, screenshot ? 1 : 0, delivered ? 1 : 0, errorText, Date.now());
+  res.status(delivered ? 200 : 503).json({ ok: delivered, saved: true, reportId, error: delivered ? '' : 'Обращение сохранено, но Telegram временно недоступен' });
 });
 
 app.post('/subscribe', (req, res) => {
