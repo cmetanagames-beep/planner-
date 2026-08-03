@@ -7,13 +7,15 @@ import TelegramBot from 'node-telegram-bot-api';
 import QRCode from 'qrcode';
 import { setDefaultResultOrder } from 'node:dns';
 import { spawn } from 'node:child_process';
-import { createHash, randomUUID, timingSafeEqual } from 'node:crypto';
+import { createHash, randomInt, randomUUID, timingSafeEqual } from 'node:crypto';
 import { existsSync, mkdirSync, readFileSync, readdirSync, statfsSync, statSync, unlinkSync, writeFileSync } from 'node:fs';
 import { cpus, freemem, loadavg, tmpdir, totalmem } from 'node:os';
 import path from 'node:path';
 setDefaultResultOrder('ipv4first');
 
 const app = express();
+app.disable('x-powered-by');
+app.set('trust proxy', 'loopback');
 const CLIENT_URL = String(process.env.CLIENT_URL || 'https://cmetanagames-beep.github.io/planner-/app/').trim();
 const CLIENT_ORIGINS = new Set(String(process.env.CLIENT_ORIGINS || 'https://cmetanagames-beep.github.io,https://pushevgen.duckdns.org,http://127.0.0.1:4177,http://localhost:4177')
   .split(',').map(value => value.trim().replace(/\/$/, '')).filter(Boolean));
@@ -24,6 +26,15 @@ app.use(cors({
   maxAge: 86400
 }));
 app.use(express.json({ limit: '8mb' }));
+app.use((req, res, next) => {
+  res.set({
+    'X-Content-Type-Options': 'nosniff',
+    'Referrer-Policy': 'no-referrer',
+    'Permissions-Policy': 'camera=(), geolocation=(), payment=()',
+    'Cross-Origin-Resource-Policy': 'same-site'
+  });
+  next();
+});
 const DEVELOPER_UI_DIR = process.env.DEVELOPER_UI_DIR || path.join(process.cwd(), 'dev');
 app.use('/dev', express.static(DEVELOPER_UI_DIR, { index: 'index.html', maxAge: '5m', fallthrough: true }));
 
@@ -55,6 +66,8 @@ db.exec(`CREATE TABLE IF NOT EXISTS telegramLog (id INTEGER PRIMARY KEY AUTOINCR
 db.exec(`CREATE TABLE IF NOT EXISTS supportReports (id TEXT PRIMARY KEY, userId TEXT NOT NULL, supportCode TEXT, category TEXT, message TEXT NOT NULL, platform TEXT, appVersion TEXT, page TEXT, hasScreenshot INTEGER NOT NULL DEFAULT 0, delivered INTEGER NOT NULL DEFAULT 0, error TEXT, ts INTEGER NOT NULL)`);
 db.exec(`CREATE TABLE IF NOT EXISTS cloudData (code TEXT PRIMARY KEY, data TEXT NOT NULL, revision INTEGER NOT NULL DEFAULT 1, updatedAt INTEGER NOT NULL, updatedBy TEXT)`);
 db.exec(`CREATE TABLE IF NOT EXISTS cloudDevices (userId TEXT PRIMARY KEY, code TEXT NOT NULL)`);
+db.exec(`CREATE TABLE IF NOT EXISTS cloudOwners (userId TEXT PRIMARY KEY, code TEXT NOT NULL)`);
+db.exec(`INSERT OR IGNORE INTO cloudOwners(userId,code) SELECT userId,code FROM cloudDevices`);
 db.exec(`CREATE TABLE IF NOT EXISTS cloudHistory (id INTEGER PRIMARY KEY AUTOINCREMENT, code TEXT NOT NULL, revision INTEGER NOT NULL, data TEXT NOT NULL, createdAt INTEGER NOT NULL, reason TEXT)`);
 db.exec(`CREATE TABLE IF NOT EXISTS cloudInvites (token TEXT PRIMARY KEY, code TEXT NOT NULL, createdBy TEXT, expiresAt INTEGER NOT NULL, usedAt INTEGER, usedBy TEXT)`);
 db.prepare('DELETE FROM cloudInvites WHERE expiresAt < ? OR usedAt IS NOT NULL').run(Date.now() - 24 * 60 * 60 * 1000);
@@ -95,7 +108,15 @@ function sameSecret(a, b) {
   const left = Buffer.from(String(a || '')), right = Buffer.from(String(b || ''));
   return left.length === right.length && left.length > 0 && timingSafeEqual(left, right);
 }
+const deviceRegistrationHits = new Map();
+function deviceRegistrationAllowed(req) {
+  const now = Date.now(), key = String(req.ip || 'unknown').slice(0, 80);
+  const recent = (deviceRegistrationHits.get(key) || []).filter(ts => now - ts < 60 * 60 * 1000);
+  if (recent.length >= 30) return false;
+  recent.push(now); deviceRegistrationHits.set(key, recent); return true;
+}
 app.post('/device/register', (req, res) => {
+  if (!deviceRegistrationAllowed(req)) return res.status(429).json({ ok: false, error: 'device registration rate limit', retryAfter: 3600 });
   const userId = String(req.body?.userId || '').slice(0, 160), token = String(req.body?.token || '');
   if (!validDeviceCredential(userId, token)) return res.status(400).json({ ok: false, error: 'invalid device credential' });
   const tokenHash = deviceTokenHash(token), existing = db.prepare('SELECT tokenHash FROM deviceAuth WHERE userId=?').get(userId), now = Date.now();
@@ -157,7 +178,17 @@ function getSub(userId) {
 function deleteSub(userId) {
   db.prepare('DELETE FROM subs WHERE userId = ?').run(userId);
 }
-function validSubscription(subscription){return !!(subscription?.endpoint&&subscription?.keys?.auth&&subscription?.keys?.p256dh);}
+const WEB_PUSH_HOSTS = String(process.env.WEB_PUSH_HOSTS || 'googleapis.com,mozilla.com,apple.com,windows.com')
+  .split(',').map(value => value.trim().toLowerCase()).filter(Boolean);
+function validSubscription(subscription) {
+  try {
+    const endpoint = new URL(String(subscription?.endpoint || ''));
+    const host = endpoint.hostname.toLowerCase(), auth = String(subscription?.keys?.auth || ''), p256dh = String(subscription?.keys?.p256dh || '');
+    const allowedHost = WEB_PUSH_HOSTS.some(suffix => host === suffix || host.endsWith(`.${suffix}`));
+    return endpoint.protocol === 'https:' && !endpoint.username && !endpoint.password && endpoint.href.length <= 2048 && allowedHost
+      && /^[A-Za-z0-9_-]{8,256}$/.test(auth) && /^[A-Za-z0-9_-]{32,512}$/.test(p256dh);
+  } catch (_) { return false; }
+}
 
 function saveUserData(userId, u) {
   db.prepare(`INSERT INTO userData (userId, tasks, notifyHour, tzOffset, sentKeys, reminders) VALUES (?, ?, ?, ?, ?, ?) ON CONFLICT(userId) DO UPDATE SET tasks = excluded.tasks, notifyHour = excluded.notifyHour, tzOffset = excluded.tzOffset, sentKeys = excluded.sentKeys, reminders = excluded.reminders`).run(
@@ -188,9 +219,21 @@ function getAllUserData() {
 function makeFamilyCode() {
   const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
   let code = '';
-  for (let i = 0; i < 4; i++) code += chars[Math.floor(Math.random() * chars.length)];
+  for (let i = 0; i < 8; i++) code += chars[randomInt(chars.length)];
   return code;
 }
+function migrateShortFamilyCodes() {
+  const legacy = db.prepare('SELECT DISTINCT familyCode FROM familyMembers WHERE length(familyCode) < 8').all();
+  const migrate = db.transaction(oldCode => {
+    let nextCode;
+    do { nextCode = makeFamilyCode(); } while (db.prepare('SELECT 1 FROM familyMembers WHERE familyCode=?').get(nextCode));
+    db.prepare('UPDATE familyMembers SET familyCode=? WHERE familyCode=?').run(nextCode, oldCode);
+    db.prepare('UPDATE shopping SET familyCode=? WHERE familyCode=?').run(nextCode, oldCode);
+    db.prepare('UPDATE eventFeed SET familyCode=? WHERE familyCode=?').run(nextCode, oldCode);
+  });
+  for (const row of legacy) migrate(row.familyCode);
+}
+migrateShortFamilyCodes();
 function saveMember(userId, familyCode, name, role) {
   db.prepare(`INSERT INTO familyMembers (userId, familyCode, name, role) VALUES (?, ?, ?, ?) ON CONFLICT(userId) DO UPDATE SET familyCode = excluded.familyCode, name = excluded.name, role = excluded.role`).run(userId, familyCode, name, role || 'other');
 }
@@ -229,14 +272,17 @@ const TELEGRAM_BOT_TOKEN = String(process.env.TELEGRAM_BOT_TOKEN || '');
 const TELEGRAM_ALLOWED_USERNAME = String(process.env.TELEGRAM_ALLOWED_USERNAME || 'EvgenAkfix').replace(/^@/, '').toLowerCase();
 let telegramBot = null;
 function telegramChatId() { return String(process.env.TELEGRAM_CHAT_ID || getSystemState('telegramChatId', '')); }
-function telegramCurl(args) {
+function telegramCurl(method, args) {
   return new Promise((resolve, reject) => {
-    const child = spawn('systemd-run', ['--user', '--wait', '--pipe', '--quiet', 'curl', '-4', '--silent', '--show-error', '--max-time', '15', ...args], { stdio: ['ignore', 'pipe', 'pipe'] });
+    const configPath=path.join(tmpdir(),`lumo-telegram-${randomUUID()}.conf`);
+    writeFileSync(configPath,`url = "https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/${method}"\nsilent\nshow-error\nmax-time = 15\n`,{mode:0o600,flag:'wx'});
+    const child = spawn('systemd-run', ['--user', '--wait', '--pipe', '--quiet', 'curl', '-4', '--config', configPath, ...args], { stdio: ['ignore', 'pipe', 'pipe'] });
     const stdout = [], stderr = [];
     child.stdout.on('data', chunk => stdout.push(chunk));
     child.stderr.on('data', chunk => stderr.push(chunk));
-    child.on('error', reject);
+    child.on('error', error => { try{unlinkSync(configPath)}catch(_){} reject(error); });
     child.on('close', code => {
+      try{unlinkSync(configPath)}catch(_){}
       const raw = Buffer.concat(stdout).toString('utf8'), errorText = Buffer.concat(stderr).toString('utf8').trim();
       let payload = null;
       try { payload = JSON.parse(raw); } catch (_) {}
@@ -246,25 +292,24 @@ function telegramCurl(args) {
   });
 }
 function telegramHttpJson(method, payload) {
-  return telegramCurl([
-    '-H', 'Content-Type: application/json',
-    '--data-binary', JSON.stringify(payload),
-    `https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/${method}`
-  ]);
+  const payloadPath=path.join(tmpdir(),`lumo-telegram-payload-${randomUUID()}.json`);
+  writeFileSync(payloadPath,JSON.stringify(payload),{mode:0o600,flag:'wx'});
+  return telegramCurl(method, ['-H','Content-Type: application/json','--data-binary',`@${payloadPath}`])
+    .finally(()=>{try{unlinkSync(payloadPath)}catch(_){}});
 }
 async function telegramHttpPhoto(chatId, buffer, caption, mime) {
   const ext = mime === 'image/png' ? 'png' : mime === 'image/webp' ? 'webp' : 'jpg';
-  const tempPath = path.join(tmpdir(), `lumo-report-${randomUUID()}.${ext}`);
+  const id=randomUUID(),tempPath = path.join(tmpdir(), `lumo-report-${id}.${ext}`),chatPath=path.join(tmpdir(),`lumo-chat-${id}.txt`),captionPath=path.join(tmpdir(),`lumo-caption-${id}.txt`);
   writeFileSync(tempPath, buffer, { mode: 0o600 });
+  writeFileSync(chatPath,String(chatId),{mode:0o600});writeFileSync(captionPath,String(caption),{mode:0o600});
   try {
-    return await telegramCurl([
-      '-F', `chat_id=${chatId}`,
-      '-F', `caption=${caption}`,
+    return await telegramCurl('sendPhoto',[
+      '-F', `chat_id=<${chatPath}`,
+      '-F', `caption=<${captionPath}`,
       '-F', `photo=@${tempPath};filename=lumo-report.${ext};type=${mime}`,
-      `https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendPhoto`
     ]);
   } finally {
-    try { unlinkSync(tempPath); } catch (_) {}
+    for(const file of [tempPath,chatPath,captionPath])try { unlinkSync(file); } catch (_) {}
   }
 }
 async function telegramSend(text) {
@@ -454,20 +499,38 @@ app.post('/subscribe', (req, res) => {
 });
 
 const cloudHits = new Map();
+const cloudCreateHits = new Map();
 app.use('/cloud', (req, res, next) => {
-  const now=Date.now(), key=`${String(req.ip||'ip').slice(0,80)}:${String(req.body?.userId||'').slice(0,120)}`;
+  const now=Date.now(), key=String(req.ip||'ip').slice(0,80);
   const recent=(cloudHits.get(key)||[]).filter(ts=>now-ts<10*60*1000);
-  if(recent.length>=240)return res.status(429).json({ok:false,err:'Слишком много запросов синхронизации',retryAfter:60});
+  if(recent.length>=120)return res.status(429).json({ok:false,err:'Слишком много запросов синхронизации',retryAfter:600});
   recent.push(now);cloudHits.set(key,recent);next();
 });
 function validCloudPayload(data){try{const raw=JSON.stringify(data);return !!data&&raw.length>20&&raw.length<=6*1024*1024;}catch(_){return false;}}
+function removeOrphanCloud(code) {
+  if (!code || db.prepare('SELECT 1 FROM cloudDevices WHERE code=? LIMIT 1').get(code) || db.prepare('SELECT 1 FROM cloudOwners WHERE code=? LIMIT 1').get(code)) return;
+  db.transaction(() => {
+    db.prepare('DELETE FROM cloudInvites WHERE code=?').run(code);
+    db.prepare('DELETE FROM cloudHistory WHERE code=?').run(code);
+    db.prepare('DELETE FROM cloudData WHERE code=?').run(code);
+  })();
+}
 
 app.post('/cloud/create', (req, res) => {
   const { userId, data } = req.body || {};
   if (!userId || !validCloudPayload(data)) return res.status(400).json({ ok: false, err: 'нет данных или копия слишком большая' });
+  const existingLink = db.prepare('SELECT code FROM cloudOwners WHERE userId=?').get(userId) || db.prepare('SELECT code FROM cloudDevices WHERE userId=?').get(userId);
+  if (existingLink) {
+    const existing = db.prepare('SELECT code,revision,updatedAt FROM cloudData WHERE code=?').get(existingLink.code);
+    if (existing) { db.prepare('INSERT INTO cloudDevices(userId,code) VALUES(?,?) ON CONFLICT(userId) DO UPDATE SET code=excluded.code').run(userId,existing.code); return res.json({ ok: true, ...existing, existing: true }); }
+  }
+  const nowHit=Date.now(),hitKey=String(req.ip||'unknown').slice(0,80),recent=(cloudCreateHits.get(hitKey)||[]).filter(ts=>nowHit-ts<60*60*1000);
+  if(recent.length>=5)return res.status(429).json({ok:false,err:'Лимит создания облачных копий. Повтори через час.',retryAfter:3600});
+  recent.push(nowHit);cloudCreateHits.set(hitKey,recent);
   const code = makeSyncCode(), now = Date.now();
   db.prepare('INSERT INTO cloudData (code, data, revision, updatedAt, updatedBy) VALUES (?, ?, 1, ?, ?)').run(code, JSON.stringify(data), now, userId);
   db.prepare('INSERT INTO cloudDevices (userId, code) VALUES (?, ?) ON CONFLICT(userId) DO UPDATE SET code=excluded.code').run(userId, code);
+  db.prepare('INSERT INTO cloudOwners (userId, code) VALUES (?, ?) ON CONFLICT(userId) DO UPDATE SET code=excluded.code').run(userId, code);
   res.json({ ok: true, code, revision: 1, updatedAt: now });
 });
 
@@ -475,7 +538,10 @@ app.post('/cloud/connect', (req, res) => {
   const userId = String(req.body?.userId || ''), code = String(req.body?.code || '').toUpperCase().replace(/[^A-Z0-9]/g, '');
   const row = db.prepare('SELECT code, revision, updatedAt FROM cloudData WHERE code = ?').get(code);
   if (!userId || !row) return res.json({ ok: false, err: 'Код синхронизации не найден' });
+  const previous = db.prepare('SELECT code FROM cloudDevices WHERE userId=?').get(userId)?.code;
   db.prepare('INSERT INTO cloudDevices (userId, code) VALUES (?, ?) ON CONFLICT(userId) DO UPDATE SET code=excluded.code').run(userId, code);
+  if(!db.prepare('SELECT 1 FROM cloudOwners WHERE code=? LIMIT 1').get(code))db.prepare('INSERT INTO cloudOwners(userId,code) VALUES(?,?) ON CONFLICT(userId) DO UPDATE SET code=excluded.code').run(userId,code);
+  if (previous && previous !== code) removeOrphanCloud(previous);
   res.json({ ok: true, code, revision: row.revision, updatedAt: row.updatedAt });
 });
 
@@ -497,7 +563,9 @@ app.post('/cloud/invite/use', (req, res) => {
   if(!row)return res.status(404).json({ok:false,err:'Облачная копия не найдена'});
   const used=db.prepare('UPDATE cloudInvites SET usedAt=?,usedBy=? WHERE token=? AND usedAt IS NULL').run(Date.now(),userId,token);
   if(!used.changes)return res.status(409).json({ok:false,err:'Приглашение уже использовано'});
+  const previous=db.prepare('SELECT code FROM cloudDevices WHERE userId=?').get(userId)?.code;
   db.prepare('INSERT INTO cloudDevices (userId,code) VALUES (?,?) ON CONFLICT(userId) DO UPDATE SET code=excluded.code').run(userId,invite.code);
+  if(previous&&previous!==invite.code)removeOrphanCloud(previous);
   res.json({ok:true,code:invite.code,revision:row.revision,updatedAt:row.updatedAt});
 });
 
@@ -522,7 +590,9 @@ app.post('/cloud/sync', (req, res) => {
 });
 
 app.post('/cloud/disconnect', (req, res) => {
-  db.prepare('DELETE FROM cloudDevices WHERE userId = ?').run(req.body?.userId || '');
+  const userId=req.body?.userId||'',previous=db.prepare('SELECT code FROM cloudDevices WHERE userId=?').get(userId)?.code;
+  db.prepare('DELETE FROM cloudDevices WHERE userId = ?').run(userId);
+  removeOrphanCloud(previous);
   res.json({ ok: true });
 });
 
@@ -582,7 +652,14 @@ app.post('/family/create', (req, res) => {
   res.json({ ok: true, familyCode: code, name });
 });
 
+const familyJoinHits = new Map();
+function familyJoinAllowed(req) {
+  const now=Date.now(),key=String(req.ip||'unknown').slice(0,80),recent=(familyJoinHits.get(key)||[]).filter(ts=>now-ts<15*60*1000);
+  if(recent.length>=10)return false;
+  recent.push(now);familyJoinHits.set(key,recent);return true;
+}
 app.post('/family/join', (req, res) => {
+  if(!familyJoinAllowed(req))return res.status(429).json({ok:false,err:'Слишком много попыток. Повтори через 15 минут.',retryAfter:900});
   const { userId, name, role, familyCode } = req.body;
   if (!userId || !name || !familyCode) return res.json({ ok: false, err: 'нет данных' });
   const code = String(familyCode).trim().toUpperCase();
@@ -624,20 +701,28 @@ app.post('/family/assign', async (req, res) => {
   if (!recipient || recipient.familyCode !== me.familyCode) {
     return res.json({ ok: false, err: 'получатель не в твоей семье' });
   }
+  const cleanTask={
+    title:String(task.title||'').trim().slice(0,240),desc:String(task.desc||'').slice(0,1200),
+    date:/^\d{4}-\d{2}-\d{2}$/.test(String(task.date||''))?String(task.date):'',
+    time:/^(?:[01]\d|2[0-3]):[0-5]\d$/.test(String(task.time||''))?String(task.time):'',
+    pri:['R','Y','B'].includes(task.pri)?task.pri:'Y',module:/^[A-Za-z0-9_-]{1,60}$/.test(String(task.module||''))?String(task.module):'personal',
+    clientEventId:String(task.clientEventId||'').replace(/[^A-Za-z0-9:_-]/g,'').slice(0,180)
+  };
+  if(!cleanTask.title)return res.status(400).json({ok:false,err:'Название поручения пустое'});
   const fromName = me.name || 'Кто-то';
-  const eventId = String(notification?.eventId || task.clientEventId || ('assign_' + Date.now())).slice(0, 180);
+  const eventId = String(notification?.eventId || cleanTask.clientEventId || ('assign_' + Date.now())).replace(/[^A-Za-z0-9:_-]/g,'').slice(0,180);
   const inboxId = 'inbox_' + eventId;
   if (!claimPushEvent(eventId)) return res.json({ ok: true, duplicate: true, assignId: inboxId });
   db.prepare('INSERT OR IGNORE INTO inbox (id, toUserId, fromUserId, fromName, task, ts) VALUES (?, ?, ?, ?, ?, ?)')
-    .run(inboxId, toUserId, userId, fromName, JSON.stringify(task), Date.now());
-  addFeedEvent(toUserId, me.familyCode, 'assignment', 'Новое поручение', fromName + ': ' + (task.title || 'Задача'), { assignId: inboxId, fromUserId: userId }, eventId);
+    .run(inboxId, toUserId, userId, fromName, JSON.stringify(cleanTask), Date.now());
+  addFeedEvent(toUserId, me.familyCode, 'assignment', 'Новое поручение', fromName + ': ' + cleanTask.title, { assignId: inboxId, fromUserId: userId }, eventId);
   await sendPush(toUserId, {
     type: 'family-task',
     eventId,
     taskId: inboxId,
     assignId: inboxId,
     title: notification?.title || ('📥 Новое поручение от ' + fromName),
-    body: notification?.body || (task.title || 'Задача')
+    body: String(notification?.body || cleanTask.title).slice(0,500)
   });
   console.log(fromName + ' поручил задачу пользователю ' + toUserId);
   res.json({ ok: true, assignId: inboxId });
@@ -712,11 +797,13 @@ app.post('/rating', (req, res) => {
 });
 
 app.post('/task-done', async (req, res) => {
-  const { fromUserId, byName, title } = req.body;
-  if (fromUserId) {
-    await sendPush(fromUserId, 'Поручение выполнено',
-      (byName || 'Кто-то') + ' сделал(а): ' + (title || 'задачу'));
-  }
+  const { fromUserId, assignId, title } = req.body, userId = requestUserId(req);
+  const assignment = db.prepare('SELECT id,fromUserId,task FROM inbox WHERE id=? AND toUserId=? AND fromUserId=?').get(String(assignId||''), userId, String(fromUserId||''));
+  if (!assignment) return res.status(403).json({ ok: false, err: 'поручение не найдено или недоступно' });
+  const me=getMember(userId),sender=getMember(fromUserId);
+  if(!me||!sender||me.familyCode!==sender.familyCode)return res.status(403).json({ok:false,err:'участники не состоят в одной семье'});
+  let savedTitle=title||'задачу';try{savedTitle=JSON.parse(assignment.task||'{}').title||savedTitle}catch(_){}
+  await sendPush(fromUserId, 'Поручение выполнено', (me.name || 'Участник семьи') + ' сделал(а): ' + savedTitle);
   res.json({ ok: true });
 });
 
@@ -745,7 +832,12 @@ app.post('/shopping/set', async (req, res) => {
   const { userId, items, event } = req.body;
   const me = getMember(userId);
   if (!me) return res.json({ ok: false, err: 'ты не в семье' });
-  const nextItems = Array.isArray(items) ? items : [];
+  const nextItems = (Array.isArray(items) ? items : []).slice(0,500).map((item,index)=>({
+    id:/^[A-Za-z0-9_-]{1,80}$/.test(String(item?.id??''))?String(item.id):`${Date.now()}_${index}`,
+    t:String(item?.t||'').trim().slice(0,300),done:!!item?.done,by:String(item?.by||'').slice(0,120),
+    byUserId:String(item?.byUserId||'').slice(0,160),familyEventId:String(item?.familyEventId||'').replace(/[^A-Za-z0-9:_-]/g,'').slice(0,180),
+    createdAt:Number.isFinite(Number(item?.createdAt))?Number(item.createdAt):Date.now(),updatedAt:Number.isFinite(Number(item?.updatedAt))?Number(item.updatedAt):Date.now()
+  })).filter(item=>item.t);
   const previousRow = db.prepare('SELECT items FROM shopping WHERE familyCode = ?').get(me.familyCode);
   let previousItems = [];
   try { previousItems = previousRow ? JSON.parse(previousRow.items || '[]') : []; } catch (e) {}
@@ -1181,11 +1273,14 @@ app.post('/schedule-morning', express.json(), async (req, res) => {
   }
 
   saveSub(userId, subscription);
-  const id = String(scheduleId || (type + ':' + userId)).slice(0, 180);
+  const safeType=String(type||'morning').replace(/[^a-z0-9-]/gi,'').slice(0,40)||'morning';
+  const requested=String(scheduleId||'').replace(/[^A-Za-z0-9:_-]/g,'').slice(0,180),suffix=`:${userId}`;
+  const id=requested.endsWith(suffix)?requested:`${safeType}:${userId}`;
+  const safeHour=Math.max(0,Math.min(23,Number(hour)||0)),safeMinute=Math.max(0,Math.min(59,Number(minute)||0));
   db.prepare(`INSERT INTO scheduledPush (scheduleId,userId,type,title,body,prompt,hour,minute,tzOffset,enabled,lastSentDay)
     VALUES (?,?,?,?,?,?,?,?,?,?,COALESCE((SELECT lastSentDay FROM scheduledPush WHERE scheduleId = ?),''))
     ON CONFLICT(scheduleId) DO UPDATE SET userId=excluded.userId,type=excluded.type,title=excluded.title,body=excluded.body,prompt=excluded.prompt,hour=excluded.hour,minute=excluded.minute,tzOffset=excluded.tzOffset,enabled=excluded.enabled`)
-    .run(id,userId,type||'morning',title||'',body||'',prompt||'',Number(hour)||0,Number(minute)||0,typeof tzOffset==='number'?tzOffset:180,enabled===false?0:1,id);
+    .run(id,userId,safeType,String(title||'').slice(0,160),String(body||'').slice(0,500),String(prompt||'').slice(0,500),safeHour,safeMinute,typeof tzOffset==='number'?Math.max(-720,Math.min(840,tzOffset)):180,enabled===false?0:1,id);
   setTimeout(runReminderScheduler, 0);
   res.json({ ok: true, scheduleId: id, persistent: true });
 }); 
@@ -1215,7 +1310,7 @@ setInterval(monitorSystemHealth, 5 * 60 * 1000);
 setTimeout(monitorSystemHealth, 5000);
 setInterval(()=>{
   const cutoff=Date.now()-24*60*60*1000;
-  for(const map of [telemetryHits,voiceHits,cloudHits,developerAttempts])for(const [key,list] of map)if(!(list||[]).some(ts=>ts>=cutoff))map.delete(key);
+  for(const map of [telemetryHits,voiceHits,cloudHits,cloudCreateHits,developerAttempts,deviceRegistrationHits,familyJoinHits,supportReportHits])for(const [key,list] of map)if(!(list||[]).some(ts=>ts>=cutoff))map.delete(key);
   for(const [key,ts] of developerSuccessSeen)if(ts<cutoff)developerSuccessSeen.delete(key);
 },60*60*1000).unref();
 app.listen(PORT, () => console.log('Сервер запущен на порту', PORT));

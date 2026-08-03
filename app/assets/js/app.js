@@ -225,6 +225,7 @@ let currentTab='all',currentPri='Y',editId=null,expType='exp',finDate=new Date()
 let expShared=false, editFinId=null, editFinType=null;
 
 function esc(s){return String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
+function isSafeImageDataUrl(value){return typeof value==='string'&&value.length<=6*1024*1024&&/^data:image\/(?:png|jpeg|webp);base64,[A-Za-z0-9+/=]+$/i.test(value)}
 function jsArg(s){
   return JSON.stringify(String(s==null?'':s))
     .replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'\\u003c');
@@ -574,7 +575,7 @@ function taskCardHTML(t, isFam){
       <div class="t-meta"><span>${modLabel[t.module]||'📋 Личное'}</span>${fromBadge}${t.date?`<span class="${over?'overdue-badge':''}">📅 ${fmtDate(t.date)}</span>`:''}${t.time?`<span class="time-badge">🕐 ${esc(t.time)}</span>`:''}${t.duration?`<span>⏱ ${Number(t.duration)} мин</span>`:''}${t.energy?`<span>${t.energy==='high'?'⚡':t.energy==='low'?'🌿':'◐'} ${t.energy==='high'?'много':t.energy==='low'?'мало':'средне'}</span>`:''}${t.repeat?`<span class="rep-badge">🔁 ${t.repeat==='daily'?'день':t.repeat==='weekly'?'нед':'мес'}</span>`:''}${subs.length?`<span class="subprog">✅ ${sdone}/${subs.length}</span>`:''}</div>
       ${t.desc?`<div class="t-desc">${esc(t.desc)}</div>`:''}
 	  ${relatedLinksHTML('task',t.id)}
-	  ${(t.photos&&t.photos.length)?`<div class="task-photos">${t.photos.map((p,i)=>`<img class="task-photo" src="${p}" onclick="openTaskPhoto(${t.id},${i})">`).join('')}</div>`:''}
+	  ${(t.photos&&t.photos.length)?`<div class="task-photos">${t.photos.filter(isSafeImageDataUrl).map((p,i)=>`<img class="task-photo" src="${esc(p)}" onclick="openTaskPhoto(${jsArg(t.id)},${i})">`).join('')}</div>`:''}
       ${subs.length?`<div class="subtasks">${subs.map((s,i)=>`<div class="subtask ${s.done?'done':''}"><div class="sc ${s.done?'on':''}" onclick="toggleSubtask(${t.id},${i})">${s.done?'✓':''}</div><span>${esc(s.t)}</span></div>`).join('')}</div>`:''}
     </div>
     <button class="task-more" onclick="event.stopPropagation();toggleTaskActions(this)" aria-label="Действия">${ICONS.more}</button>
@@ -1830,6 +1831,7 @@ async function closeReceiptScanner(){
 }
 function receiptFilePicked(ev){
   receiptFile=ev.target.files?.[0]||null;if(!receiptFile)return;
+  if(!/^image\/(?:jpeg|png|webp)$/i.test(receiptFile.type)||receiptFile.size>12*1024*1024){receiptFile=null;ev.target.value='';toast('Выбери JPG, PNG или WebP до 12 МБ');return;}
   const img=document.getElementById('receipt-preview');img.src=URL.createObjectURL(receiptFile);img.style.display='block';
   document.getElementById('receipt-scan-btn').disabled=false;setReceiptProgress(0,'Фото готово к распознаванию');
 }
@@ -1848,14 +1850,15 @@ function loadReceiptOCR(){
   if(window.Tesseract)return Promise.resolve();
   return new Promise((resolve,reject)=>{
     const old=document.getElementById('tesseract-loader');if(old){old.addEventListener('load',resolve,{once:true});old.addEventListener('error',reject,{once:true});return;}
-    const s=document.createElement('script');s.id='tesseract-loader';s.src='https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js';s.onload=resolve;s.onerror=()=>reject(new Error('Не удалось загрузить локальный OCR'));document.head.appendChild(s);
+    const s=document.createElement('script');s.id='tesseract-loader';s.src='./assets/vendor/tesseract-5.1.1.min.js';s.onload=resolve;s.onerror=()=>reject(new Error('Не удалось загрузить локальный OCR'));document.head.appendChild(s);
   });
 }
 function prepareReceiptImage(file){
   return new Promise((resolve,reject)=>{
     const img=new Image(),url=URL.createObjectURL(file);
     img.onload=()=>{
-      const scale=Math.min(3,Math.max(1,1600/img.naturalWidth)),w=Math.max(1,Math.round(img.naturalWidth*scale)),h=Math.max(1,Math.round(img.naturalHeight*scale));
+      const pixels=img.naturalWidth*img.naturalHeight;if(!pixels||pixels>40*1000*1000){URL.revokeObjectURL(url);return reject(new Error('Изображение слишком большое'));}
+      const scale=Math.min(1,1600/Math.max(img.naturalWidth,img.naturalHeight)),w=Math.max(1,Math.round(img.naturalWidth*scale)),h=Math.max(1,Math.round(img.naturalHeight*scale));
       const c=document.createElement('canvas');c.width=w;c.height=h;const ctx=c.getContext('2d',{willReadFrequently:true});ctx.drawImage(img,0,0,w,h);
       const d=ctx.getImageData(0,0,w,h);
       for(let i=0;i<d.data.length;i+=4){const g=.299*d.data[i]+.587*d.data[i+1]+.114*d.data[i+2];const v=Math.max(0,Math.min(255,(g-128)*1.35+128));d.data[i]=d.data[i+1]=d.data[i+2]=v;}
@@ -2322,14 +2325,14 @@ function closeDeviceInvite(){document.getElementById('modal-device-invite').clas
 async function shareDeviceInvite(){if(!deviceInvite)return;const text='Подключи это устройство к моей Lumo. Ссылка одноразовая и действует 15 минут.';try{if(navigator.share)await navigator.share({title:'Подключение Lumo',text,url:deviceInvite.url});else{await navigator.clipboard.writeText(deviceInvite.url);toast('Ссылка скопирована');}}catch(e){if(e?.name!=='AbortError')toast('Не удалось поделиться ссылкой');}}
 async function acceptCloudInvite(token){if(!await lumoConfirm('Это устройство получит общие дела, покупки, финансы, заметки и настройки.','Подключить к Lumo','Подключить'))return;try{const r=await fetch(FAMILY_SERVER+'/cloud/invite/use',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({userId:PUSH_USER_ID,token})}),d=await r.json();if(!d.ok)throw new Error(d.err);localStorage.setItem(CLOUD_CODE_KEY,d.code);localStorage.setItem(CLOUD_REV_KEY,d.revision);localStorage.setItem('lumo_cloud_dirty_v1','0');await cloudSyncNow(true,'pull');cloudStatusText();toast('Второе устройство подключено');}catch(e){toast(e.message||'Приглашение недействительно');}}
 async function disconnectCloudSync(){if(!localStorage.getItem(CLOUD_CODE_KEY))return;await fetch(FAMILY_SERVER+'/cloud/disconnect',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({userId:PUSH_USER_ID})}).catch(()=>{});localStorage.removeItem(CLOUD_CODE_KEY);localStorage.removeItem(CLOUD_REV_KEY);localStorage.removeItem('lumo_cloud_dirty_v1');cloudStatusText();toast('Синхронизация отключена на этом устройстве');}
-function applyCloudPayload(payload){if(!payload?.planner)return;window.__lumoCloudApplying=true;try{localStorage.setItem(KEY,JSON.stringify(payload.planner));if(payload.assistantMemory)localStorage.setItem(LOCAL_MEMORY_KEY,JSON.stringify(payload.assistantMemory));}finally{window.__lumoCloudApplying=false;}localStorage.setItem('lumo_cloud_dirty_v1','0');applyTheme();applyAccent();refreshCurrentTab();}
-function mergeCloudPayload(local,remote){const a=local?.planner||{},b=remote?.planner||{},out={...b,...a};['tasks','finance','income','notes','habits','shopping','cats','expCats','goals'].forEach(key=>{if(Array.isArray(a[key])||Array.isArray(b[key])){const map=new Map();[...(b[key]||[]),...(a[key]||[])].forEach((x,i)=>map.set(String(x?.id??x?.name??i),x));out[key]=[...map.values()];}});return {planner:out,assistantMemory:{taskModules:{...(remote?.assistantMemory?.taskModules||{}),...(local?.assistantMemory?.taskModules||{})},expenseCategories:{...(remote?.assistantMemory?.expenseCategories||{}),...(local?.assistantMemory?.expenseCategories||{})},phrases:{...(remote?.assistantMemory?.phrases||{}),...(local?.assistantMemory?.phrases||{})}},savedAt:Date.now()};}
+function applyCloudPayload(payload){const planner=normalizePlannerData(payload?.planner);if(!planner)throw new Error('Облачная копия повреждена');window.__lumoCloudApplying=true;try{localStorage.setItem(KEY,JSON.stringify(planner));if(payload.assistantMemory&&isSafeDataTree(payload.assistantMemory))localStorage.setItem(LOCAL_MEMORY_KEY,JSON.stringify(payload.assistantMemory));}finally{window.__lumoCloudApplying=false;}localStorage.setItem('lumo_cloud_dirty_v1','0');applyTheme();applyAccent();refreshCurrentTab();return true;}
+function mergeCloudPayload(local,remote){const a=normalizePlannerData(local?.planner)||{},b=normalizePlannerData(remote?.planner)||{},out={...b,...a};['tasks','finance','income','notes','habits','shopping','cats','expCats','goals'].forEach(key=>{if(Array.isArray(a[key])||Array.isArray(b[key])){const map=new Map();[...(b[key]||[]),...(a[key]||[])].forEach((x,i)=>map.set(String(x?.id??x?.name??i),x));out[key]=[...map.values()];}});return {planner:normalizePlannerData(out)||{},assistantMemory:{taskModules:{...(remote?.assistantMemory?.taskModules||{}),...(local?.assistantMemory?.taskModules||{})},expenseCategories:{...(remote?.assistantMemory?.expenseCategories||{}),...(local?.assistantMemory?.expenseCategories||{})},phrases:{...(remote?.assistantMemory?.phrases||{}),...(local?.assistantMemory?.phrases||{})}},savedAt:Date.now()};}
 async function cloudSyncNow(showToast=false,forcedAction=''){if(!localStorage.getItem(CLOUD_CODE_KEY))return showToast&&toast('Сначала подключи синхронизацию');const dirty=localStorage.getItem('lumo_cloud_dirty_v1')==='1',action=forcedAction||(dirty?'push':'pull');try{const body={userId:PUSH_USER_ID,baseRevision:Number(localStorage.getItem(CLOUD_REV_KEY)||0),action};if(action!=='pull')body.data=cloudPayload();const r=await fetch(FAMILY_SERVER+'/cloud/sync',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)}),d=await r.json();if(d.conflict){cloudConflict={local:cloudPayload(),server:d.server.data,serverRevision:d.server.revision};document.getElementById('modal-sync-conflict').classList.add('on');return;}if(!d.ok)throw new Error(d.err);if(d.data)applyCloudPayload(d.data);localStorage.setItem(CLOUD_REV_KEY,d.revision);localStorage.setItem('lumo_cloud_at_v1',d.updatedAt||Date.now());localStorage.setItem('lumo_cloud_dirty_v1','0');cloudStatusText();if(showToast)toast('Данные синхронизированы');}catch(e){if(showToast)toast(e.message||'Нет связи с сервером');}}
 async function resolveCloudConflict(choice){if(!cloudConflict)return;let data=choice==='server'?cloudConflict.server:choice==='merge'?mergeCloudPayload(cloudConflict.local,cloudConflict.server):cloudConflict.local;if(choice==='server'){applyCloudPayload(data);localStorage.setItem(CLOUD_REV_KEY,cloudConflict.serverRevision);}else{const r=await fetch(FAMILY_SERVER+'/cloud/sync',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({userId:PUSH_USER_ID,baseRevision:cloudConflict.serverRevision,action:'force',data})}),d=await r.json();if(d.ok){applyCloudPayload(data);localStorage.setItem(CLOUD_REV_KEY,d.revision);}}cloudConflict=null;document.getElementById('modal-sync-conflict').classList.remove('on');localStorage.setItem('lumo_cloud_at_v1',Date.now());cloudStatusText();toast('Конфликт решён');}
 
 /* ===== СЕМЬЯ + ПУШИ (сервер) ===== */
 const FAMILY_SERVER='https://pushevgen.duckdns.org'; // без слэша на конце, через https!
-const LUMO_APP_VERSION='v124';
+const LUMO_APP_VERSION='v125';
 const LUMO_DEVICE_ID=(()=>{let id=localStorage.getItem('lumo_device_id_v1');if(!id){id='dev_'+Date.now().toString(36)+'_'+Math.random().toString(36).slice(2,10);localStorage.setItem('lumo_device_id_v1',id)}return id})();
 const LUMO_SUPPORT_CODE=(()=>{let code=localStorage.getItem('lumo_support_code_v1');if(!code){const chars='ABCDEFGHJKLMNPQRSTUVWXYZ23456789';code='';for(let i=0;i<8;i++)code+=chars[Math.floor(Math.random()*chars.length)];localStorage.setItem('lumo_support_code_v1',code)}return code})();
 function diagnosticPlatform(){const ua=navigator.userAgent||'';if(/android/i.test(ua))return'Android';if(/iphone|ipad|ipod/i.test(ua))return'iOS';if(/windows/i.test(ua))return'Windows';if(/macintosh|mac os/i.test(ua))return'macOS';return'Web'}
@@ -2540,7 +2543,7 @@ function pushSharedExpense(exp){
 }
 function notifyTaskDone(t){
   if(!t.fromUserId)return;
-  sendOrQueue('/task-done',{fromUserId:t.fromUserId,byName:getMyName(),title:t.title},'task-done:'+(t.assignId||t.id));
+  sendOrQueue('/task-done',{fromUserId:t.fromUserId,assignId:t.assignId||t.id,title:t.title},'task-done:'+(t.assignId||t.id));
 }
 
 function openFamily(){renderFamily();document.getElementById('modal-family').classList.add('on');}
@@ -2650,7 +2653,7 @@ async function pullAssignedTasks(){
   if(Date.now()-_lastAssignmentPull<3000)return;
   _lastAssignmentPull=Date.now();
   try{const r=await fetch(FAMILY_SERVER+'/inbox',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({userId:PUSH_USER_ID})});const d=await r.json();
-    if(d.ok){const before=JSON.stringify((window.pendingAssignments||[]).map(x=>[x.assignId,x.status])),next=d.tasks||[];window.pendingAssignments=next;updateNotificationBadge();if(before!==JSON.stringify(next.map(x=>[x.assignId,x.status]))&&currentTab==='today')renderToday();}}
+    if(d.ok){const before=JSON.stringify((window.pendingAssignments||[]).map(x=>[x.assignId,x.status])),next=(Array.isArray(d.tasks)?d.tasks:[]).slice(0,200).map(normalizeAssignment).filter(Boolean);window.pendingAssignments=next;updateNotificationBadge();if(before!==JSON.stringify(next.map(x=>[x.assignId,x.status]))&&currentTab==='today')renderToday();}}
   catch(e){}
 }
 
@@ -2662,7 +2665,8 @@ async function openNotificationCenter(){const modal=document.getElementById('mod
 async function persistNotificationRead(ids){const selected=Array.isArray(ids)&&ids.length?ids.map(String):null;window.notificationEvents=(window.notificationEvents||[]).map(event=>!selected||selected.includes(String(event.id))?{...event,read:true}:event);const payload={userId:PUSH_USER_ID,...(selected?{ids:selected}:{})};try{const response=await fetch(FAMILY_SERVER+'/events/read',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)});if(!response.ok)throw new Error('read state unavailable');}catch(_){enqueueChange('/events/read',payload,selected?'events-read:'+selected.join(','):'events-read:all');}}
 async function openNotificationEvent(id,type){await persistNotificationRead([id]);if(type==='assignment'){document.getElementById('modal-notifications').classList.remove('on');openAssignmentsInbox();}else if(type==='family-shopping'){document.getElementById('modal-notifications').classList.remove('on');openShopping();}else{await openNotificationCenter();}await updateNotificationBadge();}
 async function markAllNotificationsRead(){await persistNotificationRead();await openNotificationCenter();await updateNotificationBadge();const unread=(window.notificationEvents||[]).some(event=>!event.read)||(window.pendingAssignments||[]).length>0;if(!unread){const dot=document.getElementById('notify-dot');if(dot){dot.textContent='';dot.style.display='none';}localStorage.setItem('lumo_unread_count_v1','0');updateAppBadge();}}
-async function openAssignmentsInbox(){await pullAssignedTasks();const items=window.pendingAssignments||[],body=document.getElementById('inbox-body');document.getElementById('modal-inbox').classList.add('on');body.innerHTML=items.length?items.map(a=>`<div class="inbox-card"><h4>${esc(a.title)}</h4><p>От ${esc(a.fromName||'участника семьи')} · ${a.date?fmtDate(a.date):'без даты'}${a.time?' · '+esc(a.time):''}</p>${a.desc?`<p>${esc(a.desc)}</p>`:''}<input id="inbox-comment-${esc(a.assignId)}" placeholder="Комментарий отправителю (необязательно)"><div class="inbox-actions"><button class="reject" onclick="respondAssignment(${jsArg(a.assignId)},'rejected')">Отклонить</button><button class="accept" onclick="respondAssignment(${jsArg(a.assignId)},'accepted')">Принять</button></div></div>`).join(''):'<div class="empty"><div>📥</div>Новых поручений нет</div>';}
+function normalizeAssignment(a){if(!a||typeof a!=='object')return null;const date=/^\d{4}-\d{2}-\d{2}$/.test(String(a.date||''))?String(a.date):'',time=/^(?:[01]\d|2[0-3]):[0-5]\d$/.test(String(a.time||''))?String(a.time):'';return{assignId:String(a.assignId||'').slice(0,220),fromUserId:String(a.fromUserId||'').slice(0,160),fromName:String(a.fromName||'').slice(0,120),title:String(a.title||'').slice(0,240),desc:String(a.desc||'').slice(0,1200),date,time,pri:['R','Y','B'].includes(a.pri)?a.pri:'Y',module:/^[A-Za-z0-9_-]{1,60}$/.test(String(a.module||''))?String(a.module):'personal',status:String(a.status||'pending'),comment:String(a.comment||'').slice(0,500),ts:Number(a.ts)||0};}
+async function openAssignmentsInbox(){await pullAssignedTasks();const items=window.pendingAssignments||[],body=document.getElementById('inbox-body');document.getElementById('modal-inbox').classList.add('on');body.innerHTML=items.length?items.map(a=>`<div class="inbox-card"><h4>${esc(a.title)}</h4><p>От ${esc(a.fromName||'участника семьи')} · ${esc(a.date?fmtDate(a.date):'без даты')}${a.time?' · '+esc(a.time):''}</p>${a.desc?`<p>${esc(a.desc)}</p>`:''}<input id="inbox-comment-${esc(a.assignId)}" placeholder="Комментарий отправителю (необязательно)"><div class="inbox-actions"><button class="reject" onclick="respondAssignment(${jsArg(a.assignId)},'rejected')">Отклонить</button><button class="accept" onclick="respondAssignment(${jsArg(a.assignId)},'accepted')">Принять</button></div></div>`).join(''):'<div class="empty"><div>📥</div>Новых поручений нет</div>';}
 async function respondAssignment(assignId,status,source='inbox'){const a=(window.pendingAssignments||[]).find(x=>x.assignId===assignId);if(!a||window.assignmentResponding===assignId)return;window.assignmentResponding=assignId;if(source==='home')renderToday();const comment=document.getElementById('inbox-comment-'+assignId)?.value.trim()||'',payload={userId:PUSH_USER_ID,assignId,status,comment};let d={ok:true},queued=false;try{const r=await fetch(FAMILY_SERVER+'/inbox/respond',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)});d=await r.json();}catch(e){enqueueChange('/inbox/respond',payload,'inbox-response:'+assignId);queued=true;}if(!d.ok){window.assignmentResponding='';if(source==='home')renderToday();toast(d.err||'Не удалось отправить ответ');return;}if(status==='accepted'&&!getTasks().some(x=>x.assignId===assignId)){const tasks=getTasks(),date=a.date&&a.date>=todayKey()?a.date:todayKey();tasks.push({id:Date.now()+Math.floor(Math.random()*10000),assignId,title:a.title,module:a.module||'personal',date,time:a.time||'',desc:a.desc||'',pri:a.pri||'Y',done:false,fromUserId:a.fromUserId,fromName:a.fromName});setTasks(tasks);}window.pendingAssignments=(window.pendingAssignments||[]).filter(x=>x.assignId!==assignId);window.assignmentResponding='';if(source==='inbox')openAssignmentsInbox();else renderToday();updateNotificationBadge();toast(queued?'Ответ сохранён и уйдёт при появлении сети':status==='accepted'?'Поручение принято и добавлено в дела':'Поручение отклонено');}
 
 /* ===== РЕЙТИНГ СЕМЬИ ===== */
@@ -2700,8 +2704,8 @@ function renderShopping(){
   if(!s.length){html='<div class="empty"><div>🛒</div>Список пуст</div>';}
   else{
     html='<div class="shop-list">';
-    active.forEach(i=>{html+=`<div class="shop-item"><div class="sc" onclick="toggleShopItem(${i.id})"></div><span>${esc(i.t)}</span>${i.by?`<small>${esc(i.by)}</small>`:''}<button class="shop-link" onclick="openDataLinks('shopping',${jsArg(i.id)})">${ICONS.link}</button><span class="sd" onclick="delShopItem(${i.id})">×</span></div>`;});
-    if(done.length){html+=`<div class="shop-done-h">✅ Куплено (${done.length}) <button onclick="clearDoneShop()">очистить</button></div>`;done.forEach(i=>{html+=`<div class="shop-item done"><div class="sc on" onclick="toggleShopItem(${i.id})">✓</div><span>${esc(i.t)}</span><span class="sd" onclick="delShopItem(${i.id})">🗑</span></div>`;});}
+    active.forEach(i=>{html+=`<div class="shop-item"><div class="sc" onclick="toggleShopItem(${jsArg(i.id)})"></div><span>${esc(i.t)}</span>${i.by?`<small>${esc(i.by)}</small>`:''}<button class="shop-link" onclick="openDataLinks('shopping',${jsArg(i.id)})">${ICONS.link}</button><span class="sd" onclick="delShopItem(${jsArg(i.id)})">×</span></div>`;});
+    if(done.length){html+=`<div class="shop-done-h">✅ Куплено (${done.length}) <button onclick="clearDoneShop()">очистить</button></div>`;done.forEach(i=>{html+=`<div class="shop-item done"><div class="sc on" onclick="toggleShopItem(${jsArg(i.id)})">✓</div><span>${esc(i.t)}</span><span class="sd" onclick="delShopItem(${jsArg(i.id)})">🗑</span></div>`;});}
     html+='</div>';
   }
   document.getElementById('shopping-body').innerHTML=html;
@@ -4832,23 +4836,39 @@ function initFabLongPress(){
   fab.addEventListener('mousedown',start);fab.addEventListener('mouseup',cancel);fab.addEventListener('mouseleave',cancel);
   fab.addEventListener('click',e=>{if(_fabLongPressed){e.stopImmediatePropagation();e.preventDefault();_fabLongPressed=false}},true);
 }
-function validateImportedData(d){
-  if(!d||typeof d!=='object'||Array.isArray(d))return false;
+function isSafeDataTree(value,depth=0,state={nodes:0,chars:0}){
+  if(depth>12||++state.nodes>25000)return false;
+  if(value==null||typeof value==='boolean'||typeof value==='number')return true;
+  if(typeof value==='string'){state.chars+=value.length;return value.length<=6*1024*1024&&state.chars<=12*1024*1024&&!value.includes('\0');}
+  if(Array.isArray(value))return value.length<=5000&&value.every(item=>isSafeDataTree(item,depth+1,state));
+  if(typeof value!=='object')return false;
+  return Object.keys(value).length<=200&&Object.entries(value).every(([key,item])=>!['__proto__','prototype','constructor'].includes(key)&&isSafeDataTree(item,depth+1,state));
+}
+function safeEntityId(value,fallback){if(typeof value==='number'&&Number.isSafeInteger(value))return value;const id=String(value??'');return /^[A-Za-z0-9_-]{1,100}$/.test(id)?id:fallback;}
+function cleanVisualToken(value,fallback=''){const text=String(value??'').slice(0,24);return /[<>"'&]/.test(text)?fallback:text;}
+function normalizePlannerData(input){
+  if(!input||typeof input!=='object'||Array.isArray(input)||!isSafeDataTree(input))return null;
+  let d;try{d=JSON.parse(JSON.stringify(input));}catch(_){return null;}
   const arrayFields=['tasks','notes','habits','finance','income','goals','shopping','autopays','debts','cats','expcats'];
   for(const key of arrayFields){
-    if(key in d&&!Array.isArray(d[key]))return false;
+    if(key in d&&!Array.isArray(d[key]))return null;
+    if(Array.isArray(d[key])&&d[key].length>5000)return null;
   }
-  if(Array.isArray(d.tasks)&&d.tasks.some(t=>!t||typeof t!=='object'||typeof t.title!=='string'))return false;
-  if(Array.isArray(d.finance)&&d.finance.some(x=>!x||typeof x!=='object'||!Number.isFinite(Number(x.amount))))return false;
-  if(Array.isArray(d.income)&&d.income.some(x=>!x||typeof x!=='object'||!Number.isFinite(Number(x.amount))))return false;
-  return true;
+  if(Array.isArray(d.tasks)){if(d.tasks.some(t=>!t||typeof t!=='object'||typeof t.title!=='string'))return null;d.tasks=d.tasks.map((t,i)=>({...t,id:safeEntityId(t.id,Date.now()+i),title:t.title.slice(0,500),desc:String(t.desc||'').slice(0,5000),date:/^\d{4}-\d{2}-\d{2}$/.test(String(t.date||''))?t.date:'',time:/^(?:[01]\d|2[0-3]):[0-5]\d$/.test(String(t.time||''))?t.time:'',module:/^[A-Za-z0-9_-]{1,60}$/.test(String(t.module||''))?t.module:'personal',pri:['R','Y','B'].includes(t.pri)?t.pri:'Y',photos:Array.isArray(t.photos)?t.photos.filter(isSafeImageDataUrl).slice(0,12):[],subs:Array.isArray(t.subs)?t.subs.slice(0,100).map(s=>({t:String(s?.t||'').slice(0,500),done:!!s?.done})):[]}));}
+  if(Array.isArray(d.shopping))d.shopping=d.shopping.map((item,i)=>({...item,id:safeEntityId(item?.id,`shop_${Date.now()}_${i}`),t:String(item?.t||'').slice(0,300),by:String(item?.by||'').slice(0,120),done:!!item?.done})).filter(item=>item.t);
+  for(const key of ['cats','expcats','expCats'])if(Array.isArray(d[key]))d[key]=d[key].map(item=>({...item,id:safeEntityId(item?.id,`cat_${Math.random().toString(36).slice(2)}`),emoji:cleanVisualToken(item?.emoji,'📁'),i:cleanVisualToken(item?.i,'📁'),icon:cleanVisualToken(item?.icon,'📁')}));
+  if(Array.isArray(d.finance)&&d.finance.some(x=>!x||typeof x!=='object'||!Number.isFinite(Number(x.amount))))return null;
+  if(Array.isArray(d.income)&&d.income.some(x=>!x||typeof x!=='object'||!Number.isFinite(Number(x.amount))))return null;
+  return d;
 }
+function validateImportedData(d){return !!normalizePlannerData(d)}
 function importData(ev){
   const f=ev.target.files[0];if(!f)return;
+  if(f.size>10*1024*1024){ev.target.value='';toast('Резервная копия должна быть меньше 10 МБ');return;}
   const r=new FileReader();
   r.onload=async()=>{try{
-    const d=JSON.parse(r.result);
-    if(!validateImportedData(d)){toast('Файл не похож на резервную копию Lumo');return;}
+    const d=normalizePlannerData(JSON.parse(r.result));
+    if(!d){toast('Файл не похож на безопасную резервную копию Lumo');return;}
     if(!await lumoConfirm('Текущие данные на устройстве будут заменены содержимым резервной копии.','Восстановить данные','Заменить',true))return;
     save(d);toast('📤 Данные загружены');location.reload();
   }catch(e){toast('Ошибка файла');}};

@@ -1,7 +1,10 @@
 import { randomBytes } from 'node:crypto';
 import assert from 'node:assert/strict';
 
-const base = process.env.LUMO_SERVER || 'https://pushevgen.duckdns.org';
+const base = process.env.LUMO_SERVER || 'http://127.0.0.1:3000';
+if (!/^https?:\/\/(?:127\.0\.0\.1|localhost)(?::\d+)?$/i.test(base) && process.env.ALLOW_PRODUCTION_TESTS !== '1') {
+  throw new Error('Remote smoke tests are disabled. Set ALLOW_PRODUCTION_TESTS=1 explicitly.');
+}
 const suffix = Date.now().toString(36);
 const users = [
   { id: `u_smoke_a_${suffix}`, token: randomBytes(32).toString('hex') },
