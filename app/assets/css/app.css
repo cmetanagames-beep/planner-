@@ -1167,3 +1167,47 @@ input,select,textarea,button{font-family:inherit}
 body.dark input[type="date"],body.dark input[type="time"],body.dark select{color-scheme:dark}
 body:not(.dark) input[type="date"],body:not(.dark) input[type="time"],body:not(.dark) select{color-scheme:light}
 @media(max-width:370px){.habit-page{padding-left:13px;padding-right:13px}.habit-summary{padding:16px;gap:12px}.habit-ring{width:70px;height:70px;flex-basis:70px}.habit-ring svg{width:70px;height:70px}.habit-summary-copy b{font-size:1rem}.habit-summary-stats{display:none}.habit-card{padding:12px}.habit-card-top{grid-template-columns:42px minmax(0,1fr) 58px;gap:9px}.habit-emoji{width:42px;height:42px}.habit-today{width:58px;height:53px}.habit-week{gap:3px}.habit-card-foot{align-items:flex-start;gap:7px;flex-direction:column}.settings-sheet{padding-left:13px;padding-right:13px}.settings-overview{gap:6px}.settings-overview>button{padding:10px 7px}}
+
+/* ===== FINAL MOBILE CONSISTENCY — v117 ===== */
+html,body{background:var(--bg)}
+
+/* Один акцентный язык на всех разделах: без старых чёрных фильтров/FAB. */
+.filters button.active{
+  background:linear-gradient(135deg,var(--brand),var(--brand2));
+  color:#fff;border-color:transparent;
+  box-shadow:0 8px 20px color-mix(in srgb,var(--brand) 22%,transparent)
+}
+.filters .bulk-toggle.on{
+  background:linear-gradient(135deg,var(--brand),var(--brand2))!important;
+  color:#fff!important;border-color:transparent!important
+}
+.fab,.empty-state button{
+  background:linear-gradient(135deg,var(--brand),var(--brand2));
+  color:#fff
+}
+.fab{border-radius:999px;box-shadow:0 12px 28px color-mix(in srgb,var(--brand) 30%,transparent)}
+body.dark .fab{box-shadow:0 12px 30px rgba(0,0,0,.42),0 0 22px color-mix(in srgb,var(--brand) 22%,transparent)}
+
+/* Компактная нижняя панель без высокого пустого подвала при первом запуске PWA. */
+body{padding-bottom:calc(68px + var(--lumo-safe-bottom))}
+.nav{
+  height:calc(64px + var(--lumo-safe-bottom));
+  min-height:calc(64px + var(--lumo-safe-bottom));
+  max-height:84px;
+  padding:6px 10px calc(5px + var(--lumo-safe-bottom));
+  bottom:0!important
+}
+.nav button{min-height:50px}
+
+/* Действия привычки не сжимаются и не выпадают за карточку. */
+.habit-card-foot{display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:center;gap:10px}
+.habit-card-actions{display:grid;grid-template-columns:auto auto 34px;align-items:center;gap:6px;min-width:0}
+.habit-card-actions .habit-stats-btn{display:flex;align-items:center;justify-content:center;gap:5px;white-space:nowrap}
+.habit-card-actions .habit-stats-btn svg{width:15px;height:15px;flex:0 0 auto}
+.habit-card-actions .habit-delete{width:34px;height:34px;border-radius:10px;background:var(--card2)}
+@media(max-width:430px){
+  .habit-card-foot{grid-template-columns:1fr;align-items:stretch;gap:8px}
+  .habit-card-actions{grid-template-columns:minmax(0,1fr) minmax(0,1fr) 38px;width:100%;gap:7px}
+  .habit-card-actions .habit-stats-btn{min-width:0;min-height:38px;padding:8px 6px}
+  .habit-card-actions .habit-delete{width:38px;height:38px}
+}

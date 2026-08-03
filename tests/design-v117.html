@@ -1,0 +1,19 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>Lumo v117 mobile design QA</title>
+<style>
+  *{box-sizing:border-box}body{margin:0;padding:12px;background:#181722;color:#fff;font:14px system-ui}
+  main{display:flex;gap:14px;align-items:flex-start;flex-wrap:nowrap}section{display:grid;gap:8px}
+  b{letter-spacing:.04em}iframe{width:390px;height:844px;border:0;border-radius:28px;background:#fff;box-shadow:0 20px 50px #0008}
+</style>
+<main>
+  <section><b>ДЕЛА · 390 × 844</b><iframe data-tab="all" src="../app/?qa=117-all"></iframe></section>
+  <section><b>СЕГОДНЯ · 390 × 844</b><iframe data-tab="today" src="../app/?qa=117-today"></iframe></section>
+  <section><b>ПРИВЫЧКИ · 390 × 844</b><iframe data-tab="habits" src="../app/?qa=117-habits"></iframe></section>
+</main>
+<script>
+  document.querySelectorAll('iframe').forEach(frame=>frame.addEventListener('load',()=>{
+    const open=()=>{try{frame.contentWindow.switchTab(frame.dataset.tab)}catch(e){setTimeout(open,80)}};
+    setTimeout(open,180);
+  }));
+</script>
