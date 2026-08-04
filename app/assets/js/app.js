@@ -36,6 +36,7 @@ const SHEET_MODAL_META={
   'modal-rating':['ach','Активность за последние 7 дней'],'modal-menu-editor':['more','Выбери основные разделы'],
   'modal-help':['help','Живой тур по возможностям'],'modal-notifications':['postpone','События и умные предложения'],
   'modal-inbox':['family','Новые поручения семьи'],'modal-rules':['ai','Локальные правила категорий'],
+  'modal-device-invite':['link','Одноразовый QR для второго устройства'],'modal-device-scanner':['link','Камера работает прямо в Lumo'],
   'modal-sync-conflict':['link','Безопасное объединение данных'],'modal-bulk-edit':['edit','Изменения для нескольких дел'],
   'modal-local-edit':['ai','Проверь результат до сохранения'],'modal-links':['link','Свяжи данные между разделами'],
   'modal-dialog':['help','Решение остаётся за тобой'],
@@ -46,6 +47,7 @@ const SHEET_MODAL_META={
 function stripSheetTitleEmoji(text){return String(text||'').replace(/^[^\p{L}\p{N}]+/u,'').trim();}
 function closeSheetFromHeader(button){
   const modal=button.closest('.modal');if(!modal)return;
+  if(modal.id==='modal-device-scanner'){closeDeviceScanner();return;}
   if(modal.id==='modal-dialog'){finishLumoDialog(false);return;}
   const closeButtons=[...modal.querySelectorAll('button')].filter(x=>x!==button&&/^(?:отмена|закрыть|готово|не сейчас)(?:\s|$)/i.test(x.textContent.trim()));
   if(closeButtons.length){closeButtons[closeButtons.length-1].click();return;}
@@ -2323,6 +2325,12 @@ let deviceInvite=null;
 async function createDeviceInvite(){if(!localStorage.getItem(CLOUD_CODE_KEY))return toast('Сначала создай ключ восстановления');try{const r=await fetch(FAMILY_SERVER+'/cloud/invite/create',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({userId:PUSH_USER_ID})}),d=await r.json();if(!d.ok)throw new Error(d.err);deviceInvite=d;document.getElementById('device-invite-qr').src=d.qr;document.getElementById('device-invite-until').textContent='Действует до '+new Date(d.expiresAt).toLocaleTimeString('ru-RU',{hour:'2-digit',minute:'2-digit'});document.getElementById('modal-device-invite').classList.add('on');}catch(e){toast(e.message||'Не удалось создать приглашение');}}
 function closeDeviceInvite(){document.getElementById('modal-device-invite').classList.remove('on');deviceInvite=null;}
 async function shareDeviceInvite(){if(!deviceInvite)return;const text='Подключи это устройство к моей Lumo. Ссылка одноразовая и действует 15 минут.';try{if(navigator.share)await navigator.share({title:'Подключение Lumo',text,url:deviceInvite.url});else{await navigator.clipboard.writeText(deviceInvite.url);toast('Ссылка скопирована');}}catch(e){if(e?.name!=='AbortError')toast('Не удалось поделиться ссылкой');}}
+let deviceScannerStream=null,deviceScannerFrame=0,deviceQrDetector=null,deviceScannerBusy=false;
+function cloudInviteTokenFromQr(raw){try{const url=new URL(String(raw||''),location.href),token=url.searchParams.get('cloudInvite')||'';return /^[a-f0-9]{20}$/i.test(token)?token:'';}catch(e){return '';}}
+function stopDeviceScanner(){cancelAnimationFrame(deviceScannerFrame);deviceScannerFrame=0;deviceScannerBusy=false;deviceScannerStream?.getTracks().forEach(track=>track.stop());deviceScannerStream=null;const video=document.getElementById('device-scanner-video');if(video){video.pause();video.srcObject=null;}}
+function closeDeviceScanner(){stopDeviceScanner();document.getElementById('modal-device-scanner')?.classList.remove('on');}
+async function scanDeviceQrFrame(){const modal=document.getElementById('modal-device-scanner'),video=document.getElementById('device-scanner-video');if(!modal?.classList.contains('on')||!deviceScannerStream)return stopDeviceScanner();if(!deviceScannerBusy&&video?.readyState>=2){deviceScannerBusy=true;try{const codes=await deviceQrDetector.detect(video),token=cloudInviteTokenFromQr(codes[0]?.rawValue);if(token){stopDeviceScanner();modal.classList.remove('on');await acceptCloudInvite(token);return;}}catch(e){}finally{deviceScannerBusy=false;}}deviceScannerFrame=requestAnimationFrame(scanDeviceQrFrame);}
+async function openDeviceScanner(){const modal=document.getElementById('modal-device-scanner'),status=document.getElementById('device-scanner-status'),video=document.getElementById('device-scanner-video');stopDeviceScanner();modal.classList.add('on');status.textContent='Запускаю камеру…';if(!navigator.mediaDevices?.getUserMedia){status.textContent='Этот браузер не даёт Lumo доступ к камере. Введи ключ восстановления ниже в настройках синхронизации.';return;}if(!('BarcodeDetector' in window)){status.textContent='Этот браузер пока не умеет распознавать QR внутри Lumo. Обнови браузер или введи ключ восстановления в настройках синхронизации.';return;}try{deviceQrDetector=new BarcodeDetector({formats:['qr_code']});deviceScannerStream=await navigator.mediaDevices.getUserMedia({video:{facingMode:{ideal:'environment'}},audio:false});video.srcObject=deviceScannerStream;await video.play();status.textContent='Камера включена · наведи её на QR-код';deviceScannerFrame=requestAnimationFrame(scanDeviceQrFrame);}catch(e){stopDeviceScanner();status.textContent=e?.name==='NotAllowedError'?'Разреши доступ к камере в настройках браузера и попробуй снова.':'Не удалось включить камеру. Проверь, не используется ли она другим приложением.';}}
 async function acceptCloudInvite(token){if(!await lumoConfirm('Это устройство получит общие дела, покупки, финансы, заметки и настройки.','Подключить к Lumo','Подключить'))return;try{const r=await fetch(FAMILY_SERVER+'/cloud/invite/use',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({userId:PUSH_USER_ID,token})}),d=await r.json();if(!d.ok)throw new Error(d.err);localStorage.setItem(CLOUD_CODE_KEY,d.code);localStorage.setItem(CLOUD_REV_KEY,d.revision);localStorage.setItem('lumo_cloud_dirty_v1','0');await cloudSyncNow(true,'pull');cloudStatusText();toast('Второе устройство подключено');}catch(e){toast(e.message||'Приглашение недействительно');}}
 async function disconnectCloudSync(){if(!localStorage.getItem(CLOUD_CODE_KEY))return;await fetch(FAMILY_SERVER+'/cloud/disconnect',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({userId:PUSH_USER_ID})}).catch(()=>{});localStorage.removeItem(CLOUD_CODE_KEY);localStorage.removeItem(CLOUD_REV_KEY);localStorage.removeItem('lumo_cloud_dirty_v1');cloudStatusText();toast('Синхронизация отключена на этом устройстве');}
 function applyCloudPayload(payload){const planner=normalizePlannerData(payload?.planner);if(!planner)throw new Error('Облачная копия повреждена');window.__lumoCloudApplying=true;try{localStorage.setItem(KEY,JSON.stringify(planner));if(payload.assistantMemory&&isSafeDataTree(payload.assistantMemory))localStorage.setItem(LOCAL_MEMORY_KEY,JSON.stringify(payload.assistantMemory));}finally{window.__lumoCloudApplying=false;}localStorage.setItem('lumo_cloud_dirty_v1','0');applyTheme();applyAccent();refreshCurrentTab();return true;}
@@ -2332,7 +2340,7 @@ async function resolveCloudConflict(choice){if(!cloudConflict)return;let data=ch
 
 /* ===== СЕМЬЯ + ПУШИ (сервер) ===== */
 const FAMILY_SERVER='https://pushevgen.duckdns.org'; // без слэша на конце, через https!
-const LUMO_APP_VERSION='v125';
+const LUMO_APP_VERSION='v126';
 const LUMO_DEVICE_ID=(()=>{let id=localStorage.getItem('lumo_device_id_v1');if(!id){id='dev_'+Date.now().toString(36)+'_'+Math.random().toString(36).slice(2,10);localStorage.setItem('lumo_device_id_v1',id)}return id})();
 const LUMO_SUPPORT_CODE=(()=>{let code=localStorage.getItem('lumo_support_code_v1');if(!code){const chars='ABCDEFGHJKLMNPQRSTUVWXYZ23456789';code='';for(let i=0;i<8;i++)code+=chars[Math.floor(Math.random()*chars.length)];localStorage.setItem('lumo_support_code_v1',code)}return code})();
 function diagnosticPlatform(){const ua=navigator.userAgent||'';if(/android/i.test(ua))return'Android';if(/iphone|ipad|ipod/i.test(ua))return'iOS';if(/windows/i.test(ua))return'Windows';if(/macintosh|mac os/i.test(ua))return'macOS';return'Web'}
@@ -5004,6 +5012,7 @@ if('serviceWorker' in navigator){
   document.querySelectorAll('.modal').forEach(modal=>{
     modal.addEventListener('click', e=>{
       if(e.target === modal){
+        if(modal.id==='modal-device-scanner')stopDeviceScanner();
         modal.classList.remove('on');
       }
     });

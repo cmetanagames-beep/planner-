@@ -15,7 +15,7 @@
 <link rel="manifest" href="manifest.json">
 <link rel="apple-touch-icon" sizes="512x512" href="assets/icons/icon.png">
 <link rel="icon" type="image/svg+xml" href="assets/icons/icon.svg">
-<link rel="stylesheet" href="assets/css/app.css?v=125">
+<link rel="stylesheet" href="assets/css/app.css?v=126">
 </head>
 <body>
   <svg width="0" height="0" style="position:absolute"><defs>
@@ -333,7 +333,7 @@
       <button class="btn cloud-primary-action" id="cloud-create-btn" onclick="createCloudSync()">Загрузить данные в облако</button>
       <div class="ai-hint cloud-upload-hint">Lumo создаст защищённую серверную копию и покажет ключ восстановления. Новые изменения будут синхронизироваться автоматически.</div>
       <div class="field"><label>Код с другого устройства</label><input id="cloud-code-input" maxlength="14" placeholder="Например: AB12CD34EF56" autocapitalize="characters"></div>
-      <button class="btn ghost" onclick="connectCloudSync()">Восстановить по ключу</button><button class="btn ghost" onclick="shareRecoveryKey()">Поделиться ключом</button><button class="btn ghost" onclick="createDeviceInvite()">Добавить второе устройство</button><button class="btn ghost" onclick="cloudSyncNow(true)">Синхронизировать сейчас</button><button class="btn danger-soft" onclick="disconnectCloudSync()">Отключить это устройство</button>
+      <button class="btn" onclick="openDeviceScanner()">Сканировать QR камерой</button><button class="btn ghost" onclick="connectCloudSync()">Восстановить по ключу</button><button class="btn ghost" onclick="shareRecoveryKey()">Поделиться ключом</button><button class="btn ghost" onclick="createDeviceInvite()">Показать QR для второго устройства</button><button class="btn ghost" onclick="cloudSyncNow(true)">Синхронизировать сейчас</button><button class="btn danger-soft" onclick="disconnectCloudSync()">Отключить это устройство</button>
       <div class="ai-hint">Ключ восстанавливает данные после удаления Lumo. Для второго телефона создай одноразовый QR: он действует 15 минут и срабатывает один раз.</div>
     </div></details>
     <details class="settings-group" id="settings-push"><summary><span class="settings-icon"><svg viewBox="0 0 24 24"><path d="M14 5h5v5M19 5l-8 8"/><path d="M19 13v6H5V5h6"/></svg></span><span><b>Уведомления PWA</b><small>Разрешения и диагностика</small></span></summary><div class="settings-content">
@@ -413,7 +413,8 @@
 <div class="modal" id="modal-inbox"><div class="sheet"><h3>Входящие поручения</h3><div id="inbox-body"></div></div></div>
 <div class="modal" id="modal-rules"><div class="sheet"><h3>Правила помощника</h3><p class="ai-hint">Здесь хранятся категории и объяснённые фразы. Например, «аптека» → «Здоровье», а непонятную команду можно один раз объяснить другими словами.</p><div id="rules-body"></div><button class="btn ghost" onclick="addAssistantRule()">Добавить правило</button><button class="btn" onclick="saveAssistantRules()">Сохранить правила</button><button class="btn ghost" onclick="document.getElementById('modal-rules').classList.remove('on')">Отмена</button></div></div>
 <div class="modal" id="modal-sync-conflict"><div class="sheet"><h3>Данные изменены на двух устройствах</h3><p class="ai-hint" id="sync-conflict-info">Выбери, какую версию оставить. Ничего не будет удалено без твоего решения.</p><button class="btn" onclick="resolveCloudConflict('merge')">Объединить версии</button><button class="btn ghost" onclick="resolveCloudConflict('local')">Оставить это устройство</button><button class="btn ghost" onclick="resolveCloudConflict('server')">Загрузить версию с сервера</button></div></div>
-<div class="modal" id="modal-device-invite"><div class="sheet"><h3>Подключение второго устройства</h3><p class="ai-hint">Открой камеру на новом телефоне и отсканируй QR. Приглашение действует 15 минут и только один раз.</p><img id="device-invite-qr" class="device-invite-qr" alt="QR-код подключения"><div class="sync-status" id="device-invite-until"></div><button class="btn" onclick="shareDeviceInvite()">Поделиться ссылкой</button></div></div>
+<div class="modal" id="modal-device-invite"><div class="sheet"><h3>Подключение второго устройства</h3><p class="ai-hint">На новом телефоне открой Lumo → Настройки → Синхронизация и нажми «Сканировать QR камерой». Приглашение действует 15 минут и только один раз.</p><img id="device-invite-qr" class="device-invite-qr" alt="QR-код подключения"><div class="sync-status" id="device-invite-until"></div><button class="btn" onclick="shareDeviceInvite()">Поделиться ссылкой</button></div></div>
+<div class="modal" id="modal-device-scanner"><div class="sheet"><h3>Сканирование QR</h3><p class="ai-hint">Наведи камеру на QR-код, показанный на первом устройстве. Lumo подключится автоматически.</p><div class="device-scanner-view"><video id="device-scanner-video" playsinline muted aria-label="Камера для сканирования QR-кода"></video><div class="device-scanner-frame" aria-hidden="true"></div></div><div class="sync-status" id="device-scanner-status" role="status">Запускаю камеру…</div><button class="btn ghost" onclick="closeDeviceScanner()">Отмена</button></div></div>
 <div class="modal" id="modal-bulk-edit"><div class="sheet"><h3>Изменить выбранные дела</h3><div class="field"><label>Дата</label><input id="bulk-date" type="date"></div><div class="field"><label>Категория</label><select id="bulk-category"></select></div><div class="field"><label>Приоритет</label><select id="bulk-priority"><option value="">Не менять</option><option value="R">Важно</option><option value="Y">Средне</option><option value="B">Потом</option></select></div><button class="btn" onclick="applyBulkEdit()">Применить</button><button class="btn ghost" onclick="document.getElementById('modal-bulk-edit').classList.remove('on')">Отмена</button></div></div>
 <div class="modal" id="modal-local-edit">
   <div class="sheet">
@@ -466,7 +467,7 @@
 <div id="tour-layer" style="display:none"></div>
 
 <div class="toast" id="toast" role="status" aria-live="polite" aria-atomic="true"></div>
-<script src="assets/js/app.js?v=125"></script>
+<script src="assets/js/app.js?v=126"></script>
 
   <!-- МОДАЛКА АВТО-ПЛАТЕЖЕЙ -->
 <div class="modal" id="modal-autopay">
