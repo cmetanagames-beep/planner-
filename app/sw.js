@@ -1,4 +1,4 @@
-const CACHE = 'planner-v126';
+const CACHE = 'planner-v127';
 const PUSH_STATE_CACHE = 'lumo-push-state-v1';
 const PUSH_TRACE_API='https://pushevgen.duckdns.org/telemetry/push-state';
 function tracePush(d,stage,detail=''){if(!d?.traceKey)return Promise.resolve();return fetch(PUSH_TRACE_API,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({traceKey:d.traceKey,type:d.type||'',stage,detail}),keepalive:true}).catch(()=>{});}
@@ -10,8 +10,9 @@ const ASSETS = [
   './',
   './index.html',
   './manifest.json',
-  './assets/css/app.css?v=126',
-  './assets/js/app.js?v=126',
+  './assets/css/app.css?v=127',
+  './assets/vendor/jsQR-1.4.0.js?v=127',
+  './assets/js/app.js?v=127',
   './assets/vendor/tesseract-5.1.1.min.js',
   './assets/icons/icon.svg',
   './assets/icons/icon.png'
